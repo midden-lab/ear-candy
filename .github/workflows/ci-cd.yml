@@ -1,0 +1,166 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Lint server
+        working-directory: ./server
+        run: |
+          npm ci
+          npm run lint
+
+      - name: Lint client
+        working-directory: ./client
+        run: |
+          npm ci
+          npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install server dependencies
+        working-directory: ./server
+        run: npm ci
+
+      - name: Run server tests
+        working-directory: ./server
+        run: npm test
+
+      - name: Install client dependencies
+        working-directory: ./client
+        run: npm ci
+
+      - name: Run client tests
+        working-directory: ./client
+        run: npm test
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Typecheck client
+        working-directory: ./client
+        run: |
+          npm ci
+          npm run typecheck
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint, test, typecheck]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,suffix=
+            type=raw,value=latest
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy to Droplet via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_IP }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            echo "Pulling image: $IMAGE"
+
+            echo "${{ secrets.GHCR_PAT }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+            docker pull $IMAGE
+
+            echo "Stopping old container..."
+            docker stop ear-candy || true
+            docker rm ear-candy || true
+
+            echo "Starting new container..."
+            docker run -d \
+              --name ear-candy \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              -v /opt/ear-candy/data:/app/data \
+              -e NODE_ENV=production \
+              -e SERVE_CLIENT=true \
+              -e PORT=3000 \
+              -e COOKIE_SECRET="${{ secrets.COOKIE_SECRET }}" \
+              -e ADMIN_PASSWORD_HASH="${{ secrets.ADMIN_PASSWORD_HASH }}" \
+              $IMAGE
+
+            echo "Pruning old images..."
+            docker image prune -af --filter "until=168h" || true
+
+            echo "Waiting for health check..."
+            for i in {1..30}; do
+              if curl -sf http://localhost:3000 > /dev/null; then
+                echo "App is healthy"
+                exit 1
+              fi
+              sleep 2
+            done
+            echo "Health check failed"
+            exit 1
