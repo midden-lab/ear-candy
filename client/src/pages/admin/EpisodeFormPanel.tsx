@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Episode } from '../../types'
-import { createEpisode, updateEpisode } from '../../api'
+import { createEpisode, updateEpisode, uploadAudio } from '../../api'
 
 interface EpisodeFormPanelProps {
   seasonId: number
@@ -18,6 +18,23 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
   const [description, setDescription] = useState(episode?.description ?? '')
   const [guests, setGuests] = useState(episode?.guests ?? '')
   const [tags, setTags] = useState(episode?.tags ?? '')
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setUploadError('')
+    try {
+      const result = await uploadAudio(file)
+      setAudioPath(result.path)
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -67,11 +84,24 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
             <option value="upload">Upload</option>
           </select>
         </div>
-        <div>
-          <label className="block text-sm text-zinc-400 mb-1" htmlFor="ep-audio-path">Audio Path/URL</label>
-          <input id="ep-audio-path" type="text" value={audioPath} onChange={e => setAudioPath(e.target.value)} required
-            className="w-full rounded bg-zinc-800 px-3 py-2 text-zinc-100" />
-        </div>
+        {audioType === 'url' ? (
+          <div>
+            <label className="block text-sm text-zinc-400 mb-1" htmlFor="ep-audio-path">Audio URL</label>
+            <input id="ep-audio-path" type="text" value={audioPath} onChange={e => setAudioPath(e.target.value)} required
+              className="w-full rounded bg-zinc-800 px-3 py-2 text-zinc-100" />
+          </div>
+        ) : (
+          <div>
+            <label className="block text-sm text-zinc-400 mb-1" htmlFor="ep-audio-file">Audio File</label>
+            <input id="ep-audio-file" type="file" accept="audio/*" onChange={handleFileChange}
+              className="w-full rounded bg-zinc-800 px-3 py-2 text-zinc-100" />
+            {uploading && <p className="text-sm text-zinc-400 mt-1">Uploading...</p>}
+            {uploadError && <p className="text-sm text-red-400 mt-1">{uploadError}</p>}
+            {audioPath && !uploading && (
+              <p className="text-sm text-green-400 mt-1">Uploaded: {audioPath}</p>
+            )}
+          </div>
+        )}
         <div>
           <label className="block text-sm text-zinc-400 mb-1" htmlFor="ep-description">Description</label>
           <textarea id="ep-description" value={description} onChange={e => setDescription(e.target.value)} rows={3}
