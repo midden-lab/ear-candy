@@ -55,9 +55,13 @@ export function buildApp(opts: AppOptions = {}) {
       decorateReply: false,
       wildcard: false,
     })
-    const indexHtml = fs.readFileSync(path.join(clientDist, 'index.html'), 'utf-8')
     app.setNotFoundHandler((_req, reply) => {
-      void reply.type('text/html').send(indexHtml)
+      const indexPath = path.join(clientDist, 'index.html')
+      const indexHtml = fs.readFileSync(indexPath, 'utf-8')
+      void reply.code(200)
+        .header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        .type('text/html')
+        .send(indexHtml)
     })
   }
 
