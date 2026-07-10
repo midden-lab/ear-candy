@@ -90,7 +90,7 @@ test.describe('Admin panel — episode management', () => {
     await page.getByLabel('Episode #').fill('2')
     await page.getByLabel('Publish Date').fill('2024-06-02')
     await page.getByLabel('Audio Type').selectOption('upload')
-    await page.getByLabel('Audio File').setInputFiles('e2e/fixtures/test-audio.mp3')
+    await page.getByLabel('Audio File').setInputFiles('/Users/m8ttyb/workspace/midden-lab/ear_candy/e2e/fixtures/test-audio.mp3')
     await expect(page.getByText(/uploaded:/i)).toBeVisible()
     await page.getByRole('button', { name: 'Save' }).click()
     // Episode appears in season block
