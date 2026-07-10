@@ -203,6 +203,7 @@ jobs:
         run: npm test
         env:
           TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'changeme' }}
+          BASE_URL: https://earcandy.example.com
 
       - name: Upload Playwright report
         if: failure()
