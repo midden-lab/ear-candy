@@ -8,12 +8,11 @@ services:
     volumes:
       - ./server/src:/app/src
       - ./server/data:/app/data
+    env_file:
+      - .env
     environment:
       - NODE_ENV=development
       - PORT=3001
-      - COOKIE_SECRET=${COOKIE_SECRET:-dev-secret}
-      # Generate with: ./scripts/hash-password.sh <password>
-      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:?ADMIN_PASSWORD_HASH must be set}
     command: npm run dev
 
   client:
