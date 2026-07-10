@@ -44,6 +44,28 @@ Server or client could read audio file metadata to auto-fill `duration_seconds`.
 | `client/src/pages/admin/EpisodeManager.tsx` | No changes expected (uses EpisodeFormPanel) |
 | `server/src/routes/admin/upload.ts` | No changes (already works) |
 | `server/src/routes/admin/episodes.ts` | No changes (already accepts audio_type/path) |
+| `.github/workflows/ci-cd.yml` | Add `e2e` and `e2e-ui` jobs |
+
+## CI/CD Changes
+
+### New Jobs in `.github/workflows/ci-cd.yml`
+
+| Job | Purpose | Trigger |
+|-----|---------|---------|
+| `e2e` | Run Playwright E2E tests in headless mode (`npm test`) | `push` to `main`, `pull_request` to `main` |
+| `e2e-ui` | Run Playwright E2E tests in UI mode (`npm run test:ui`) | `workflow_dispatch` only (manual trigger) |
+
+### `e2e` Job Requirements
+- Runs after `build` job completes (needs deployed app or Docker stack)
+- Starts the full app stack (`make up` or `docker compose up`) before tests
+- Uses `actions/cache` for Playwright browser binaries
+- Uploads Playwright report (`playwright-report/`) and trace files on failure
+- Runs `playwright test` (headless)
+
+### `e2e-ui` Job Requirements
+- Manual trigger only (`workflow_dispatch`) — UI mode is interactive and not suitable for CI
+- Same setup as `e2e` but runs `playwright test --ui`
+- Primarily for local debugging via GitHub Actions (optional)
 
 ## Automated Tests
 
@@ -94,6 +116,8 @@ Server or client could read audio file metadata to auto-fill `duration_seconds`.
 - [ ] All server tests pass (`cd server && npm test`)
 - [ ] All client tests pass (`cd client && npm test`)
 - [ ] All E2E tests pass (`cd e2e && npm test`)
+- [ ] CI runs E2E tests on every PR and push to main
+- [ ] CI runs E2E UI mode on manual trigger (`workflow_dispatch`)
 
 ## Out of Scope (Future)
 - Drag-and-drop upload
