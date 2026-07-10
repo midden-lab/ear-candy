@@ -1,4 +1,12 @@
 import { test } from '@playwright/test'
+import fs from 'node:fs'
+import path from 'node:path'
+
+const screenshotsDir = path.join(process.cwd(), 'screenshots')
+
+if (!fs.existsSync(screenshotsDir)) {
+  fs.mkdirSync(screenshotsDir, { recursive: true })
+}
 
 test('before - player with episode selected', async ({ page }) => {
   await page.goto('/')
@@ -8,7 +16,7 @@ test('before - player with episode selected', async ({ page }) => {
     await episodeBtn.click()
     await page.waitForTimeout(500)
   }
-  await page.screenshot({ path: '/tmp/before-player.png' })
+  await page.screenshot({ path: path.join(screenshotsDir, 'before-player.png') })
 })
 
 test('before - admin login overlap', async ({ page }) => {
@@ -21,5 +29,5 @@ test('before - admin login overlap', async ({ page }) => {
   }
   await page.getByRole('button', { name: 'Admin settings' }).click()
   await page.waitForTimeout(500)
-  await page.screenshot({ path: '/tmp/before-admin-overlap.png' })
+  await page.screenshot({ path: path.join(screenshotsDir, 'before-admin-overlap.png') })
 })
