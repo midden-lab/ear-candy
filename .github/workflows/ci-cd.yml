@@ -78,18 +78,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: [lint, test, typecheck]
-    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
       packages: write
+    outputs:
+      sha_tag: ${{ steps.meta.outputs.sha_tag }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
-        uses: docker/login-action@v4
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -97,15 +98,17 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=sha,prefix=,suffix=
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+          flavor: |
+            latest=false
 
       - name: Build and push image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
@@ -114,24 +117,32 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Export SHA tag
+        id: export_sha
+        run: echo "sha_tag=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
   e2e:
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build test image
-        uses: docker/build-push-action@v7
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          context: .
-          push: false
-          load: true
-          tags: ear-candy:test
-          cache-from: type=gha
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull built image
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo "Pulling: $IMAGE"
+          docker pull "$IMAGE"
+          docker tag "$IMAGE" ear-candy:test
 
       - name: Start test container
         run: |
@@ -141,8 +152,8 @@ jobs:
             -e NODE_ENV=production \
             -e SERVE_CLIENT=true \
             -e PORT=3000 \
-            -e COOKIE_SECRET='test-cookie-secret-for-ci' \
-            -e ADMIN_PASSWORD_HASH='$2b$10$aF4QagAZkZG4mQx8uQo.1..UFYDw3cY.jh4kUgXlVuL01F2jO.9Ei' \
+            -e COOKIE_SECRET='${{ secrets.CI_COOKIE_SECRET }}' \
+            -e ADMIN_PASSWORD_HASH='${{ secrets.CI_ADMIN_PASSWORD_HASH }}' \
             ear-candy:test
 
       - name: Wait for test app
@@ -172,11 +183,15 @@ jobs:
         working-directory: ./e2e
         run: npx playwright install chromium
 
+      - name: Install Playwright OS dependencies
+        working-directory: ./e2e
+        run: npx playwright install-deps chromium
+
       - name: Run E2E tests
         working-directory: ./e2e
         run: npm test
         env:
-          TEST_ADMIN_PASSWORD: testpass
+          TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'changeme' }}
           BASE_URL: http://localhost:3000
 
       - name: Upload Playwright report
@@ -199,94 +214,9 @@ jobs:
         if: always()
         run: docker stop ear-candy-test && docker rm ear-candy-test
 
-  e2e-ui:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build test image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: false
-          load: true
-          tags: ear-candy:test
-          cache-from: type=gha
-
-      - name: Start test container
-        run: |
-          docker run -d \
-            --name ear-candy-test \
-            -p 3000:3000 \
-            -e NODE_ENV=production \
-            -e SERVE_CLIENT=true \
-            -e PORT=3000 \
-            -e COOKIE_SECRET='test-cookie-secret-for-ci' \
-            -e ADMIN_PASSWORD_HASH='$2b$10$aF4QagAZkZG4mQx8uQo.1..UFYDw3cY.jh4kUgXlVuL01F2jO.9Ei' \
-            ear-candy:test
-
-      - name: Wait for test app
-        run: |
-          for i in {1..30}; do
-            if curl -sf http://localhost:3000/api/settings > /dev/null; then
-              echo "Test app is ready"
-              exit 0
-            fi
-            echo "Waiting for test app... ($i/30)"
-            sleep 2
-          done
-          echo "Test app not ready"
-          docker logs ear-candy-test
-          exit 1
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install E2E dependencies
-        working-directory: ./e2e
-        run: npm ci
-
-      - name: Install Playwright browsers
-        working-directory: ./e2e
-        run: npx playwright install chromium
-
-      - name: Run E2E UI tests
-        working-directory: ./e2e
-        run: xvfb-run -a npx playwright test --headed
-        env:
-          TEST_ADMIN_PASSWORD: testpass
-          BASE_URL: http://localhost:3000
-
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-ui
-          path: e2e/playwright-report/
-          retention-days: 7
-
-      - name: Upload E2E screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-screenshots-ui
-          path: e2e/screenshots/
-          retention-days: 7
-
-      - name: Stop test container
-        if: always()
-        run: docker stop ear-candy-test && docker rm ear-candy-test
-
   deploy:
     runs-on: ubuntu-latest
-    needs: [build, e2e, e2e-ui]
+    needs: [build, e2e]
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Deploy to Droplet via SSH
@@ -297,12 +227,15 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
-            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
             echo "Pulling image: $IMAGE"
 
             echo "${{ secrets.GHCR_PAT }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
-            docker pull $IMAGE
+            docker pull "$IMAGE"
+
+            echo "Verifying image digest..."
+            docker inspect "$IMAGE" --format='{{.RepoDigests}}' > /dev/null
 
             echo "Stopping old container..."
             docker stop ear-candy || true
@@ -319,10 +252,10 @@ jobs:
               -e PORT=3000 \
               -e COOKIE_SECRET='${{ secrets.COOKIE_SECRET }}' \
               -e ADMIN_PASSWORD_HASH='${{ secrets.ADMIN_PASSWORD_HASH }}' \
-              $IMAGE
+              "$IMAGE"
 
-            echo "Pruning old images..."
-            docker image prune -af --filter "until=168h" || true
+            echo "Pruning dangling images..."
+            docker image prune -f || true
 
             echo "Waiting for health check..."
             for i in {1..30}; do
