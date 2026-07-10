@@ -259,7 +259,7 @@ jobs:
 
       - name: Run E2E UI tests
         working-directory: ./e2e
-        run: xvfb-run -a npm run test:ui
+        run: xvfb-run -a npx playwright test --headed
         env:
           TEST_ADMIN_PASSWORD: testpass
           BASE_URL: http://localhost:3000
