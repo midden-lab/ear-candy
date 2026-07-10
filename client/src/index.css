@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --accent: #5a3ef5;
+}
+
+/* Dark mode background/text defaults */
+body {
+  @apply bg-zinc-950 text-zinc-100;
+}
+
+@keyframes eq-bar {
+  0%, 100% { transform: scaleY(0.4); }
+  50%       { transform: scaleY(1); }
+}
+.eq-bar { animation: eq-bar 0.8s ease-in-out infinite; transform-origin: bottom; }
+.eq-bar:nth-child(2) { animation-delay: 0.2s; }
+.eq-bar:nth-child(3) { animation-delay: 0.4s; }

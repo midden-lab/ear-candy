@@ -1,0 +1,91 @@
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { vi, beforeEach } from 'vitest'
+import App from '../App'
+import { usePlayerStore } from '../store/playerStore'
+import { getSettings } from '../api'
+
+vi.mock('../api', () => ({
+  getSettings: vi.fn().mockResolvedValue({
+    podcast_name: 'Test Pod',
+    tagline: '',
+    description: '',
+    cover_art_path: null,
+    accent_color: '#ff0000',
+  }),
+  getSeasons: vi.fn().mockResolvedValue([]),
+  getEpisodes: vi.fn().mockResolvedValue([]),
+  getEpisode: vi.fn(),
+  login: vi.fn(),
+  createSeason: vi.fn(),
+  updateSeason: vi.fn(),
+  deleteSeason: vi.fn(),
+  createEpisode: vi.fn(),
+  updateEpisode: vi.fn(),
+  deleteEpisode: vi.fn(),
+  updateSettings: vi.fn(),
+}))
+
+beforeEach(() => {
+  HTMLMediaElement.prototype.load = vi.fn()
+  HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+  HTMLMediaElement.prototype.pause = vi.fn()
+  usePlayerStore.setState({ episode: null, playing: false, currentTime: 0, duration: 0 })
+  vi.clearAllMocks()
+  // Re-apply HTMLMediaElement mocks after clearAllMocks
+  HTMLMediaElement.prototype.load = vi.fn()
+  HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+  HTMLMediaElement.prototype.pause = vi.fn()
+})
+
+it('shows loading initially when settings are pending', () => {
+  vi.mocked(getSettings).mockReturnValue(new Promise(() => {}))
+  render(<App />)
+  expect(screen.getByText('Loading…')).toBeInTheDocument()
+})
+
+it('renders player view after settings load', async () => {
+  vi.mocked(getSettings).mockResolvedValue({
+    podcast_name: 'Test Pod',
+    tagline: '',
+    description: '',
+    cover_art_path: null,
+    accent_color: '#ff0000',
+  })
+  render(<App />)
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
+  )
+})
+
+it('navigates to admin login when admin button is clicked', async () => {
+  const user = userEvent.setup()
+  vi.mocked(getSettings).mockResolvedValue({
+    podcast_name: 'Test Pod',
+    tagline: '',
+    description: '',
+    cover_art_path: null,
+    accent_color: '#ff0000',
+  })
+  render(<App />)
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
+  )
+  await user.click(screen.getByRole('button', { name: 'Admin settings' }))
+  expect(screen.getByRole('heading', { name: 'Admin Login' })).toBeInTheDocument()
+})
+
+it('applies accent color from settings to CSS variable', async () => {
+  vi.mocked(getSettings).mockResolvedValue({
+    podcast_name: 'Test Pod',
+    tagline: '',
+    description: '',
+    cover_art_path: null,
+    accent_color: '#ff0000',
+  })
+  render(<App />)
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
+  )
+  expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#ff0000')
+})

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+server/data/*.sqlite
+server/data/uploads/*
+!server/data/uploads/.gitkeep
+.env
+.env.*
+!.env.example
+.superpowers/
+*.sqlite

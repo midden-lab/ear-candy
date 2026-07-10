@@ -1,0 +1,184 @@
+import { describe, it, expect, afterEach } from 'vitest'
+import bcrypt from 'bcrypt'
+import { buildTestApp } from './helpers.js'
+
+async function makeApp() {
+  process.env.ADMIN_PASSWORD_HASH = await bcrypt.hash('password', 10)
+  return buildTestApp()
+}
+
+async function getAuthCookie(app: Awaited<ReturnType<typeof buildTestApp>>) {
+  const loginRes = await app.inject({
+    method: 'POST',
+    url: '/api/admin/login',
+    payload: { password: 'password' }
+  })
+  const setCookie = loginRes.headers['set-cookie'] as string | string[]
+  const cookieStr = Array.isArray(setCookie) ? setCookie[0] : setCookie
+  return cookieStr.split(';')[0]
+}
+
+describe('Admin Settings routes', () => {
+  afterEach(() => {
+    delete process.env.ADMIN_PASSWORD_HASH
+  })
+
+  describe('PUT /api/admin/settings', () => {
+    it('returns 401 without auth cookie', async () => {
+      const app = await makeApp()
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        payload: {
+          podcast_name: 'Test',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          accent_color: '#ffffff'
+        }
+      })
+      expect(res.statusCode).toBe(401)
+    })
+
+    it('updates all fields and returns full settings object', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const payload = {
+        podcast_name: 'My Awesome Podcast',
+        tagline: 'The best podcast ever',
+        description: 'We talk about stuff',
+        cover_art_path: '/audio/cover.jpg',
+        accent_color: '#ff0000'
+      }
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.podcast_name).toBe('My Awesome Podcast')
+      expect(body.tagline).toBe('The best podcast ever')
+      expect(body.description).toBe('We talk about stuff')
+      expect(body.cover_art_path).toBe('/audio/cover.jpg')
+      expect(body.accent_color).toBe('#ff0000')
+    })
+
+    it('sets cover_art_path to null when not provided', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'Nulled Art',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          accent_color: '#123456'
+        }
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.cover_art_path).toBeNull()
+    })
+  })
+
+  describe('PATCH /api/admin/settings', () => {
+    it('returns 401 without auth cookie', async () => {
+      const app = await makeApp()
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        payload: { podcast_name: 'New Name' }
+      })
+      expect(res.statusCode).toBe(401)
+    })
+
+    it('returns 400 when no fields are provided', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {}
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.json()).toEqual({ error: 'No fields to update' })
+    })
+
+    it('updates only provided fields and returns full settings object', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      // First set some values via PUT
+      await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'Initial Name',
+          tagline: 'Initial Tagline',
+          description: 'Initial Desc',
+          cover_art_path: null,
+          accent_color: '#aabbcc'
+        }
+      })
+
+      // Now patch only podcast_name
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: { podcast_name: 'Patched Name' }
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.podcast_name).toBe('Patched Name')
+      // Other fields unchanged
+      expect(body.tagline).toBe('Initial Tagline')
+      expect(body.description).toBe('Initial Desc')
+      expect(body.accent_color).toBe('#aabbcc')
+    })
+
+    it('can patch cover_art_path to null', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      // Set cover_art_path first
+      await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'Test',
+          tagline: '',
+          description: '',
+          cover_art_path: '/audio/art.jpg',
+          accent_color: '#000000'
+        }
+      })
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: { cover_art_path: null }
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json().cover_art_path).toBeNull()
+    })
+  })
+})

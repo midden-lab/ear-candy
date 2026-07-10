@@ -1,0 +1,31 @@
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./server/src:/app/src
+      - ./server/data:/app/data
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - COOKIE_SECRET=${COOKIE_SECRET:-dev-secret}
+      # Generate with: ./scripts/hash-password.sh <password>
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:?ADMIN_PASSWORD_HASH must be set}
+    command: npm run dev
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client/src:/app/src
+    environment:
+      - VITE_API_URL=http://server:3001
+    depends_on:
+      - server
+    command: npm run dev -- --host

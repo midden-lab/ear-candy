@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - SERVE_CLIENT=true
+      - PORT=3000
+      - COOKIE_SECRET=${COOKIE_SECRET:?COOKIE_SECRET must be set}
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:?ADMIN_PASSWORD_HASH must be set}
