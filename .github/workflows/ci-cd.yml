@@ -179,13 +179,6 @@ jobs:
           TEST_ADMIN_PASSWORD: testpass
           BASE_URL: http://localhost:3000
 
-      - name: Run E2E UI tests
-        working-directory: ./e2e
-        run: npm run test:ui
-        env:
-          TEST_ADMIN_PASSWORD: testpass
-          BASE_URL: http://localhost:3000
-
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
@@ -206,9 +199,94 @@ jobs:
         if: always()
         run: docker stop ear-candy-test && docker rm ear-candy-test
 
+  e2e-ui:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build test image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ear-candy:test
+          cache-from: type=gha
+
+      - name: Start test container
+        run: |
+          docker run -d \
+            --name ear-candy-test \
+            -p 3000:3000 \
+            -e NODE_ENV=production \
+            -e SERVE_CLIENT=true \
+            -e PORT=3000 \
+            -e COOKIE_SECRET='test-cookie-secret-for-ci' \
+            -e ADMIN_PASSWORD_HASH='$2b$10$aF4QagAZkZG4mQx8uQo.1..UFYDw3cY.jh4kUgXlVuL01F2jO.9Ei' \
+            ear-candy:test
+
+      - name: Wait for test app
+        run: |
+          for i in {1..30}; do
+            if curl -sf http://localhost:3000/api/settings > /dev/null; then
+              echo "Test app is ready"
+              exit 0
+            fi
+            echo "Waiting for test app... ($i/30)"
+            sleep 2
+          done
+          echo "Test app not ready"
+          docker logs ear-candy-test
+          exit 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install E2E dependencies
+        working-directory: ./e2e
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: ./e2e
+        run: npx playwright install chromium
+
+      - name: Run E2E UI tests
+        working-directory: ./e2e
+        run: xvfb-run -a npm run test:ui
+        env:
+          TEST_ADMIN_PASSWORD: testpass
+          BASE_URL: http://localhost:3000
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-ui
+          path: e2e/playwright-report/
+          retention-days: 7
+
+      - name: Upload E2E screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots-ui
+          path: e2e/screenshots/
+          retention-days: 7
+
+      - name: Stop test container
+        if: always()
+        run: docker stop ear-candy-test && docker rm ear-candy-test
+
   deploy:
     runs-on: ubuntu-latest
-    needs: [build, e2e]
+    needs: [build, e2e, e2e-ui]
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Deploy to Droplet via SSH
