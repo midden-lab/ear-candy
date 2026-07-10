@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Concept C — Dark vs Light Mode</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0f0f13; color: #e0e0e0;
+  padding: 28px 24px 80px;
+}
+h1 { font-size: 1.35rem; font-weight: 600; color: #fff; margin-bottom: 4px; }
+.subtitle { font-size: 0.88rem; color: #666; margin-bottom: 28px; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+.panel-label {
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
+  color: #888; margin-bottom: 10px; text-transform: uppercase;
+}
+
+/* ─── TOGGLE POSITIONS ─── */
+.toggle-question {
+  font-size: 0.9rem; color: #ccc;
+  margin: 24px 0 14px;
+}
+
+.placements { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.placement-card {
+  border: 2px solid #2a2a35; border-radius: 10px; overflow: hidden;
+  cursor: pointer; background: #16161f; transition: border-color 0.2s;
+}
+.placement-card:hover { border-color: #5a5af0; }
+.placement-card.selected { border-color: #7b7bff; box-shadow: 0 0 0 3px rgba(123,123,255,0.18); }
+
+.placement-name {
+  padding: 10px 12px 6px;
+  font-size: 0.82rem; font-weight: 600; color: #fff;
+}
+.placement-sub { font-size: 0.73rem; color: #555; padding: 0 12px 10px; }
+
+/* ─── APP SHELL MOCKUP — DARK ─── */
+.shell {
+  border-radius: 8px; overflow: hidden;
+  border: 1px solid #222230; font-size: 10px; line-height: 1.4;
+}
+
+/* DARK THEME */
+.shell.dark { background: #0d0d14; }
+.shell.dark .rail { background: #0e0e18; border-right: 1px solid #1e1e28; }
+.shell.dark .ep-list { background: #111119; border-right: 1px solid #1e1e28; }
+.shell.dark .list-header { background: #111119; border-bottom: 1px solid #1e1e28; color: #fff; }
+.shell.dark .ep-item { border-bottom: 1px solid #1a1a22; }
+.shell.dark .ep-item h4 { color: #bbb; }
+.shell.dark .ep-item.active { background: #1c1c30; }
+.shell.dark .ep-item.active h4 { color: #9898ff; }
+.shell.dark .ep-item p { color: #555; }
+.shell.dark .detail { background: #13131e; }
+.shell.dark .detail-hero { background: linear-gradient(180deg, #1a1a2e 0%, #13131e 100%); border-bottom: 1px solid #1e1e28; }
+.shell.dark .detail-hero h3 { color: #fff; }
+.shell.dark .detail-hero .meta-sub { color: #666; }
+.shell.dark .tag { background: #2a2a40; color: #9898ff; }
+.shell.dark .prog-bg { background: #222; }
+.shell.dark .prog-fill { background: #6060f0; }
+.shell.dark .time-row { color: #444; }
+.shell.dark .ctrl-btns { color: #777; }
+.shell.dark .ctrl-btns .play-btn { color: #fff; }
+.shell.dark .desc-text { color: #555; }
+.shell.dark .icon { color: #555; }
+.shell.dark .icon.active { background: #6060f0; color: #fff; }
+
+/* LIGHT THEME */
+.shell.light { background: #f5f5f8; }
+.shell.light .rail { background: #eeeef3; border-right: 1px solid #dddde8; }
+.shell.light .ep-list { background: #f8f8fc; border-right: 1px solid #dddde8; }
+.shell.light .list-header { background: #f8f8fc; border-bottom: 1px solid #dddde8; color: #111; }
+.shell.light .ep-item { border-bottom: 1px solid #ebebf2; }
+.shell.light .ep-item h4 { color: #333; }
+.shell.light .ep-item.active { background: #ededf8; }
+.shell.light .ep-item.active h4 { color: #4040c0; }
+.shell.light .ep-item p { color: #aaa; }
+.shell.light .detail { background: #fff; }
+.shell.light .detail-hero { background: linear-gradient(180deg, #f0f0fa 0%, #fff 100%); border-bottom: 1px solid #e8e8f2; }
+.shell.light .detail-hero h3 { color: #111; }
+.shell.light .detail-hero .meta-sub { color: #999; }
+.shell.light .tag { background: #e8e8f8; color: #5050c0; }
+.shell.light .prog-bg { background: #e0e0e8; }
+.shell.light .prog-fill { background: #5050d0; }
+.shell.light .time-row { color: #bbb; }
+.shell.light .ctrl-btns { color: #999; }
+.shell.light .ctrl-btns .play-btn { color: #222; }
+.shell.light .desc-text { color: #999; }
+.shell.light .icon { color: #bbb; }
+.shell.light .icon.active { background: #5050d0; color: #fff; }
+
+/* SHARED STRUCTURE */
+.shell-inner { display: flex; height: 210px; }
+.rail {
+  width: 34px; padding: 10px 0;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  flex-shrink: 0;
+}
+.icon {
+  width: 20px; height: 20px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center; font-size: 9px;
+}
+.ep-list { width: 106px; flex-shrink: 0; overflow: hidden; }
+.list-header { padding: 7px 9px 6px; font-size: 9px; font-weight: 700; }
+.ep-item { padding: 5px 9px; cursor: pointer; }
+.ep-item h4 { font-size: 9px; }
+.ep-item p { font-size: 8px; margin-top: 1px; }
+.detail { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.detail-hero { padding: 10px; display: flex; gap: 9px; }
+.ep-art { width: 42px; height: 42px; border-radius: 5px; flex-shrink: 0; background: linear-gradient(135deg, #5a3ef5, #a03ef5); }
+.detail-hero h3 { font-size: 10px; font-weight: 700; }
+.meta-sub { font-size: 8px; margin-top: 2px; }
+.tags { display: flex; gap: 3px; margin-top: 4px; }
+.tag { font-size: 7px; padding: 2px 5px; border-radius: 3px; }
+.player-area { padding: 8px 10px 4px; }
+.prog-bg { height: 3px; border-radius: 2px; }
+.prog-fill { height: 100%; width: 30%; border-radius: 2px; }
+.time-row { display: flex; justify-content: space-between; font-size: 8px; margin-top: 2px; }
+.ctrl-btns { display: flex; gap: 8px; justify-content: center; margin-top: 5px; font-size: 11px; }
+.play-btn { font-size: 14px; }
+.desc-text { padding: 0 10px; font-size: 8px; line-height: 1.5; }
+
+/* ─── TOGGLE MINI MOCKUPS ─── */
+.mini-shell { height: 50px; display: flex; overflow: hidden; font-size: 8px; }
+.mini-rail { width: 26px; background: #0e0e18; border-right: 1px solid #1e1e28; display: flex; flex-direction: column; align-items: center; padding: 6px 0; gap: 4px; }
+.mini-rail.light { background: #eeeef3; border-right: 1px solid #dddde8; }
+.mini-dot { width: 12px; height: 12px; background: #1e1e30; border-radius: 3px; }
+.mini-dot.active { background: #6060f0; }
+.mini-list { flex: 1; background: #111119; }
+.mini-list.light { background: #f8f8fc; }
+
+/* toggle in icon rail */
+.mini-toggle-rail {
+  width: 26px; background: #0e0e18; border-right: 1px solid #1e1e28;
+  display: flex; flex-direction: column; align-items: center; padding: 6px 0; gap: 4px;
+}
+.mini-toggle-rail.light { background: #eeeef3; border-right: 1px solid #dddde8; }
+.mini-sun { font-size: 9px; color: #6060f0; }
+
+/* toggle in top bar */
+.mini-topbar {
+  display: flex; align-items: center; gap: 8px; width: 100%; flex-direction: column;
+}
+.topbar-row {
+  width: 100%; height: 14px; background: #1a1a26;
+  display: flex; align-items: center; justify-content: flex-end; padding: 0 6px;
+}
+.topbar-row.light { background: #eeeef3; }
+.mini-toggle-pill {
+  width: 18px; height: 8px; border-radius: 4px;
+  background: #6060f0; position: relative;
+}
+.mini-toggle-pill::after {
+  content: ''; position: absolute; width: 6px; height: 6px;
+  background: #fff; border-radius: 50%; top: 1px; right: 1px;
+}
+.mini-content-row { width: 100%; flex: 1; display: flex; }
+
+/* toggle floating corner */
+.floating-badge {
+  position: absolute; bottom: 4px; right: 4px;
+  background: #2a2a40; border: 1px solid #3a3a60;
+  border-radius: 5px; padding: 2px 5px; font-size: 8px; color: #9898ff;
+}
+
+.placement-preview { position: relative; margin: 8px 12px 10px; height: 50px; border-radius: 5px; overflow: hidden; border: 1px solid #222230; }
+.placement-preview.light-bg { border-color: #dddde8; }
+
+/* selected bar */
+.sel-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: #1e1e30; border-top: 1px solid #3a3a60;
+  padding: 10px 24px; display: none; align-items: center; justify-content: space-between;
+  font-size: 0.85rem;
+}
+.sel-bar.visible { display: flex; }
+.sel-name { color: #9898ff; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>Concept C — App Shell: Dark vs Light</h1>
+<p class="subtitle">The same layout in both modes. The toggle placement question is below.</p>
+
+<div class="split">
+  <!-- DARK -->
+  <div>
+    <div class="panel-label">Dark Mode</div>
+    <div class="shell dark">
+      <div class="shell-inner">
+        <div class="rail">
+          <div class="icon active">⊕</div>
+          <div class="icon">☰</div>
+          <div class="icon">🔍</div>
+          <div class="icon" style="margin-top:auto">☀</div>
+        </div>
+        <div class="ep-list">
+          <div class="list-header">Season 3</div>
+          <div class="ep-item active"><h4>Ep 12 · Sound Design</h4><p>48 min</p></div>
+          <div class="ep-item"><h4>Ep 11 · Mixing</h4><p>61 min</p></div>
+          <div class="ep-item"><h4>Ep 10 · Budget Gear</h4><p>35 min</p></div>
+          <div class="ep-item"><h4>Ep 9 · Field Recording</h4><p>52 min</p></div>
+          <div class="ep-item"><h4>Ep 8 · Voice Coaching</h4><p>44 min</p></div>
+        </div>
+        <div class="detail">
+          <div class="detail-hero">
+            <div class="ep-art"></div>
+            <div>
+              <h3>The Future of Sound Design</h3>
+              <div class="meta-sub">Season 3, Episode 12 · Nov 2024</div>
+              <div class="tags"><span class="tag">Interview</span><span class="tag">Technique</span></div>
+            </div>
+          </div>
+          <div class="player-area">
+            <div class="prog-bg"><div class="prog-fill"></div></div>
+            <div class="time-row"><span>18:22</span><span>48:00</span></div>
+            <div class="ctrl-btns"><span>⏮</span><span>⏪</span><span class="play-btn">▶</span><span>⏩</span><span>⏭</span></div>
+          </div>
+          <div class="desc-text">Jonah Wells breaks down the complete production workflow — from room treatment to mastering. Dynamic mic technique, compression philosophy, spatial layering…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIGHT -->
+  <div>
+    <div class="panel-label">Light Mode</div>
+    <div class="shell light">
+      <div class="shell-inner">
+        <div class="rail">
+          <div class="icon active">⊕</div>
+          <div class="icon">☰</div>
+          <div class="icon">🔍</div>
+          <div class="icon" style="margin-top:auto">🌙</div>
+        </div>
+        <div class="ep-list">
+          <div class="list-header">Season 3</div>
+          <div class="ep-item active"><h4>Ep 12 · Sound Design</h4><p>48 min</p></div>
+          <div class="ep-item"><h4>Ep 11 · Mixing</h4><p>61 min</p></div>
+          <div class="ep-item"><h4>Ep 10 · Budget Gear</h4><p>35 min</p></div>
+          <div class="ep-item"><h4>Ep 9 · Field Recording</h4><p>52 min</p></div>
+          <div class="ep-item"><h4>Ep 8 · Voice Coaching</h4><p>44 min</p></div>
+        </div>
+        <div class="detail">
+          <div class="detail-hero">
+            <div class="ep-art"></div>
+            <div>
+              <h3>The Future of Sound Design</h3>
+              <div class="meta-sub">Season 3, Episode 12 · Nov 2024</div>
+              <div class="tags"><span class="tag">Interview</span><span class="tag">Technique</span></div>
+            </div>
+          </div>
+          <div class="player-area">
+            <div class="prog-bg"><div class="prog-fill"></div></div>
+            <div class="time-row"><span>18:22</span><span>48:00</span></div>
+            <div class="ctrl-btns"><span>⏮</span><span>⏪</span><span class="play-btn">▶</span><span>⏩</span><span>⏭</span></div>
+          </div>
+          <div class="desc-text">Jonah Wells breaks down the complete production workflow — from room treatment to mastering. Dynamic mic technique, compression philosophy, spatial layering…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOGGLE PLACEMENT -->
+<div class="toggle-question">Where should the dark/light toggle live?</div>
+
+<div class="placements">
+
+  <!-- Option 1: Icon rail bottom -->
+  <div class="placement-card" data-choice="toggle-rail" onclick="selectToggle(this)">
+    <div class="placement-name">☀ / 🌙 Icon Rail</div>
+    <div class="placement-sub">Toggle sits at the bottom of the left nav rail — always visible, minimal clutter</div>
+    <div class="placement-preview">
+      <div style="display:flex;height:100%">
+        <div style="width:26px;background:#0e0e18;border-right:1px solid #1e1e28;display:flex;flex-direction:column;align-items:center;padding:5px 0;gap:4px;">
+          <div style="width:12px;height:12px;background:#6060f0;border-radius:3px;"></div>
+          <div style="width:12px;height:12px;background:#1e1e30;border-radius:3px;"></div>
+          <div style="width:12px;height:12px;background:#1e1e30;border-radius:3px;"></div>
+          <div style="margin-top:auto;font-size:10px;color:#6060f0;">☀</div>
+        </div>
+        <div style="flex:1;background:#111119;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option 2: Top bar right -->
+  <div class="placement-card" data-choice="toggle-topbar" onclick="selectToggle(this)">
+    <div class="placement-name">Top Bar Toggle</div>
+    <div class="placement-sub">A small pill toggle in the top-right header bar — familiar from most web apps</div>
+    <div class="placement-preview">
+      <div style="display:flex;flex-direction:column;height:100%">
+        <div style="height:14px;background:#1a1a26;display:flex;align-items:center;justify-content:flex-end;padding:0 6px;border-bottom:1px solid #222;">
+          <div style="width:20px;height:10px;border-radius:5px;background:#6060f0;position:relative;">
+            <div style="position:absolute;width:7px;height:7px;background:#fff;border-radius:50%;top:1.5px;right:1.5px;"></div>
+          </div>
+        </div>
+        <div style="flex:1;display:flex;">
+          <div style="width:26px;background:#0e0e18;border-right:1px solid #1e1e28;"></div>
+          <div style="flex:1;background:#111119;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option 3: Floating corner badge -->
+  <div class="placement-card" data-choice="toggle-float" onclick="selectToggle(this)">
+    <div class="placement-name">Floating Badge</div>
+    <div class="placement-sub">A subtle floating button in the bottom-right corner — out of the way but findable</div>
+    <div class="placement-preview">
+      <div style="display:flex;height:100%;position:relative;">
+        <div style="width:26px;background:#0e0e18;border-right:1px solid #1e1e28;"></div>
+        <div style="flex:1;background:#111119;"></div>
+        <div style="position:absolute;bottom:4px;right:5px;background:#2a2a40;border:1px solid #3a3a60;border-radius:5px;padding:2px 5px;font-size:8px;color:#9898ff;">☀ / 🌙</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="sel-bar" id="sel-bar">
+  Selected: <span class="sel-name" id="sel-name">—</span>
+  <span style="color:#555;font-size:0.8rem">Reply in terminal with any thoughts</span>
+</div>
+
+<script>
+const toggleNames = {
+  'toggle-rail': 'Icon Rail (bottom of nav)',
+  'toggle-topbar': 'Top Bar Toggle',
+  'toggle-float': 'Floating Corner Badge'
+};
+
+function selectToggle(el) {
+  document.querySelectorAll('.placement-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const choice = el.dataset.choice;
+  document.getElementById('sel-name').textContent = toggleNames[choice];
+  document.getElementById('sel-bar').classList.add('visible');
+  fetch('/__event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'click', choice, text: toggleNames[choice], timestamp: Date.now() })
+  }).catch(() => {});
+}
+</script>
+</body>
+</html>

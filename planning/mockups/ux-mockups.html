@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Podcast Webapp — 3 UX Concepts</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f13; color: #e0e0e0; padding: 32px 24px; }
+  h1 { font-size: 1.4rem; font-weight: 600; color: #fff; margin-bottom: 6px; }
+  .subtitle { font-size: 0.9rem; color: #888; margin-bottom: 32px; }
+
+  .concepts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+
+  .concept-card {
+    border: 2px solid #2a2a35;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+    background: #16161f;
+  }
+  .concept-card:hover { border-color: #5a5af0; transform: translateY(-2px); }
+  .concept-card.selected { border-color: #7b7bff; box-shadow: 0 0 0 3px rgba(123,123,255,0.2); }
+
+  .concept-label {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid #222230;
+  }
+  .concept-badge {
+    background: #2a2a40; color: #9898ff;
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
+    padding: 3px 8px; border-radius: 4px;
+  }
+  .concept-name { font-size: 1rem; font-weight: 600; color: #fff; }
+  .concept-tagline { font-size: 0.78rem; color: #666; padding: 0 16px 10px; margin-top: 6px; }
+
+  /* ── MOCKUP FRAME ── */
+  .mockup-frame {
+    margin: 0 16px 12px;
+    border: 1px solid #222230;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #0d0d14;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  /* ──────────────────────────────────────────
+     CONCEPT A  –  Clean Stream
+     Top nav · hero episode · list · bottom player
+  ────────────────────────────────────────── */
+  .a-nav {
+    background: #1a1a26; padding: 8px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #222;
+  }
+  .a-logo { font-size: 11px; font-weight: 700; color: #7b7bff; letter-spacing: 0.05em; }
+  .a-search { background: #252535; border-radius: 4px; padding: 3px 8px; font-size: 10px; color: #555; }
+
+  .a-hero {
+    background: linear-gradient(135deg, #1e1e32 0%, #12122a 100%);
+    padding: 14px 12px; display: flex; gap: 10px; align-items: center;
+  }
+  .a-hero-art { width: 44px; height: 44px; background: linear-gradient(135deg, #5a3ef5, #a03ef5); border-radius: 6px; flex-shrink: 0; }
+  .a-hero-meta h3 { font-size: 11px; font-weight: 700; color: #fff; }
+  .a-hero-meta p { font-size: 9px; color: #888; margin-top: 2px; }
+  .a-play-btn {
+    margin-top: 6px; background: #6060f0; color: #fff;
+    font-size: 9px; padding: 3px 8px; border-radius: 4px; display: inline-block;
+  }
+
+  .a-section-label { padding: 8px 12px 4px; font-size: 9px; font-weight: 700; color: #555; letter-spacing: 0.1em; }
+
+  .a-episode { padding: 6px 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #1a1a22; }
+  .a-ep-num { font-size: 9px; color: #444; width: 14px; text-align: center; }
+  .a-ep-info h4 { font-size: 10px; color: #ccc; }
+  .a-ep-info p { font-size: 9px; color: #555; }
+  .a-ep-dur { margin-left: auto; font-size: 9px; color: #444; }
+
+  .a-player {
+    background: #1e1e2e; border-top: 1px solid #2a2a3a;
+    padding: 6px 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .a-player-art { width: 24px; height: 24px; background: linear-gradient(135deg, #5a3ef5, #a03ef5); border-radius: 3px; }
+  .a-player-info { flex: 1; }
+  .a-player-info p { font-size: 9px; color: #ccc; }
+  .a-player-info span { font-size: 8px; color: #555; }
+  .a-progress { height: 2px; background: #333; margin-top: 3px; border-radius: 1px; }
+  .a-progress-fill { height: 100%; width: 35%; background: #6060f0; border-radius: 1px; }
+  .a-controls { display: flex; gap: 6px; color: #777; font-size: 11px; }
+
+  /* ──────────────────────────────────────────
+     CONCEPT B  –  Season Shelf
+     Sidebar seasons · episode grid with art · floating player
+  ────────────────────────────────────────── */
+  .b-wrap { display: flex; height: 220px; }
+  .b-sidebar {
+    width: 76px; background: #111118; border-right: 1px solid #222;
+    padding: 10px 0; flex-shrink: 0;
+  }
+  .b-sidebar-logo { font-size: 9px; font-weight: 800; color: #fff; padding: 0 10px 10px; letter-spacing: 0.08em; border-bottom: 1px solid #1e1e28; margin-bottom: 8px; }
+  .b-season {
+    padding: 5px 10px; font-size: 9px; color: #555; cursor: pointer;
+    border-left: 2px solid transparent;
+  }
+  .b-season.active { color: #9898ff; border-left-color: #6060f0; background: #1a1a28; }
+
+  .b-main { flex: 1; overflow: hidden; background: #13131c; padding: 10px; position: relative; }
+  .b-season-title { font-size: 11px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .b-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .b-card { background: #1c1c28; border-radius: 5px; overflow: hidden; }
+  .b-card-art { height: 32px; background: linear-gradient(135deg, #3a1ef0, #c03ef5); }
+  .b-card-art.v2 { background: linear-gradient(135deg, #1e7af0, #3ac0f5); }
+  .b-card-art.v3 { background: linear-gradient(135deg, #f03e6e, #f09e3e); }
+  .b-card-art.v4 { background: linear-gradient(135deg, #1ef07e, #1ec0d0); }
+  .b-card-art.v5 { background: linear-gradient(135deg, #f0b01e, #f0601e); }
+  .b-card-art.v6 { background: linear-gradient(135deg, #901ef0, #f01e90); }
+  .b-card-body { padding: 4px 5px; }
+  .b-card-body p { font-size: 8px; color: #ccc; line-height: 1.3; }
+  .b-card-body span { font-size: 8px; color: #555; }
+
+  .b-player {
+    position: absolute; bottom: 8px; right: 8px; left: 8px;
+    background: rgba(22,22,34,0.96); backdrop-filter: blur(8px);
+    border: 1px solid #2a2a40; border-radius: 8px;
+    padding: 6px 10px; display: flex; align-items: center; gap: 8px;
+  }
+  .b-player-art { width: 22px; height: 22px; background: linear-gradient(135deg, #3a1ef0, #c03ef5); border-radius: 3px; }
+  .b-player-info { flex: 1; }
+  .b-player-info p { font-size: 9px; color: #fff; }
+  .b-player-prog { height: 2px; background: #333; margin-top: 3px; border-radius: 1px; }
+  .b-player-prog-fill { height: 100%; width: 45%; background: #6060f0; border-radius: 1px; }
+  .b-ctrl { color: #9898ff; font-size: 12px; }
+
+  /* ──────────────────────────────────────────
+     CONCEPT C  –  App Shell
+     Left nav · episode list panel · detail/player pane
+  ────────────────────────────────────────── */
+  .c-wrap { display: flex; height: 220px; }
+  .c-rail {
+    width: 36px; background: #0e0e18; border-right: 1px solid #1e1e28;
+    padding: 10px 0; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .c-icon { width: 20px; height: 20px; background: #1e1e30; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #555; }
+  .c-icon.active { background: #6060f0; color: #fff; }
+
+  .c-list {
+    width: 110px; background: #111119; border-right: 1px solid #1e1e28;
+    overflow: hidden;
+  }
+  .c-list-header { padding: 8px 10px 6px; font-size: 9px; font-weight: 700; color: #fff; border-bottom: 1px solid #1e1e28; }
+  .c-ep-item { padding: 6px 10px; border-bottom: 1px solid #1a1a22; cursor: pointer; }
+  .c-ep-item.active { background: #1c1c30; }
+  .c-ep-item h4 { font-size: 9px; color: #ccc; }
+  .c-ep-item.active h4 { color: #9898ff; }
+  .c-ep-item p { font-size: 8px; color: #555; margin-top: 1px; }
+
+  .c-detail { flex: 1; background: #13131e; display: flex; flex-direction: column; }
+  .c-detail-hero {
+    padding: 12px; display: flex; gap: 10px;
+    background: linear-gradient(180deg, #1a1a2e 0%, #13131e 100%);
+    border-bottom: 1px solid #1e1e28;
+  }
+  .c-detail-art { width: 48px; height: 48px; background: linear-gradient(135deg, #5a3ef5, #a03ef5); border-radius: 6px; flex-shrink: 0; }
+  .c-detail-meta h3 { font-size: 11px; font-weight: 700; color: #fff; }
+  .c-detail-meta p { font-size: 9px; color: #777; margin-top: 2px; line-height: 1.4; }
+  .c-tags { display: flex; gap: 4px; margin-top: 5px; }
+  .c-tag { background: #2a2a40; color: #9898ff; font-size: 8px; padding: 2px 6px; border-radius: 3px; }
+
+  .c-player-area { padding: 10px 12px; }
+  .c-prog-bar { height: 3px; background: #222; border-radius: 2px; margin-bottom: 6px; }
+  .c-prog-fill { height: 100%; width: 30%; background: #6060f0; border-radius: 2px; }
+  .c-time { display: flex; justify-content: space-between; font-size: 8px; color: #444; }
+  .c-btns { display: flex; gap: 10px; justify-content: center; margin-top: 8px; color: #777; font-size: 13px; }
+  .c-btns .play { color: #fff; font-size: 16px; }
+
+  .c-desc { padding: 0 12px; font-size: 9px; color: #555; line-height: 1.5; }
+
+  /* ── TRAIT CHIPS ── */
+  .trait-row { display: flex; flex-wrap: wrap; gap: 5px; padding: 10px 16px 14px; }
+  .trait { background: #1e1e2e; border: 1px solid #2a2a3c; color: #888; font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; }
+  .trait.pos { border-color: #3a3a60; color: #9898cc; }
+  .trait.neg { border-color: #3a2a2a; color: #cc8888; }
+
+  /* ── SELECTED INDICATOR ── */
+  .selected-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #1e1e30; border-top: 1px solid #3a3a60;
+    padding: 10px 24px; display: none; align-items: center; justify-content: space-between;
+    font-size: 0.85rem;
+  }
+  .selected-bar.visible { display: flex; }
+  .selected-name { color: #9898ff; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>Podcast Webapp — 3 UX Concepts</h1>
+<p class="subtitle">Click a concept to select it. You can change your mind.</p>
+
+<div class="concepts">
+
+  <!-- ══════════ CONCEPT A ══════════ -->
+  <div class="concept-card" data-choice="a" onclick="select(this)">
+    <div class="concept-label">
+      <span class="concept-badge">A</span>
+      <span class="concept-name">Clean Stream</span>
+    </div>
+    <div class="concept-tagline">Editorial focus · content-first · fixed bottom player</div>
+
+    <div class="mockup-frame">
+      <!-- Nav -->
+      <div class="a-nav">
+        <span class="a-logo">◈ EAR CANDY</span>
+        <span class="a-search">🔍 Search episodes</span>
+      </div>
+      <!-- Hero -->
+      <div class="a-hero">
+        <div class="a-hero-art"></div>
+        <div class="a-hero-meta">
+          <h3>S3 E12 · The Future of Sound Design</h3>
+          <p>Season 3 · 48 min · Nov 2024</p>
+          <span class="a-play-btn">▶ Play</span>
+        </div>
+      </div>
+      <!-- Season filter -->
+      <div class="a-section-label">ALL EPISODES · SEASON 3</div>
+      <!-- Episode list -->
+      <div class="a-episode">
+        <span class="a-ep-num">12</span>
+        <div class="a-ep-info"><h4>The Future of Sound Design</h4><p>Interview with Jonah Wells</p></div>
+        <span class="a-ep-dur">48m</span>
+      </div>
+      <div class="a-episode">
+        <span class="a-ep-num">11</span>
+        <div class="a-ep-info"><h4>Mixing for Intimacy</h4><p>Live session breakdown</p></div>
+        <span class="a-ep-dur">61m</span>
+      </div>
+      <div class="a-episode">
+        <span class="a-ep-num">10</span>
+        <div class="a-ep-info"><h4>Podcast Gear on a Budget</h4><p>Gear guide roundup</p></div>
+        <span class="a-ep-dur">35m</span>
+      </div>
+      <!-- Bottom player -->
+      <div class="a-player">
+        <div class="a-player-art"></div>
+        <div class="a-player-info">
+          <p>The Future of Sound Design</p>
+          <span>18:22 / 48:00</span>
+          <div class="a-progress"><div class="a-progress-fill"></div></div>
+        </div>
+        <div class="a-controls"><span>⏮</span><span>▶</span><span>⏭</span></div>
+      </div>
+    </div>
+
+    <div class="trait-row">
+      <span class="trait pos">Simple to navigate</span>
+      <span class="trait pos">Mobile-friendly</span>
+      <span class="trait pos">Fast load</span>
+      <span class="trait neg">Less visual impact</span>
+    </div>
+  </div>
+
+  <!-- ══════════ CONCEPT B ══════════ -->
+  <div class="concept-card" data-choice="b" onclick="select(this)">
+    <div class="concept-label">
+      <span class="concept-badge">B</span>
+      <span class="concept-name">Season Shelf</span>
+    </div>
+    <div class="concept-tagline">Artwork-forward · season browsing · floating player</div>
+
+    <div class="mockup-frame">
+      <div class="b-wrap">
+        <!-- Sidebar -->
+        <div class="b-sidebar">
+          <div class="b-sidebar-logo">EC</div>
+          <div class="b-season active">Season 3</div>
+          <div class="b-season">Season 2</div>
+          <div class="b-season">Season 1</div>
+          <div class="b-season">Bonus</div>
+        </div>
+        <!-- Main grid -->
+        <div class="b-main">
+          <div class="b-season-title">Season 3 · 12 Episodes</div>
+          <div class="b-grid">
+            <div class="b-card">
+              <div class="b-card-art"></div>
+              <div class="b-card-body"><p>The Future of Sound</p><span>48m · Ep 12</span></div>
+            </div>
+            <div class="b-card">
+              <div class="b-card-art v2"></div>
+              <div class="b-card-body"><p>Mixing for Intimacy</p><span>61m · Ep 11</span></div>
+            </div>
+            <div class="b-card">
+              <div class="b-card-art v3"></div>
+              <div class="b-card-body"><p>Gear on a Budget</p><span>35m · Ep 10</span></div>
+            </div>
+            <div class="b-card">
+              <div class="b-card-art v4"></div>
+              <div class="b-card-body"><p>Field Recording</p><span>52m · Ep 9</span></div>
+            </div>
+            <div class="b-card">
+              <div class="b-card-art v5"></div>
+              <div class="b-card-body"><p>Voice Coaching 101</p><span>44m · Ep 8</span></div>
+            </div>
+            <div class="b-card">
+              <div class="b-card-art v6"></div>
+              <div class="b-card-body"><p>The Edit Room</p><span>39m · Ep 7</span></div>
+            </div>
+          </div>
+          <!-- Floating player -->
+          <div class="b-player">
+            <div class="b-player-art"></div>
+            <div class="b-player-info">
+              <p>The Future of Sound Design · Ep 12</p>
+              <div class="b-player-prog"><div class="b-player-prog-fill"></div></div>
+            </div>
+            <span class="b-ctrl">▶</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="trait-row">
+      <span class="trait pos">Visually rich</span>
+      <span class="trait pos">Easy season browsing</span>
+      <span class="trait pos">Artwork-forward</span>
+      <span class="trait neg">Busier layout</span>
+    </div>
+  </div>
+
+  <!-- ══════════ CONCEPT C ══════════ -->
+  <div class="concept-card" data-choice="c" onclick="select(this)">
+    <div class="concept-label">
+      <span class="concept-badge">C</span>
+      <span class="concept-name">App Shell</span>
+    </div>
+    <div class="concept-tagline">3-pane layout · player-centric · Spotify-like depth</div>
+
+    <div class="mockup-frame">
+      <div class="c-wrap">
+        <!-- Icon rail -->
+        <div class="c-rail">
+          <div class="c-icon active">⊕</div>
+          <div class="c-icon">☰</div>
+          <div class="c-icon">🔍</div>
+          <div class="c-icon" style="margin-top:auto">⚙</div>
+        </div>
+        <!-- Episode list panel -->
+        <div class="c-list">
+          <div class="c-list-header">Season 3</div>
+          <div class="c-ep-item active">
+            <h4>Ep 12 · Sound Design</h4>
+            <p>48 min</p>
+          </div>
+          <div class="c-ep-item">
+            <h4>Ep 11 · Mixing</h4>
+            <p>61 min</p>
+          </div>
+          <div class="c-ep-item">
+            <h4>Ep 10 · Budget Gear</h4>
+            <p>35 min</p>
+          </div>
+          <div class="c-ep-item">
+            <h4>Ep 9 · Field Recording</h4>
+            <p>52 min</p>
+          </div>
+          <div class="c-ep-item">
+            <h4>Ep 8 · Voice Coaching</h4>
+            <p>44 min</p>
+          </div>
+        </div>
+        <!-- Detail / player pane -->
+        <div class="c-detail">
+          <div class="c-detail-hero">
+            <div class="c-detail-art"></div>
+            <div class="c-detail-meta">
+              <h3>The Future of Sound Design</h3>
+              <p>Season 3, Episode 12 · Nov 2024</p>
+              <div class="c-tags">
+                <span class="c-tag">Interview</span>
+                <span class="c-tag">Technique</span>
+              </div>
+            </div>
+          </div>
+          <div class="c-player-area">
+            <div class="c-prog-bar"><div class="c-prog-fill"></div></div>
+            <div class="c-time"><span>18:22</span><span>48:00</span></div>
+            <div class="c-btns">
+              <span>⏮</span>
+              <span>⏪</span>
+              <span class="play">▶</span>
+              <span>⏩</span>
+              <span>⏭</span>
+            </div>
+          </div>
+          <div class="c-desc">
+            Jonah Wells breaks down the complete production workflow used for the latest
+            season — from room treatment to mastering. Covers dynamic mic technique,
+            compression philosophy, and spatial layering…
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="trait-row">
+      <span class="trait pos">Player front-and-center</span>
+      <span class="trait pos">Rich episode detail</span>
+      <span class="trait pos">Metadata + description</span>
+      <span class="trait neg">Requires wider screen</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="selected-bar" id="sel-bar">
+  Selected: <span class="selected-name" id="sel-name">—</span>
+  <span style="color:#555;font-size:0.8rem">Reply in terminal with any thoughts</span>
+</div>
+
+<script>
+  const names = { a: 'A · Clean Stream', b: 'B · Season Shelf', c: 'C · App Shell' };
+  function select(el) {
+    document.querySelectorAll('.concept-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    const choice = el.dataset.choice;
+    document.getElementById('sel-name').textContent = names[choice];
+    document.getElementById('sel-bar').classList.add('visible');
+    // write event for claude to read
+    fetch('/__event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'click', choice, text: names[choice], timestamp: Date.now() })
+    }).catch(() => {});
+  }
+</script>
+</body>
+</html>
