@@ -242,6 +242,7 @@ ear-candy/
 25. **Production Dockerfile is multi-stage.** Stage 1 builds client, Stage 2 builds server TS, Stage 3 runs server with compiled JS and static client files. Native addons (bcrypt, better-sqlite3) compile in the runner stage because Alpine needs `python3 make g++`.
 26. **Production compose mounts `./data` for persistence.** Without this, the SQLite DB and uploads are lost on container restart.
 27. **nginx in production compose serves the client.** The `docker-compose.prod.yml` uses nginx to serve the built client and proxy `/api/` and `/audio/` to the server. The monolithic `Dockerfile` (root level) builds everything into one image where the server serves the client directly.
+28. **Bcrypt hashes contain `$` characters.** When passing `ADMIN_PASSWORD_HASH` or `COOKIE_SECRET` to `docker run` in shell scripts (e.g., GitHub Actions deploy), always use single quotes (`'...'`) to prevent bash from interpreting `$` as variable expansion. Double quotes will corrupt the hash and login will fail silently.
 
 ### Linting
 
