@@ -1,5 +1,5 @@
 import { vi, beforeEach, describe, it, expect } from 'vitest'
-import { getSettings, getSeasons, getEpisodes, getEpisode, login } from '../api'
+import { getSettings, getSeasons, getEpisodes, getEpisode, login, uploadAudio } from '../api'
 import type { Settings, Season, Episode } from '../types'
 
 const mockSettings: Settings = {
@@ -133,5 +133,36 @@ describe('login', () => {
 
     mockFetch.mockResolvedValueOnce({ ok: false } as Response)
     await expect(login('wrong')).rejects.toThrow('Invalid password')
+  })
+})
+
+describe('uploadAudio', () => {
+  it('posts FormData to /api/admin/upload with credentials and returns path', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ path: '/audio/test-123.mp3' }),
+    } as Response)
+
+    const file = new File(['fake audio'], 'test.mp3', { type: 'audio/mpeg' })
+    const result = await uploadAudio(file)
+
+    expect(result).toEqual({ path: '/audio/test-123.mp3' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/admin/upload')
+    expect(init?.method).toBe('POST')
+    expect(init?.credentials).toBe('include')
+    expect(init?.body).toBeInstanceOf(FormData)
+  })
+
+  it('throws on non-ok response', async () => {
+    vi.stubGlobal('fetch', makeFetch(null, false, 500))
+    const file = new File(['fake audio'], 'test.mp3', { type: 'audio/mpeg' })
+    await expect(uploadAudio(file)).rejects.toThrow('Upload failed: HTTP 500')
   })
 })

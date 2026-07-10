@@ -76,10 +76,25 @@ test.describe('Admin panel — episode management', () => {
     await page.getByLabel('Title').fill('My Test Episode')
     await page.getByLabel('Episode #').fill('1')
     await page.getByLabel('Publish Date').fill('2024-06-01')
-    await page.getByLabel('Audio Path/URL').fill('https://example.com/test.mp3')
+    await page.getByLabel('Audio URL').fill('https://example.com/test.mp3')
     await page.getByRole('button', { name: 'Save' }).click()
     // Episode appears in season block
     await expect(lastSeason.getByText('My Test Episode')).toBeVisible()
+  })
+
+  test('create an episode with uploaded audio — it appears in the season block', async ({ adminPage: page }) => {
+    const lastSeason = page.getByTestId('season-card').last()
+    await lastSeason.getByRole('button', { name: '+ New Episode' }).click()
+    // Fill in the episode form panel with upload
+    await page.getByLabel('Title').fill('Uploaded Episode')
+    await page.getByLabel('Episode #').fill('2')
+    await page.getByLabel('Publish Date').fill('2024-06-02')
+    await page.getByLabel('Audio Type').selectOption('upload')
+    await page.getByLabel('Audio File').setInputFiles('e2e/fixtures/test-audio.mp3')
+    await expect(page.getByText(/uploaded:/i)).toBeVisible()
+    await page.getByRole('button', { name: 'Save' }).click()
+    // Episode appears in season block
+    await expect(lastSeason.getByText('Uploaded Episode')).toBeVisible()
   })
 
   test('edit an episode title — change is reflected in the list', async ({ adminPage: page }) => {
@@ -89,7 +104,7 @@ test.describe('Admin panel — episode management', () => {
     await page.getByLabel('Title').fill('Original Title')
     await page.getByLabel('Episode #').fill('1')
     await page.getByLabel('Publish Date').fill('2024-06-01')
-    await page.getByLabel('Audio Path/URL').fill('https://example.com/test.mp3')
+    await page.getByLabel('Audio URL').fill('https://example.com/test.mp3')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(lastSeason.getByText('Original Title')).toBeVisible()
     // Edit it — scope to the episode row to avoid matching the season header's Edit button
@@ -109,7 +124,7 @@ test.describe('Admin panel — episode management', () => {
     await page.getByLabel('Title').fill('Episode To Delete')
     await page.getByLabel('Episode #').fill('1')
     await page.getByLabel('Publish Date').fill('2024-06-01')
-    await page.getByLabel('Audio Path/URL').fill('https://example.com/test.mp3')
+    await page.getByLabel('Audio URL').fill('https://example.com/test.mp3')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(lastSeason.getByText('Episode To Delete')).toBeVisible()
     // Delete it
