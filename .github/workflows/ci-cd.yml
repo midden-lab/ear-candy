@@ -152,8 +152,8 @@ jobs:
             -e NODE_ENV=production \
             -e SERVE_CLIENT=true \
             -e PORT=3000 \
-            -e COOKIE_SECRET='${{ secrets.CI_COOKIE_SECRET }}' \
-            -e ADMIN_PASSWORD_HASH='${{ secrets.CI_ADMIN_PASSWORD_HASH }}' \
+            -e COOKIE_SECRET='${{ secrets.COOKIE_SECRET }}' \
+            -e ADMIN_PASSWORD_HASH='${{ secrets.ADMIN_PASSWORD_HASH }}' \
             ear-candy:test
 
       - name: Wait for test app
