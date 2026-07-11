@@ -144,6 +144,23 @@ jobs:
           docker pull "$IMAGE"
           docker tag "$IMAGE" ear-candy:test
 
+      - name: Generate CI-only credentials
+        id: creds
+        run: |
+          COOKIE_SECRET=$(openssl rand -hex 32)
+          HASH=$(docker run --rm \
+            -v "$PWD/server:/app" \
+            -w /app \
+            -e PW="$PASSWORD" \
+            node:20-alpine \
+            sh -c 'npm ci --quiet >/dev/null 2>&1 && node -e "const b=require(\"bcrypt\"); b.hash(process.env.PW, 10).then(h=>process.stdout.write(h))"')
+          echo "::add-mask::$COOKIE_SECRET"
+          echo "::add-mask::$HASH"
+          echo "cookie_secret=$COOKIE_SECRET" >> "$GITHUB_OUTPUT"
+          echo "admin_password_hash=$HASH" >> "$GITHUB_OUTPUT"
+        env:
+          PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'changeme' }}
+
       - name: Start test container
         run: |
           docker run -d \
@@ -152,8 +169,8 @@ jobs:
             -e NODE_ENV=production \
             -e SERVE_CLIENT=true \
             -e PORT=3000 \
-            -e COOKIE_SECRET='${{ secrets.COOKIE_SECRET }}' \
-            -e ADMIN_PASSWORD_HASH='${{ secrets.ADMIN_PASSWORD_HASH }}' \
+            -e COOKIE_SECRET='${{ steps.creds.outputs.cookie_secret }}' \
+            -e ADMIN_PASSWORD_HASH='${{ steps.creds.outputs.admin_password_hash }}' \
             ear-candy:test
 
       - name: Wait for test app
