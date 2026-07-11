@@ -181,6 +181,44 @@ describe('Admin Episodes CRUD', () => {
 
       expect(res.statusCode).toBe(400)
     })
+
+    it('accepts a valid /images/ path for cover_art_thumb_path and cover_art_path', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      const season = await createSeason(app, cookie)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: {
+          ...BASE_EPISODE,
+          season_id: season.id,
+          cover_art_path: '/images/abc-detail.webp',
+          cover_art_thumb_path: '/images/abc-thumb.webp'
+        }
+      })
+
+      expect(res.statusCode).toBe(201)
+      const json = res.json()
+      expect(json.cover_art_path).toBe('/images/abc-detail.webp')
+      expect(json.cover_art_thumb_path).toBe('/images/abc-thumb.webp')
+    })
+
+    it('rejects a javascript: URI as cover_art_thumb_path', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      const season = await createSeason(app, cookie)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: { ...BASE_EPISODE, season_id: season.id, cover_art_thumb_path: "javascript:alert(1)" }
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
   })
 
   describe('PUT /api/admin/episodes/:id', () => {
@@ -377,6 +415,37 @@ describe('Admin Episodes CRUD', () => {
       })
 
       expect(res.statusCode).toBe(400)
+    })
+
+    it('patches cover_art_thumb_path and rejects an invalid one', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      const season = await createSeason(app, cookie)
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: { ...BASE_EPISODE, season_id: season.id }
+      })
+      const created = createRes.json()
+
+      const okRes = await app.inject({
+        method: 'PATCH',
+        url: `/api/admin/episodes/${created.id}`,
+        headers: { cookie },
+        payload: { cover_art_thumb_path: '/images/xyz-thumb.webp' }
+      })
+      expect(okRes.statusCode).toBe(200)
+      expect(okRes.json().cover_art_thumb_path).toBe('/images/xyz-thumb.webp')
+
+      const badRes = await app.inject({
+        method: 'PATCH',
+        url: `/api/admin/episodes/${created.id}`,
+        headers: { cookie },
+        payload: { cover_art_thumb_path: 'javascript:alert(1)' }
+      })
+      expect(badRes.statusCode).toBe(400)
     })
   })
 

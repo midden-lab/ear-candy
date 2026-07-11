@@ -97,6 +97,35 @@ test.describe('Admin panel — episode management', () => {
     await expect(lastSeason.getByText('Uploaded Episode')).toBeVisible()
   })
 
+  test('create an episode with cover art — thumbnail shows in the list, full image in the detail pane', async ({ adminPage: page }) => {
+    const lastSeason = page.getByTestId('season-card').last()
+    await lastSeason.getByRole('button', { name: 'New Episode' }).click()
+    await page.getByLabel('Title').fill('Episode With Art')
+    await page.getByLabel('Episode #').fill('3')
+    await page.getByLabel('Publish Date').fill('2024-06-03')
+    await page.getByLabel('Audio Type').selectOption('url')
+    await page.getByLabel('Audio URL').fill('https://example.com/ep3.mp3')
+    await page.getByLabel(/cover art/i).setInputFiles('fixtures/test-cover.jpg')
+    await expect(page.getByAltText('Cover art preview')).toBeVisible()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(lastSeason.getByText('Episode With Art')).toBeVisible()
+
+    // Switch to the public listener view to verify the art actually renders there.
+    await page.goto('/')
+    const item = page.locator('button', { hasText: 'Episode With Art' })
+    await expect(item).toBeVisible()
+    await expect(item.locator('img')).toHaveAttribute('src', /\/images\/.*-thumb\.webp$/)
+
+    await item.click()
+    const detailImg = page.locator('main img').first()
+    await expect(detailImg).toHaveAttribute('srcset', /-detail\.webp/)
+
+    // Return to the admin panel so the shared afterEach can find and clean
+    // up the season/episode created above.
+    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await expect(page.getByText('Ear Candy Admin')).toBeVisible()
+  })
+
   test('edit an episode title — change is reflected in the list', async ({ adminPage: page }) => {
     // Create an episode first
     const lastSeason = page.getByTestId('season-card').last()

@@ -12,7 +12,7 @@ vi.mock('../api', () => ({
   createSeason: vi.fn(),
   updateSeason: vi.fn(),
   deleteSeason: vi.fn(),
-  createEpisode: vi.fn().mockResolvedValue({ id: 99, season_id: 1, number: 1, title: 'New Episode', description: '', guests: '', tags: '', cover_art_path: null, duration_seconds: 0, publish_date: '2024-01-01', audio_type: 'url', audio_path: 'http://example.com/audio.mp3', hidden: false, created_at: '', updated_at: '' }),
+  createEpisode: vi.fn().mockResolvedValue({ id: 99, season_id: 1, number: 1, title: 'New Episode', description: '', guests: '', tags: '', cover_art_path: null, cover_art_thumb_path: null, duration_seconds: 0, publish_date: '2024-01-01', audio_type: 'url', audio_path: 'http://example.com/audio.mp3', hidden: false, created_at: '', updated_at: '' }),
   updateEpisode: vi.fn(),
   deleteEpisode: vi.fn(),
   getSettings: vi.fn(),
@@ -55,7 +55,7 @@ describe('episode creation flow', () => {
 
   it('submitting the form creates an episode and adds it to the list', async () => {
     vi.mocked(getEpisodes).mockResolvedValueOnce([]).mockResolvedValueOnce([
-      { id: 99, season_id: 1, number: 1, title: 'Test Episode', description: '', guests: '', tags: '', cover_art_path: null, duration_seconds: 1, publish_date: '2024-01-01', audio_type: 'url', audio_path: 'http://example.com/audio.mp3', hidden: false, created_at: '', updated_at: '' },
+      { id: 99, season_id: 1, number: 1, title: 'Test Episode', description: '', guests: '', tags: '', cover_art_path: null, cover_art_thumb_path: null, duration_seconds: 1, publish_date: '2024-01-01', audio_type: 'url', audio_path: 'http://example.com/audio.mp3', hidden: false, created_at: '', updated_at: '' },
     ])
 
     render(<EpisodeManager />)

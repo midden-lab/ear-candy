@@ -34,6 +34,20 @@ it('renders rail, sidebar, and detail content', () => {
   expect(screen.getByText('Detail Content')).toBeInTheDocument()
 })
 
+it('aside reserves the same bottom padding as main for the fixed player bar (regression: rail buttons must never sit under the player bar)', () => {
+  render(
+    <AppShell
+      rail={<div>Rail Content</div>}
+      sidebar={<div>Sidebar Content</div>}
+      detail={<div>Detail Content</div>}
+    />
+  )
+  const aside = document.querySelector('aside')
+  const main = document.querySelector('main')
+  expect(aside?.style.paddingBottom).toBe(main?.style.paddingBottom)
+  expect(aside?.style.paddingBottom).toContain('var(--player-h')
+})
+
 it('renders rail content inside an aside', () => {
   render(
     <AppShell

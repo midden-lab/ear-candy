@@ -11,6 +11,7 @@ const mockEpisode: Episode = {
   guests: '',
   tags: '',
   cover_art_path: null,
+  cover_art_thumb_path: null,
   duration_seconds: 3600,
   publish_date: '2024-01-01',
   audio_type: 'upload',

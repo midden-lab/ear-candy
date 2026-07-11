@@ -13,6 +13,7 @@ const episode: Episode = {
   guests: 'Alice, Bob',
   tags: '',
   cover_art_path: null,
+  cover_art_thumb_path: null,
   duration_seconds: 3661,
   publish_date: '2024-01-15',
   audio_type: 'upload',
@@ -82,4 +83,17 @@ it('meta row does not wrap and truncates a long guest list to one line', () => {
   expect(guestsEl).toHaveClass('truncate')
   const row = guestsEl.parentElement
   expect(row).not.toHaveClass('flex-wrap')
+})
+
+it('renders a lazy-loaded thumbnail when cover_art_thumb_path is set', () => {
+  const withArt = { ...episode, cover_art_thumb_path: 'https://example.com/thumb.webp' }
+  render(<EpisodeItem episode={withArt} isActive={false} onClick={() => {}} />)
+  const img = document.querySelector('img')
+  expect(img).toHaveAttribute('src', 'https://example.com/thumb.webp')
+  expect(img).toHaveAttribute('loading', 'lazy')
+})
+
+it('renders no img, just the placeholder slot, when there is no cover art', () => {
+  render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
+  expect(document.querySelector('img')).not.toBeInTheDocument()
 })

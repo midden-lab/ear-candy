@@ -1,4 +1,5 @@
 import type { Episode } from '../types'
+import EpisodeCoverArt from './EpisodeCoverArt'
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600)
@@ -27,6 +28,15 @@ export default function EpisodeItem({ episode, isActive, isPlaying = false, onCl
       }`}
       aria-current={isActive ? 'true' : undefined}
     >
+      <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-zinc-800">
+        <EpisodeCoverArt
+          thumbPath={episode.cover_art_thumb_path}
+          detailPath={null}
+          alt=""
+          variant="thumb"
+          className="h-full w-full object-cover"
+        />
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-xs text-zinc-500 shrink-0">Ep {episode.number}</span>

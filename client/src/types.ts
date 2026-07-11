@@ -25,6 +25,7 @@ export interface Episode {
   guests: string
   tags: string
   cover_art_path: string | null
+  cover_art_thumb_path: string | null
   duration_seconds: number
   publish_date: string
   audio_type: 'upload' | 'url'

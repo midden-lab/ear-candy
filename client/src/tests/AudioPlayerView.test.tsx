@@ -34,6 +34,7 @@ const mockEpisode: Episode = {
   guests: 'Alice, Bob',
   tags: 'tech,news',
   cover_art_path: null,
+  cover_art_thumb_path: null,
   duration_seconds: 120,
   publish_date: '2024-01-01',
   audio_type: 'url',
@@ -90,6 +91,22 @@ it('renders episode title and play button when an episode is given', () => {
 it('shows pause button when playing is true', () => {
   renderView({ episode: mockEpisode, playing: true })
   expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
+})
+
+it('desktop mini-bar shows a lazy-loaded thumbnail when cover art is set', () => {
+  renderView({
+    episode: { ...mockEpisode, cover_art_path: 'https://example.com/detail.webp', cover_art_thumb_path: 'https://example.com/thumb.webp' },
+  })
+  const img = screen.getByRole('img')
+  expect(img).toHaveAttribute('src', 'https://example.com/thumb.webp')
+  expect(img).toHaveAttribute('loading', 'lazy')
+  // Mini-bar only ever needs the small thumbnail — never the larger detail asset.
+  expect(img).not.toHaveAttribute('srcset')
+})
+
+it('desktop mini-bar renders no image when there is no cover art', () => {
+  renderView({ episode: mockEpisode })
+  expect(screen.queryByRole('img')).not.toBeInTheDocument()
 })
 
 it('clicking play calls onTogglePlay, flipping the controlled playing state', () => {
@@ -179,6 +196,19 @@ describe('mobile (< md)', () => {
     expect(screen.getByRole('button', { name: 'Skip to start' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /speed/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Collapse now playing' })).toBeInTheDocument()
+  })
+
+  it('now-playing overlay shows a responsive srcset image when cover art is set', async () => {
+    const user = userEvent.setup()
+    mockMobile()
+    renderView({
+      episode: { ...mockEpisode, cover_art_path: 'https://example.com/detail.webp', cover_art_thumb_path: 'https://example.com/thumb.webp' },
+    })
+    await user.click(screen.getByRole('button', { name: /now playing/i }))
+    const img = screen.getByRole('img')
+    expect(img).toHaveAttribute('loading', 'lazy')
+    expect(img).toHaveAttribute('srcset', expect.stringContaining('150w'))
+    expect(img).toHaveAttribute('srcset', expect.stringContaining('640w'))
   })
 
   it('collapses back to the mini-bar when the collapse control is tapped', async () => {
