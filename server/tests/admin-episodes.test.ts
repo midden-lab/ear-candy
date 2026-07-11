@@ -83,7 +83,7 @@ describe('Admin Episodes CRUD', () => {
           title: 'Minimal Episode',
           publish_date: '2024-01-02',
           audio_type: 'upload',
-          audio_path: '/uploads/ep2.mp3'
+          audio_path: '/audio/ep2.mp3'
         }
       })
 
@@ -106,6 +106,80 @@ describe('Admin Episodes CRUD', () => {
       })
 
       expect(res.statusCode).toBe(401)
+    })
+
+    it('rejects an empty title', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      const season = await createSeason(app, cookie)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: { ...BASE_EPISODE, season_id: season.id, title: '   ' }
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
+
+    it('rejects a negative duration_seconds', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      const season = await createSeason(app, cookie)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: { ...BASE_EPISODE, season_id: season.id, duration_seconds: -5 }
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
+
+    it('rejects a season_id that does not reference an existing season', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: { ...BASE_EPISODE, season_id: 999999 }
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
+
+    it('rejects a javascript: URI as audio_path', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      const season = await createSeason(app, cookie)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: { ...BASE_EPISODE, season_id: season.id, audio_path: "javascript:alert(1)" }
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
+
+    it('rejects a javascript: URI as cover_art_path', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      const season = await createSeason(app, cookie)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: { ...BASE_EPISODE, season_id: season.id, cover_art_path: "javascript:alert(1)" }
+      })
+
+      expect(res.statusCode).toBe(400)
     })
   })
 
@@ -137,7 +211,7 @@ describe('Admin Episodes CRUD', () => {
           duration_seconds: 7200,
           publish_date: '2025-06-01',
           audio_type: 'upload',
-          audio_path: '/uploads/replaced.mp3',
+          audio_path: '/audio/replaced.mp3',
           hidden: true
         }
       })
@@ -153,7 +227,7 @@ describe('Admin Episodes CRUD', () => {
       expect(body.duration_seconds).toBe(7200)
       expect(body.publish_date).toBe('2025-06-01')
       expect(body.audio_type).toBe('upload')
-      expect(body.audio_path).toBe('/uploads/replaced.mp3')
+      expect(body.audio_path).toBe('/audio/replaced.mp3')
       expect(body.hidden).toBeTruthy()
     })
 
@@ -249,6 +323,60 @@ describe('Admin Episodes CRUD', () => {
       })
 
       expect(res.statusCode).toBe(401)
+    })
+
+    it('rejects a PATCH body containing a field not in the allowlist (SQL injection guard)', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      const season = await createSeason(app, cookie)
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: { ...BASE_EPISODE, season_id: season.id }
+      })
+      const created = createRes.json()
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/api/admin/episodes/${created.id}`,
+        headers: { cookie },
+        payload: { 'title; DROP TABLE episodes; --': 'pwned' }
+      })
+
+      expect(res.statusCode).toBe(400)
+
+      // Confirm the table survived and nothing was mutated.
+      const getRes = await app.inject({
+        method: 'GET',
+        url: `/api/episodes/${created.id}`
+      })
+      expect(getRes.statusCode).toBe(200)
+      expect(getRes.json().title).toBe(BASE_EPISODE.title)
+    })
+
+    it('rejects a negative duration_seconds', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      const season = await createSeason(app, cookie)
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: { ...BASE_EPISODE, season_id: season.id }
+      })
+      const created = createRes.json()
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/api/admin/episodes/${created.id}`,
+        headers: { cookie },
+        payload: { duration_seconds: -1 }
+      })
+
+      expect(res.statusCode).toBe(400)
     })
   })
 

@@ -2,6 +2,8 @@ import Fastify from 'fastify'
 import cookie from '@fastify/cookie'
 import multipart from '@fastify/multipart'
 import staticPlugin from '@fastify/static'
+import helmet from '@fastify/helmet'
+import rateLimit from '@fastify/rate-limit'
 import path from 'node:path'
 import fs from 'node:fs'
 import type { Database } from 'better-sqlite3'
@@ -39,6 +41,51 @@ export function buildApp(opts: AppOptions = {}) {
     throw new Error('COOKIE_SECRET env var is required')
   }
   app.register(cookie, { secret: cookieSecret })
+
+  app.register(helmet, {
+    // HSTS is deliberately left off: this is self-hosted software with
+    // variable deployment topology. A wrong HSTS header (e.g. an operator
+    // running behind a proxy without TLS, or accessing directly over LAN)
+    // makes browsers refuse plain HTTP for the cache duration — a far
+    // worse footgun than the header's upside. TLS enforcement belongs in
+    // the reverse proxy in front (e.g. the Caddy setup in scripts/), not
+    // baked into the app.
+    hsts: false,
+    // Helmet defaults X-Frame-Options to SAMEORIGIN; this app has no
+    // same-origin framing use case, so deny outright (matches the CSP
+    // frame-ancestors 'none' below — X-Frame-Options is the fallback for
+    // browsers that don't honor CSP).
+    frameguard: { action: 'deny' },
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        // React inline `style={{...}}` props are governed by style-src too,
+        // not just <style> tags — 'unsafe-inline' is required for those to
+        // keep working, not just for stylesheets.
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        // Episodes may point at an external URL (audio_type: 'url'), so
+        // media-src needs more than 'self'.
+        mediaSrc: ["'self'", 'https:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      }
+    }
+  })
+
+  // A generous backstop against genuinely abusive/scripted traffic, not a
+  // fine-grained limit — a single admin's real browsing session (or an
+  // automated test suite, which fires many requests per page load in rapid
+  // succession) can easily exceed a tight per-minute cap from one IP.
+  // Brute-force login protection is handled separately and precisely in
+  // the login route itself (only failed attempts count there).
+  app.register(rateLimit, {
+    max: 1000,
+    timeWindow: '1 minute'
+  })
 
   app.register(multipart, { limits: { fileSize: 500 * 1024 * 1024 } })
 

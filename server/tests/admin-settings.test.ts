@@ -180,5 +180,33 @@ describe('Admin Settings routes', () => {
       expect(res.statusCode).toBe(200)
       expect(res.json().cover_art_path).toBeNull()
     })
+
+    it('rejects a PATCH body containing a field not in the allowlist (SQL injection guard)', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: { 'podcast_name; DROP TABLE settings; --': 'pwned' }
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
+
+    it('rejects a javascript: URI as cover_art_path', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: { cover_art_path: 'javascript:alert(1)' }
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
   })
 })

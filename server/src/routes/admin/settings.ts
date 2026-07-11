@@ -1,12 +1,19 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Settings } from '../../types.js'
 import { requireAdmin } from '../../auth.js'
+import { isValidMediaPath } from '../../utils/validation.js'
+
+const ALLOWED_SETTINGS_PATCH_FIELDS = new Set(['podcast_name', 'tagline', 'description', 'cover_art_path', 'accent_color'])
 
 export const adminSettingsRoute: FastifyPluginAsync = async (app) => {
   app.put<{
     Body: Settings
-  }>('/admin/settings', { preHandler: requireAdmin }, async (req, _reply) => {
+  }>('/admin/settings', { preHandler: requireAdmin }, async (req, reply) => {
     const { podcast_name, tagline, description, cover_art_path, accent_color } = req.body
+    if (!podcast_name.trim()) return reply.status(400).send({ error: 'podcast_name is required' })
+    if (cover_art_path && !isValidMediaPath(cover_art_path)) {
+      return reply.status(400).send({ error: 'Invalid cover_art_path' })
+    }
 
     app.db.prepare('DELETE FROM settings').run()
     app.db.prepare(
@@ -25,6 +32,17 @@ export const adminSettingsRoute: FastifyPluginAsync = async (app) => {
 
     if (fields.length === 0) {
       return reply.status(400).send({ error: 'No fields to update' })
+    }
+
+    const invalidFields = fields.filter(f => !ALLOWED_SETTINGS_PATCH_FIELDS.has(f))
+    if (invalidFields.length > 0) {
+      return reply.status(400).send({ error: `Invalid field(s): ${invalidFields.join(', ')}` })
+    }
+    if (updates.podcast_name !== undefined && !updates.podcast_name.trim()) {
+      return reply.status(400).send({ error: 'podcast_name is required' })
+    }
+    if (updates.cover_art_path && !isValidMediaPath(updates.cover_art_path)) {
+      return reply.status(400).send({ error: 'Invalid cover_art_path' })
     }
 
     const setClauses = fields.map(f => `${f} = ?`)

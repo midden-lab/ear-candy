@@ -1,6 +1,9 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Season } from '../../types.js'
 import { requireAdmin } from '../../auth.js'
+import { isValidMediaPath } from '../../utils/validation.js'
+
+const ALLOWED_SEASON_PATCH_FIELDS = new Set(['number', 'title', 'description', 'cover_art_path', 'hidden'])
 
 export const adminSeasonsRoute: FastifyPluginAsync = async (app) => {
   app.post<{
@@ -12,6 +15,7 @@ export const adminSeasonsRoute: FastifyPluginAsync = async (app) => {
     }
   }>('/admin/seasons', { preHandler: requireAdmin }, async (req, reply) => {
     const { number, title, description = '', hidden = false } = req.body
+    if (!title.trim()) return reply.status(400).send({ error: 'title is required' })
     const result = app.db.prepare(`
       INSERT INTO seasons (number, title, description, hidden)
       VALUES (?, ?, ?, ?)
@@ -32,6 +36,10 @@ export const adminSeasonsRoute: FastifyPluginAsync = async (app) => {
   }>('/admin/seasons/:id', { preHandler: requireAdmin }, async (req, reply) => {
     const id = parseInt(req.params.id, 10)
     const { number, title, description = '', cover_art_path = null, hidden = false } = req.body
+    if (!title.trim()) return reply.status(400).send({ error: 'title is required' })
+    if (cover_art_path && !isValidMediaPath(cover_art_path)) {
+      return reply.status(400).send({ error: 'Invalid cover_art_path' })
+    }
     app.db.prepare(`
       UPDATE seasons SET number = ?, title = ?, description = ?, cover_art_path = ?, hidden = ?
       WHERE id = ?
@@ -54,6 +62,17 @@ export const adminSeasonsRoute: FastifyPluginAsync = async (app) => {
     const id = parseInt(req.params.id, 10)
     const updates = req.body
     const fields = Object.keys(updates) as Array<keyof typeof updates>
+
+    const invalidFields = fields.filter(f => !ALLOWED_SEASON_PATCH_FIELDS.has(f))
+    if (invalidFields.length > 0) {
+      return reply.status(400).send({ error: `Invalid field(s): ${invalidFields.join(', ')}` })
+    }
+    if (updates.title !== undefined && !updates.title.trim()) {
+      return reply.status(400).send({ error: 'title is required' })
+    }
+    if (updates.cover_art_path && !isValidMediaPath(updates.cover_art_path)) {
+      return reply.status(400).send({ error: 'Invalid cover_art_path' })
+    }
 
     if (fields.length === 0) {
       const row = app.db.prepare('SELECT * FROM seasons WHERE id = ?').get(id) as Season | undefined

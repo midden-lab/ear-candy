@@ -2,22 +2,62 @@ import type { FastifyPluginAsync } from 'fastify'
 import bcrypt from 'bcrypt'
 import { requireAdmin } from '../../auth.js'
 
+const MAX_FAILED_ATTEMPTS = 10
+const LOCKOUT_WINDOW_MS = 15 * 60 * 1000
+
 export const adminAuthRoute: FastifyPluginAsync = async (app) => {
+  // Tracks failed login attempts per IP, not all requests — a legitimate
+  // user (or an e2e suite) logging in repeatedly with the *correct*
+  // password never touches this counter. Only someone actually guessing
+  // wrong passwords gets throttled, which is the real brute-force scenario
+  // this guards against. Scoped to this plugin instance (not module-level)
+  // so each buildApp() call — including each test's fresh app — gets its
+  // own isolated state.
+  const failedAttempts = new Map<string, { count: number; resetAt: number }>()
+
+  function isLockedOut(ip: string): boolean {
+    const entry = failedAttempts.get(ip)
+    if (!entry) return false
+    if (Date.now() > entry.resetAt) {
+      failedAttempts.delete(ip)
+      return false
+    }
+    return entry.count >= MAX_FAILED_ATTEMPTS
+  }
+
+  function recordFailedAttempt(ip: string): void {
+    const entry = failedAttempts.get(ip)
+    if (!entry || Date.now() > entry.resetAt) {
+      failedAttempts.set(ip, { count: 1, resetAt: Date.now() + LOCKOUT_WINDOW_MS })
+    } else {
+      entry.count += 1
+    }
+  }
+
   app.post<{ Body: { password: string } }>('/admin/login', async (req, reply) => {
+    if (isLockedOut(req.ip)) {
+      return reply.status(429).send({ error: 'Too many failed login attempts. Try again later.' })
+    }
+
     const hash = process.env.ADMIN_PASSWORD_HASH
     if (!hash) {
-      return reply.status(500).send({ error: 'Server misconfigured' })
+      req.log.error('ADMIN_PASSWORD_HASH is not set')
+      return reply.status(500).send({ error: 'Internal server error' })
     }
 
     const { password } = req.body
     const match = await bcrypt.compare(password, hash)
     if (!match) {
+      recordFailedAttempt(req.ip)
       return reply.status(401).send({ error: 'Invalid password' })
     }
 
+    failedAttempts.delete(req.ip)
     reply.setCookie('admin_session', 'authenticated', {
       signed: true,
       httpOnly: true,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
       path: '/'
     })
     return { ok: true }
