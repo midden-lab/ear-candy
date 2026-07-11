@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi, beforeEach } from 'vitest'
+import { vi, beforeEach, afterEach, describe } from 'vitest'
 import App from '../App'
 import { usePlayerStore } from '../store/playerStore'
-import { getSettings } from '../api'
+import { getSettings, logout } from '../api'
 
 vi.mock('../api', () => ({
   getSettings: vi.fn().mockResolvedValue({
@@ -17,6 +17,7 @@ vi.mock('../api', () => ({
   getEpisodes: vi.fn().mockResolvedValue([]),
   getEpisode: vi.fn(),
   login: vi.fn(),
+  logout: vi.fn(),
   createSeason: vi.fn(),
   updateSeason: vi.fn(),
   deleteSeason: vi.fn(),
@@ -73,6 +74,58 @@ it('navigates to admin login when admin button is clicked', async () => {
   )
   await user.click(screen.getByRole('button', { name: 'Admin settings' }))
   expect(screen.getByRole('heading', { name: 'Admin Login' })).toBeInTheDocument()
+})
+
+describe('admin sign out', () => {
+  beforeEach(() => {
+    // handleAdminClick and AdminLayout's mount-time check both call
+    // /api/admin/session directly via global fetch (not through ../api).
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ authenticated: true }),
+    }))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('clicking "Sign out" calls the server logout endpoint before returning to the player view', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getSettings).mockResolvedValue({
+      podcast_name: 'Test Pod',
+      tagline: '',
+      description: '',
+      cover_art_path: null,
+      accent_color: '#ff0000',
+    })
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Admin settings' }))
+    await user.click(await screen.findByText('Sign out'))
+
+    expect(logout).toHaveBeenCalledTimes(1)
+    expect(await screen.findByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
+  })
+
+  it('still returns to the player view if the logout request fails', async () => {
+    vi.mocked(logout).mockRejectedValueOnce(new Error('network error'))
+    const user = userEvent.setup()
+    vi.mocked(getSettings).mockResolvedValue({
+      podcast_name: 'Test Pod',
+      tagline: '',
+      description: '',
+      cover_art_path: null,
+      accent_color: '#ff0000',
+    })
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Admin settings' }))
+    await user.click(await screen.findByText('Sign out'))
+
+    expect(logout).toHaveBeenCalledTimes(1)
+    expect(await screen.findByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
+  })
 })
 
 it('applies accent color from settings to CSS variable', async () => {

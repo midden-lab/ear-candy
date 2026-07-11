@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getSettings, getSeasons, getEpisodes } from './api'
+import { getSettings, getSeasons, getEpisodes, logout } from './api'
 import { useTheme } from './hooks/useTheme'
 import { usePlayerStore } from './store/playerStore'
 import type { Settings, Season, Episode } from './types'
@@ -69,6 +69,15 @@ export default function App() {
     setView('admin-login')
   }
 
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch {
+      // ignore — fall through to clearing local view state regardless
+    }
+    setView('player')
+  }
+
   if (settings === null) {
     return (
       <div className="flex h-screen items-center justify-center text-zinc-400">
@@ -83,7 +92,7 @@ export default function App() {
 
   if (view === 'admin') {
     return (
-      <AdminLayout onLogout={() => setView('player')} onUnauthorized={() => setView('admin-login')}>
+      <AdminLayout onLogout={() => void handleLogout()} onUnauthorized={() => setView('admin-login')}>
         <div className="mb-6 flex gap-3 border-b border-zinc-800 pb-3">
           <button
             onClick={() => setAdminTab('episodes')}

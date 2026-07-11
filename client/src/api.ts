@@ -59,6 +59,13 @@ export async function login(password: string): Promise<void> {
   if (!res.ok) throw new Error('Invalid password')
 }
 
+export async function logout(): Promise<void> {
+  await fetch('/api/admin/logout', {
+    method: 'POST',
+    credentials: 'include',
+  })
+}
+
 export async function uploadAudio(file: File): Promise<{ path: string }> {
   const formData = new FormData()
   formData.append('file', file)
