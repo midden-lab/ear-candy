@@ -42,6 +42,7 @@ export function buildApp(opts: AppOptions = {}) {
 
   if (dbPath !== ':memory:') {
     const uploadsDir = path.resolve('data/uploads')
+    fs.mkdirSync(uploadsDir, { recursive: true })
     app.register(staticPlugin, { root: uploadsDir, prefix: '/audio/' })
   }
 
