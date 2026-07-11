@@ -127,7 +127,7 @@ ear-candy/
 │   ├── playwright.config.ts    # workers: 1, chromium only
 │   └── tests/                  # E2E specs
 │
-├── docs/superpowers/           # Design specs and plans
+├── planning/                  # Design specs and plans
 ├── scripts/hash-password.sh  # bcrypt hash helper
 ├── Makefile                  # Primary dev commands
 ├── docker-compose.yml        # Dev stack
@@ -251,11 +251,25 @@ ear-candy/
 
 ---
 
+## CI/CD
+
+`.github/workflows/ci-cd.yml` runs on push/PR to `main`. Jobs run in this order:
+
+1. `lint` — ESLint on server + client (parallel with `test`/`typecheck`)
+2. `test` — Vitest server (51 tests, node env) + client (117 tests, jsdom env)
+3. `typecheck` — `tsc --noEmit` on client
+4. `build` — builds the root `Dockerfile` image, pushes to GHCR (needs lint+test+typecheck)
+5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build)
+6. `deploy` — only on `main`; SSHes to the production Droplet, pulls the new image by SHA tag, restarts the container, health-checks it (needs build+e2e)
+
+Note: CI's `e2e` job exercises the **production image**, not `docker compose up` — different from local `make e2e`, which requires the dev stack (`make up`).
+
 ## Design Documents
 
-Reference specs in `docs/superpowers/specs/` and plans in `docs/superpowers/plans/` for historical context on architectural decisions. Notable:
+Reference specs and plans in `planning/` for historical context on architectural decisions. Notable:
 - `2026-05-05-podcast-webapp-design.md` — Original design spec
 - `2026-05-06-playwright-e2e-design.md` — E2E testing design
+- `2026-07-10-deploy-do-gitlab.md` / `2026-07-10-do-droplet-setup.md` — Production deployment setup (GitHub Actions + DigitalOcean Droplet)
 
 ---
 

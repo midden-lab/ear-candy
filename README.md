@@ -171,13 +171,24 @@ ear-candy/
 
 ---
 
+## CI/CD
+
+`.github/workflows/ci-cd.yml` runs on every push/PR to `main`:
+
+1. `lint` — ESLint on server + client
+2. `test` — Vitest server (node) + client (jsdom)
+3. `typecheck` — `tsc --noEmit` on client
+4. `build` — builds the production Docker image and pushes it to GHCR
+5. `e2e` — runs the built image, waits for it to be healthy, then runs Playwright against it
+6. `deploy` (main only) — SSHes to the production host, pulls the new image, and restarts the container
+
 ## Testing
 
 ```bash
-# Server (49 tests)
+# Server (51 tests)
 cd server && npm test
 
-# Client (83 tests)
+# Client (117 tests)
 cd client && npm test
 ```
 
