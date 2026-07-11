@@ -1,11 +1,30 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 
 interface AdminLayoutProps {
   onLogout: () => void
+  onUnauthorized: () => void
   children: React.ReactNode
 }
 
-export default function AdminLayout({ onLogout, children }: AdminLayoutProps) {
+export default function AdminLayout({ onLogout, onUnauthorized, children }: AdminLayoutProps) {
+  // Defense in depth: the real access boundary is the server-side
+  // requireAdmin check on every admin API call, but this catches a forced
+  // or incorrect client-side `view` state before it renders a broken shell
+  // whose data fetches would just 401 (see issue #14 / EC-008).
+  const [authorized, setAuthorized] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch('/api/admin/session', { credentials: 'include' })
+      .then(res => setAuthorized(res.ok))
+      .catch(() => setAuthorized(false))
+  }, [])
+
+  useEffect(() => {
+    if (authorized === false) onUnauthorized()
+  }, [authorized, onUnauthorized])
+
+  if (authorized !== true) return null
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">

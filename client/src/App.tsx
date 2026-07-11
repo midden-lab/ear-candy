@@ -83,7 +83,7 @@ export default function App() {
 
   if (view === 'admin') {
     return (
-      <AdminLayout onLogout={() => setView('player')}>
+      <AdminLayout onLogout={() => setView('player')} onUnauthorized={() => setView('admin-login')}>
         <div className="mb-6 flex gap-3 border-b border-zinc-800 pb-3">
           <button
             onClick={() => setAdminTab('episodes')}
