@@ -23,7 +23,7 @@ docker --version
 
 # --- Step 3: Create data directory ---
 echo "Creating data directory..."
-mkdir -p /opt/ear-candy/data
+mkdir -p /opt/ear-candy/data/uploads
 
 # --- Step 4: Install Caddy ---
 echo "Installing Caddy..."
