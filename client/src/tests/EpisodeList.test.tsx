@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { vi } from 'vitest'
 import EpisodeList from '../components/EpisodeList'
 import { usePlayerStore } from '../store/playerStore'
 import type { Season, Episode } from '../types'
@@ -113,4 +114,49 @@ it('renders the podcast name at the top', () => {
     />
   )
   expect(screen.getByText('My Great Show')).toBeInTheDocument()
+})
+
+it('calls onEpisodeSelect when an episode is clicked', async () => {
+  const user = userEvent.setup()
+  const onEpisodeSelect = vi.fn()
+  render(
+    <EpisodeList
+      podcastName="Test Show"
+      seasons={seasons}
+      episodes={episodes}
+      activeSeason={1}
+      onSeasonSelect={() => {}}
+      onEpisodeSelect={onEpisodeSelect}
+    />
+  )
+  await user.click(screen.getByText('First Episode'))
+  expect(onEpisodeSelect).toHaveBeenCalledTimes(1)
+})
+
+it('shows a loading indicator instead of episodes when loading', () => {
+  render(
+    <EpisodeList
+      podcastName="Test Show"
+      seasons={seasons}
+      episodes={episodes}
+      activeSeason={1}
+      loading
+      onSeasonSelect={() => {}}
+    />
+  )
+  expect(screen.getByText('Loading…')).toBeInTheDocument()
+  expect(screen.queryByText('First Episode')).not.toBeInTheDocument()
+})
+
+it('shows an empty state when the season has no episodes', () => {
+  render(
+    <EpisodeList
+      podcastName="Test Show"
+      seasons={seasons}
+      episodes={[]}
+      activeSeason={1}
+      onSeasonSelect={() => {}}
+    />
+  )
+  expect(screen.getByText('No episodes in this season yet.')).toBeInTheDocument()
 })

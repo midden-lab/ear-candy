@@ -76,3 +76,12 @@ it('formats duration under 1h as m:ss', () => {
   render(<EpisodeItem episode={short} isActive={false} onClick={() => {}} />)
   expect(screen.getByText('3:05')).toBeInTheDocument()
 })
+
+it('meta row does not wrap and truncates a long guest list to one line', () => {
+  const longGuests = { ...episode, guests: 'A Very Long Guest Name, Another Very Long Guest Name, A Third Guest' }
+  render(<EpisodeItem episode={longGuests} isActive={false} onClick={() => {}} />)
+  const guestsEl = screen.getByText(/A Very Long Guest Name/i)
+  expect(guestsEl).toHaveClass('truncate')
+  const row = guestsEl.parentElement
+  expect(row).not.toHaveClass('flex-wrap')
+})

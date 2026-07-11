@@ -6,6 +6,7 @@ import type { Settings, Season, Episode } from './types'
 import AppShell from './components/AppShell'
 import ThemeBadge from './components/ThemeBadge'
 import IconRail from './components/IconRail'
+import MobileHeader from './components/MobileHeader'
 import EpisodeList from './components/EpisodeList'
 import DetailPane from './components/DetailPane'
 import AudioPlayer from './components/AudioPlayer'
@@ -22,8 +23,14 @@ export default function App() {
   const [seasons, setSeasons] = useState<Season[]>([])
   const [episodes, setEpisodes] = useState<Episode[]>([])
   const [activeSeason, setActiveSeason] = useState<number | null>(null)
+  const [episodesLoading, setEpisodesLoading] = useState(false)
   const [view, setView] = useState<View>('player')
   const [adminTab, setAdminTab] = useState<AdminTab>('episodes')
+  // Which pane is focused on mobile. Set unconditionally on episode
+  // selection (not gated by device class) so a desktop window resized down
+  // to phone width behaves identically to an actual phone — AppShell only
+  // gives this visual effect below the `md` breakpoint.
+  const [focusedPane, setFocusedPane] = useState<'list' | 'detail'>('list')
   const episode = usePlayerStore(s => s.episode)
 
   const { isDark, toggleDark } = useTheme(settings?.accent_color ?? '#5a3ef5')
@@ -34,14 +41,32 @@ export default function App() {
       setSeasons(s)
       if (s.length > 0) {
         setActiveSeason(s[0].id)
-        void getEpisodes(s[0].id).then(setEpisodes).catch(console.error)
+        setEpisodesLoading(true)
+        void getEpisodes(s[0].id).then(setEpisodes).catch(console.error).finally(() => setEpisodesLoading(false))
       }
     }).catch(console.error)
   }, [])
 
   const handleSeasonSelect = (seasonId: number) => {
     setActiveSeason(seasonId)
-    void getEpisodes(seasonId).then(setEpisodes).catch(console.error)
+    setEpisodesLoading(true)
+    void getEpisodes(seasonId).then(setEpisodes).catch(console.error).finally(() => setEpisodesLoading(false))
+  }
+
+  const handleAdminClick = async () => {
+    try {
+      const res = await fetch('/api/admin/session', { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json() as { authenticated: boolean }
+        if (data.authenticated) {
+          setView('admin')
+          return
+        }
+      }
+    } catch {
+      // ignore — fall through to login
+    }
+    setView('admin-login')
   }
 
   if (settings === null) {
@@ -78,39 +103,39 @@ export default function App() {
     )
   }
 
+  const themeBadge = <ThemeBadge isDark={isDark} onToggle={toggleDark} />
+
   return (
     <AppShell
-      rail={<IconRail onAdminClick={async () => {
-        try {
-          const res = await fetch('/api/admin/session', { credentials: 'include' })
-          if (res.ok) {
-            const data = await res.json() as { authenticated: boolean }
-            if (data.authenticated) {
-              setView('admin')
-              return
-            }
-          }
-        } catch {
-          // ignore — fall through to login
-        }
-        setView('admin-login')
-      }} />}
+      focusedPane={focusedPane}
+      rail={<IconRail onAdminClick={() => void handleAdminClick()} />}
+      mobileHeader={
+        <MobileHeader
+          podcastName={settings.podcast_name}
+          onAdminClick={() => void handleAdminClick()}
+          themeBadge={themeBadge}
+        />
+      }
       sidebar={
         <EpisodeList
           podcastName={settings.podcast_name}
           seasons={seasons}
           episodes={episodes}
           activeSeason={activeSeason}
+          loading={episodesLoading}
           onSeasonSelect={handleSeasonSelect}
+          onEpisodeSelect={() => setFocusedPane('detail')}
         />
       }
       detail={
-        <>
-          <DetailPane episode={episode} seasons={seasons} />
-          <AudioPlayer />
-        </>
+        <DetailPane
+          episode={episode}
+          seasons={seasons}
+          onBack={() => setFocusedPane('list')}
+        />
       }
-      themeBadge={<ThemeBadge isDark={isDark} onToggle={toggleDark} />}
+      player={<AudioPlayer />}
+      themeBadge={themeBadge}
     />
   )
 }

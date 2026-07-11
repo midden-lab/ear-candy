@@ -35,14 +35,14 @@ export default function EpisodeItem({ episode, isActive, onClick }: EpisodeItemP
           <span className="text-xs text-zinc-500 shrink-0">Ep {episode.number}</span>
           <span className="text-sm font-medium truncate">{episode.title}</span>
         </div>
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          <span className="text-xs text-zinc-500">{episode.publish_date}</span>
-          <span className="text-xs text-zinc-500">·</span>
-          <span className="text-xs text-zinc-500">{formatDuration(episode.duration_seconds)}</span>
+        <div className="flex items-center gap-2 mt-0.5 min-w-0">
+          <span className="text-xs text-zinc-500 shrink-0">{episode.publish_date}</span>
+          <span className="text-xs text-zinc-500 shrink-0">·</span>
+          <span className="text-xs text-zinc-500 shrink-0">{formatDuration(episode.duration_seconds)}</span>
           {episode.guests ? (
             <>
-              <span className="text-xs text-zinc-500">·</span>
-              <span className="text-xs text-zinc-400 italic truncate">{episode.guests}</span>
+              <span className="text-xs text-zinc-500 shrink-0">·</span>
+              <span className="text-xs text-zinc-400 italic truncate min-w-0">{episode.guests}</span>
             </>
           ) : null}
         </div>

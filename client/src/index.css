@@ -4,6 +4,10 @@
 
 :root {
   --accent: #5a3ef5;
+  /* Set by AudioPlayer to its own rendered height; consumed by AppShell's
+     <main> padding-bottom so content is never hidden behind the fixed
+     player bar, on any breakpoint. */
+  --player-h: 0px;
 }
 
 /* Dark mode background/text defaults */
