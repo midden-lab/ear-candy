@@ -13,7 +13,7 @@ export default function SeasonTabs({ seasons, activeSeason, onSelect }: SeasonTa
         <button
           key={season.id}
           onClick={() => onSelect(season.id)}
-          className={`whitespace-nowrap rounded px-3 py-1 text-sm transition-colors ${
+          className={`flex min-h-11 items-center whitespace-nowrap rounded px-3 py-1 text-sm transition-colors md:min-h-0 ${
             activeSeason === season.id
               ? 'bg-[var(--accent)] text-white'
               : 'text-zinc-400 hover:text-zinc-100'

@@ -1,4 +1,6 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { vi } from 'vitest'
 import DetailPane from '../components/DetailPane'
 import type { Episode, Season } from '../types'
 
@@ -70,4 +72,18 @@ it('renders cover art image when cover_art_path is set', () => {
 it('does not render img when cover_art_path is null', () => {
   render(<DetailPane episode={{ ...mockEpisode, cover_art_path: null }} seasons={seasons} />)
   expect(screen.queryByRole('img')).not.toBeInTheDocument()
+})
+
+it('does not render a back button when onBack is not provided', () => {
+  render(<DetailPane episode={mockEpisode} seasons={seasons} />)
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+})
+
+it('renders a back button and calls onBack when clicked, given onBack', async () => {
+  const user = userEvent.setup()
+  const onBack = vi.fn()
+  render(<DetailPane episode={mockEpisode} seasons={seasons} onBack={onBack} />)
+  const backButton = screen.getByRole('button', { name: /back to episodes/i })
+  await user.click(backButton)
+  expect(onBack).toHaveBeenCalledTimes(1)
 })
