@@ -96,10 +96,10 @@ export function buildApp(opts: AppOptions = {}) {
     app.register(staticPlugin, {
       root: uploadsDir,
       prefix: '/audio/',
-      setHeaders: (res) => {
+      setHeaders: (reply) => {
         // Defense in depth: even if an unexpected file ever lands here,
         // browsers must not sniff/execute it as HTML/JS.
-        res.setHeader('X-Content-Type-Options', 'nosniff')
+        reply.header('X-Content-Type-Options', 'nosniff')
       }
     })
   }
