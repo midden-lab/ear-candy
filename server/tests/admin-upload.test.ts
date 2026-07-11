@@ -107,4 +107,60 @@ describe('POST /api/admin/upload', () => {
     expect(json.path).toMatch(/^\/audio\//)
     expect(json.path).toMatch(/\.mp3$/)
   })
+
+  it('rejects a file with a disallowed extension (e.g. .html)', async () => {
+    const app = await makeApp()
+    const cookie = await getAuthCookie(app)
+
+    const boundary = '----testboundary'
+    const body = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="file"; filename="evil.html"',
+      'Content-Type: text/html',
+      '',
+      '<script>alert(document.cookie)</script>',
+      `--${boundary}--`
+    ].join('\r\n')
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/upload',
+      headers: {
+        cookie,
+        'content-type': `multipart/form-data; boundary=${boundary}`
+      },
+      payload: body
+    })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({ error: 'Only audio file uploads are allowed' })
+  })
+
+  it('rejects an audio extension with a mismatched, non-audio mimetype', async () => {
+    const app = await makeApp()
+    const cookie = await getAuthCookie(app)
+
+    const boundary = '----testboundary'
+    const body = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="file"; filename="disguised.mp3"',
+      'Content-Type: text/html',
+      '',
+      '<script>alert(1)</script>',
+      `--${boundary}--`
+    ].join('\r\n')
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/upload',
+      headers: {
+        cookie,
+        'content-type': `multipart/form-data; boundary=${boundary}`
+      },
+      payload: body
+    })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({ error: 'Only audio file uploads are allowed' })
+  })
 })

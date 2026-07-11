@@ -34,16 +34,26 @@ export function buildApp(opts: AppOptions = {}) {
 
   app.decorate('db', db)
 
-  app.register(cookie, {
-    secret: process.env.COOKIE_SECRET ?? 'dev-secret-change-in-production'
-  })
+  const cookieSecret = process.env.COOKIE_SECRET
+  if (!cookieSecret) {
+    throw new Error('COOKIE_SECRET env var is required')
+  }
+  app.register(cookie, { secret: cookieSecret })
 
   app.register(multipart, { limits: { fileSize: 500 * 1024 * 1024 } })
 
   if (dbPath !== ':memory:') {
     const uploadsDir = path.resolve('data/uploads')
     fs.mkdirSync(uploadsDir, { recursive: true })
-    app.register(staticPlugin, { root: uploadsDir, prefix: '/audio/' })
+    app.register(staticPlugin, {
+      root: uploadsDir,
+      prefix: '/audio/',
+      setHeaders: (res) => {
+        // Defense in depth: even if an unexpected file ever lands here,
+        // browsers must not sniff/execute it as HTML/JS.
+        res.setHeader('X-Content-Type-Options', 'nosniff')
+      }
+    })
   }
 
   const clientDist = opts.clientDistPath ?? (
@@ -67,10 +77,6 @@ export function buildApp(opts: AppOptions = {}) {
   }
 
   app.addHook('onClose', () => { db.close() })
-
-  if (process.env.NODE_ENV === 'production' && !process.env.COOKIE_SECRET) {
-    throw new Error('COOKIE_SECRET env var is required in production')
-  }
 
   app.register(settingsRoute, { prefix: '/api' })
   app.register(seasonsRoute, { prefix: '/api' })
