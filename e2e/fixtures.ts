@@ -78,6 +78,8 @@ export const test = base.extend<Fixtures>({
   },
 
   adminPage: async ({ page }, use) => {
+    // Auto-accept native confirm() dialogs (used by season/episode delete)
+    page.on('dialog', dialog => dialog.accept())
     // Authenticate the browser context (page.request shares the browser's cookie jar)
     await page.request.post('/api/admin/login', {
       data: { password: PASSWORD },

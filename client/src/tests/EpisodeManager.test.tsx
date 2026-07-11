@@ -48,9 +48,9 @@ describe('episode creation flow', () => {
     await waitFor(() => {
       expect(screen.getByText('S1: S1')).toBeInTheDocument()
     })
-    const newEpisodeButtons = screen.getAllByText('+ New Episode')
+    const newEpisodeButtons = screen.getAllByText('New Episode')
     await userEvent.click(newEpisodeButtons[0])
-    expect(screen.getByText('New Episode')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'New Episode' })).toBeInTheDocument()
   })
 
   it('submitting the form creates an episode and adds it to the list', async () => {
@@ -63,9 +63,9 @@ describe('episode creation flow', () => {
       expect(screen.getByText('S1: S1')).toBeInTheDocument()
     })
 
-    const newEpisodeButtons = screen.getAllByText('+ New Episode')
+    const newEpisodeButtons = screen.getAllByText('New Episode')
     await userEvent.click(newEpisodeButtons[0])
-    expect(screen.getByText('New Episode')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'New Episode' })).toBeInTheDocument()
 
     await userEvent.type(screen.getByLabelText(/title/i), 'Test Episode')
     await userEvent.type(screen.getByLabelText(/episode #/i), '1')
