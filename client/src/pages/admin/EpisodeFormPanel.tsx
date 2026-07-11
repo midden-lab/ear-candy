@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Episode } from '../../types'
-import { createEpisode, updateEpisode, uploadAudio } from '../../api'
+import { createEpisode, updateEpisode, uploadAudio, uploadEpisodeArt } from '../../api'
 
 interface EpisodeFormPanelProps {
   seasonId: number
@@ -20,6 +20,10 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
   const [tags, setTags] = useState(episode?.tags ?? '')
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [coverArtPath, setCoverArtPath] = useState(episode?.cover_art_path ?? null)
+  const [coverArtThumbPath, setCoverArtThumbPath] = useState(episode?.cover_art_thumb_path ?? null)
+  const [artUploading, setArtUploading] = useState(false)
+  const [artUploadError, setArtUploadError] = useState('')
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -36,6 +40,28 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
     }
   }
 
+  async function handleArtFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setArtUploading(true)
+    setArtUploadError('')
+    try {
+      const result = await uploadEpisodeArt(file)
+      setCoverArtPath(result.detail)
+      setCoverArtThumbPath(result.thumb)
+    } catch (err) {
+      setArtUploadError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setArtUploading(false)
+    }
+  }
+
+  function handleRemoveArt() {
+    setCoverArtPath(null)
+    setCoverArtThumbPath(null)
+    setArtUploadError('')
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const formData: Partial<Episode> = {
@@ -47,6 +73,8 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
       description,
       guests,
       tags,
+      cover_art_path: coverArtPath,
+      cover_art_thumb_path: coverArtThumbPath,
     }
     const result = episode
       ? await updateEpisode(episode.id, formData)
@@ -102,6 +130,27 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
             )}
           </div>
         )}
+        <div>
+          <label className="block text-sm text-zinc-400 mb-1" htmlFor="ep-cover-art">Cover Art</label>
+          <div className="flex items-center gap-3">
+            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-zinc-800">
+              {coverArtThumbPath && (
+                <img src={coverArtThumbPath} alt="Cover art preview" className="h-full w-full object-cover" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <input id="ep-cover-art" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleArtFileChange}
+                className="w-full rounded bg-zinc-800 px-3 py-2 text-zinc-100" />
+              {artUploading && <p className="text-sm text-zinc-400 mt-1">Uploading...</p>}
+              {artUploadError && <p className="text-sm text-red-400 mt-1">{artUploadError}</p>}
+              {coverArtPath && !artUploading && (
+                <button type="button" onClick={handleRemoveArt} className="text-sm text-zinc-400 hover:text-zinc-100 mt-1">
+                  Remove cover art
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
         <div>
           <label className="block text-sm text-zinc-400 mb-1" htmlFor="ep-description">Description</label>
           <textarea id="ep-description" value={description} onChange={e => setDescription(e.target.value)} rows={3}

@@ -1,5 +1,6 @@
 import type { Episode, Season } from '../types'
 import PillBadge from './PillBadge'
+import EpisodeCoverArt from './EpisodeCoverArt'
 
 interface DetailPaneProps {
   episode: Episode | null
@@ -40,13 +41,13 @@ export default function DetailPane({ episode, seasons, onBack }: DetailPaneProps
           Back to episodes
         </button>
       )}
-      {episode.cover_art_path && (
-        <img
-          src={episode.cover_art_path}
-          alt={episode.title}
-          className="mb-6 w-48 rounded-xl shadow-lg"
-        />
-      )}
+      <EpisodeCoverArt
+        thumbPath={episode.cover_art_thumb_path}
+        detailPath={episode.cover_art_path}
+        alt={episode.title}
+        variant="responsive"
+        className="mb-6 w-48 aspect-square object-cover rounded-xl shadow-lg"
+      />
       <p className="mb-1 text-xs font-medium uppercase tracking-wider text-zinc-500">{seasonLabel}</p>
       <h1 className="text-2xl font-bold text-zinc-100">{episode.title}</h1>
       <p className="mt-1 text-sm text-zinc-400">{episode.publish_date}</p>

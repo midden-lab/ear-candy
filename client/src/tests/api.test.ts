@@ -1,5 +1,5 @@
 import { vi, beforeEach, describe, it, expect } from 'vitest'
-import { getSettings, getSeasons, getEpisodes, getEpisode, login, logout, uploadAudio } from '../api'
+import { getSettings, getSeasons, getEpisodes, getEpisode, login, logout, uploadAudio, uploadEpisodeArt } from '../api'
 import type { Settings, Season, Episode } from '../types'
 
 const mockSettings: Settings = {
@@ -29,6 +29,7 @@ const mockEpisode: Episode = {
   guests: '',
   tags: '',
   cover_art_path: null,
+  cover_art_thumb_path: null,
   duration_seconds: 1800,
   publish_date: '2024-01-05',
   audio_type: 'upload',
@@ -178,5 +179,36 @@ describe('uploadAudio', () => {
     vi.stubGlobal('fetch', makeFetch(null, false, 500))
     const file = new File(['fake audio'], 'test.mp3', { type: 'audio/mpeg' })
     await expect(uploadAudio(file)).rejects.toThrow('Upload failed: HTTP 500')
+  })
+})
+
+describe('uploadEpisodeArt', () => {
+  it('posts FormData to /api/admin/upload/image with credentials and returns thumb/detail', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ thumb: '/images/abc-thumb.webp', detail: '/images/abc-detail.webp' }),
+    } as Response)
+
+    const file = new File(['fake image'], 'cover.jpg', { type: 'image/jpeg' })
+    const result = await uploadEpisodeArt(file)
+
+    expect(result).toEqual({ thumb: '/images/abc-thumb.webp', detail: '/images/abc-detail.webp' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/admin/upload/image')
+    expect(init?.method).toBe('POST')
+    expect(init?.credentials).toBe('include')
+    expect(init?.body).toBeInstanceOf(FormData)
+  })
+
+  it('throws on non-ok response', async () => {
+    vi.stubGlobal('fetch', makeFetch(null, false, 500))
+    const file = new File(['fake image'], 'cover.jpg', { type: 'image/jpeg' })
+    await expect(uploadEpisodeArt(file)).rejects.toThrow('Upload failed: HTTP 500')
   })
 })

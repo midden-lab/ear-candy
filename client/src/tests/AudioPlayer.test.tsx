@@ -22,6 +22,7 @@ const mockEpisode: Episode = {
   guests: 'Alice, Bob',
   tags: 'tech,news',
   cover_art_path: null,
+  cover_art_thumb_path: null,
   duration_seconds: 120,
   publish_date: '2024-01-01',
   audio_type: 'url',

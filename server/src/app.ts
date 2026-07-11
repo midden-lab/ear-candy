@@ -16,6 +16,7 @@ import { adminAuthRoute } from './routes/admin/auth.js'
 import { adminSeasonsRoute } from './routes/admin/seasons.js'
 import { adminEpisodesRoute } from './routes/admin/episodes.js'
 import { adminUploadRoute } from './routes/admin/upload.js'
+import { adminUploadImageRoute } from './routes/admin/upload-image.js'
 import { adminSettingsRoute } from './routes/admin/settings.js'
 
 declare module 'fastify' {
@@ -102,6 +103,21 @@ export function buildApp(opts: AppOptions = {}) {
         reply.header('X-Content-Type-Options', 'nosniff')
       }
     })
+
+    const imagesDir = path.resolve('data/uploads/images')
+    fs.mkdirSync(imagesDir, { recursive: true })
+    app.register(staticPlugin, {
+      root: imagesDir,
+      prefix: '/images/',
+      decorateReply: false,
+      setHeaders: (reply) => {
+        reply.header('X-Content-Type-Options', 'nosniff')
+        // Filenames are UUID-based and never mutated in place, so these can
+        // be cached aggressively — meaningfully helps repeat visits on slow
+        // cellular connections avoid re-fetching cover art at all.
+        reply.header('Cache-Control', 'public, max-age=31536000, immutable')
+      }
+    })
   }
 
   const clientDist = opts.clientDistPath ?? (
@@ -134,6 +150,7 @@ export function buildApp(opts: AppOptions = {}) {
   app.register(adminSeasonsRoute, { prefix: '/api' })
   app.register(adminEpisodesRoute, { prefix: '/api' })
   app.register(adminUploadRoute, { prefix: '/api' })
+  app.register(adminUploadImageRoute, { prefix: '/api' })
   app.register(adminSettingsRoute, { prefix: '/api' })
 
   return app

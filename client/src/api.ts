@@ -77,3 +77,15 @@ export async function uploadAudio(file: File): Promise<{ path: string }> {
   if (!res.ok) throw new Error(`Upload failed: HTTP ${res.status}`)
   return res.json() as Promise<{ path: string }>
 }
+
+export async function uploadEpisodeArt(file: File): Promise<{ thumb: string; detail: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await fetch('/api/admin/upload/image', {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  })
+  if (!res.ok) throw new Error(`Upload failed: HTTP ${res.status}`)
+  return res.json() as Promise<{ thumb: string; detail: string }>
+}

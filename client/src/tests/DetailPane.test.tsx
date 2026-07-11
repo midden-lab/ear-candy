@@ -17,6 +17,7 @@ const mockEpisode: Episode = {
   guests: 'Jane Doe, John Smith',
   tags: 'comedy, drama',
   cover_art_path: 'https://example.com/cover.jpg',
+  cover_art_thumb_path: 'https://example.com/cover-thumb.jpg',
   duration_seconds: 3600,
   publish_date: '2024-03-15',
   audio_type: 'upload',
@@ -66,11 +67,15 @@ it('shows "About this episode" label before description', () => {
 
 it('renders cover art image when cover_art_path is set', () => {
   render(<DetailPane episode={mockEpisode} seasons={seasons} />)
-  expect(screen.getByRole('img', { name: 'My Great Episode' })).toBeInTheDocument()
+  const img = screen.getByRole('img', { name: 'My Great Episode' })
+  expect(img).toBeInTheDocument()
+  expect(img).toHaveAttribute('loading', 'lazy')
+  expect(img).toHaveAttribute('srcset', expect.stringContaining('150w'))
+  expect(img).toHaveAttribute('srcset', expect.stringContaining('640w'))
 })
 
 it('does not render img when cover_art_path is null', () => {
-  render(<DetailPane episode={{ ...mockEpisode, cover_art_path: null }} seasons={seasons} />)
+  render(<DetailPane episode={{ ...mockEpisode, cover_art_path: null, cover_art_thumb_path: null }} seasons={seasons} />)
   expect(screen.queryByRole('img')).not.toBeInTheDocument()
 })
 

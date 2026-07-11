@@ -34,7 +34,10 @@ export default function AppShell({
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-zinc-950 md:flex-row">
       {isDesktop ? (
-        <aside className="flex flex-shrink-0">
+        <aside
+          className="flex flex-shrink-0"
+          style={{ paddingBottom: 'calc(var(--player-h, 0px) + env(safe-area-inset-bottom, 0px))' }}
+        >
           {rail}
           <div className="w-64 overflow-y-auto border-r border-zinc-800">
             {sidebar}

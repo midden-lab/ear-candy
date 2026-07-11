@@ -43,6 +43,11 @@ export function runMigrations(db: Database): void {
     )
   `).run()
 
+  const episodeCols = db.prepare('PRAGMA table_info(episodes)').all() as { name: string }[]
+  if (!episodeCols.some(c => c.name === 'cover_art_thumb_path')) {
+    db.prepare('ALTER TABLE episodes ADD COLUMN cover_art_thumb_path TEXT').run()
+  }
+
   const { c } = db.prepare('SELECT COUNT(*) as c FROM settings').get() as { c: number }
   if (c === 0) {
     db.prepare('INSERT INTO settings DEFAULT VALUES').run()

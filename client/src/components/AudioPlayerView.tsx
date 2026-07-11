@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Episode } from '../types'
 import ProgressBar from './ProgressBar'
+import EpisodeCoverArt from './EpisodeCoverArt'
 import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 
 function formatTime(seconds: number, showSign = false): string {
@@ -277,9 +278,13 @@ export default function AudioPlayerView({
           </button>
         </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-8 px-6 pb-6">
-          {episode.cover_art_path && (
-            <img src={episode.cover_art_path} alt={episode.title} className="w-full max-w-xs rounded-xl shadow-lg" />
-          )}
+          <EpisodeCoverArt
+            thumbPath={episode.cover_art_thumb_path}
+            detailPath={episode.cover_art_path}
+            alt={episode.title}
+            variant="responsive"
+            className="w-full max-w-xs aspect-square object-cover rounded-xl shadow-lg"
+          />
           <div className="w-full max-w-xs text-center">
             <div className="truncate text-lg font-semibold text-zinc-100">{episode.title}</div>
           </div>
@@ -301,14 +306,23 @@ export default function AudioPlayerView({
   return (
     <div ref={barRef} data-testid="player-bar" className="fixed bottom-0 left-0 right-0 border-t border-zinc-800 bg-zinc-900 px-6 py-3">
       {audioEl}
-      <div className="mx-auto max-w-3xl space-y-2">
-        <div className="truncate text-sm font-medium text-zinc-100">{episode.title}</div>
-        <ProgressBar currentTime={currentTime} duration={duration} onSeek={handleSeek} />
-        <div className="flex items-center justify-between text-xs text-zinc-500">
-          <span>{formatTime(currentTime)}</span>
-          <span>{formatTime(remaining, true)}</span>
+      <div className="mx-auto flex max-w-3xl items-center gap-3">
+        <EpisodeCoverArt
+          thumbPath={episode.cover_art_thumb_path}
+          detailPath={episode.cover_art_path}
+          alt={episode.title}
+          variant="thumb"
+          className="h-10 w-10 shrink-0 rounded object-cover"
+        />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="truncate text-sm font-medium text-zinc-100">{episode.title}</div>
+          <ProgressBar currentTime={currentTime} duration={duration} onSeek={handleSeek} />
+          <div className="flex items-center justify-between text-xs text-zinc-500">
+            <span>{formatTime(currentTime)}</span>
+            <span>{formatTime(remaining, true)}</span>
+          </div>
+          <TransportControls {...transportProps} />
         </div>
-        <TransportControls {...transportProps} />
       </div>
     </div>
   )
