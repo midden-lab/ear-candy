@@ -1,28 +1,17 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { vi, beforeEach, afterEach, describe } from 'vitest'
+import { vi, beforeEach } from 'vitest'
 import { usePlayerStore } from '../store/playerStore'
 import AudioPlayer from '../components/AudioPlayer'
 import type { Episode } from '../types'
 
+// Full behavioral coverage (mini-bar, expand/collapse, transport controls,
+// mobile layout) lives in AudioPlayerView.test.tsx against the presentational
+// component directly. These tests only prove the container wires the global
+// player store to AudioPlayerView correctly.
+
 HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
 HTMLMediaElement.prototype.pause = vi.fn()
 HTMLMediaElement.prototype.load = vi.fn()
-
-const originalMatchMedia = window.matchMedia
-
-function mockMobile() {
-  window.matchMedia = ((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  })) as unknown as typeof window.matchMedia
-}
 
 const mockEpisode: Episode = {
   id: 1,
@@ -47,131 +36,42 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-it('renders nothing when there is no episode in store', () => {
+it('renders nothing when there is no episode in the store', () => {
   const { container } = render(<AudioPlayer />)
   expect(container.firstChild).toBeNull()
 })
 
-it('renders episode title and play button when episode is in store', () => {
+it('renders the store episode title when one is set', () => {
   usePlayerStore.setState({ episode: mockEpisode })
   render(<AudioPlayer />)
   expect(screen.getByText('Test Episode')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument()
 })
 
-it('shows pause button when playing', () => {
-  usePlayerStore.setState({ episode: mockEpisode, playing: true })
-  render(<AudioPlayer />)
-  expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
-})
-
-it('clicking play button sets playing to true', () => {
+it('clicking play updates the store', () => {
   usePlayerStore.setState({ episode: mockEpisode, playing: false })
   render(<AudioPlayer />)
   fireEvent.click(screen.getByRole('button', { name: 'Play' }))
   expect(usePlayerStore.getState().playing).toBe(true)
 })
 
-it('renders skip-to-start button', () => {
-  usePlayerStore.setState({ episode: mockEpisode })
-  render(<AudioPlayer />)
-  expect(screen.getByRole('button', { name: 'Skip to start' })).toBeInTheDocument()
-})
-
-it('renders back 15 seconds button', () => {
-  usePlayerStore.setState({ episode: mockEpisode })
-  render(<AudioPlayer />)
-  expect(screen.getByRole('button', { name: 'Back 15 seconds' })).toBeInTheDocument()
-})
-
-it('renders forward 15 seconds button', () => {
-  usePlayerStore.setState({ episode: mockEpisode })
-  render(<AudioPlayer />)
-  expect(screen.getByRole('button', { name: 'Forward 15 seconds' })).toBeInTheDocument()
-})
-
-it('renders skip to end button', () => {
-  usePlayerStore.setState({ episode: mockEpisode })
-  render(<AudioPlayer />)
-  expect(screen.getByRole('button', { name: 'Skip to end' })).toBeInTheDocument()
-})
-
-it('renders speed toggle showing current speed', () => {
+it('clicking the speed toggle updates the store', () => {
   usePlayerStore.setState({ episode: mockEpisode, speed: 1 })
   render(<AudioPlayer />)
-  expect(screen.getByRole('button', { name: /speed/i })).toHaveTextContent('1×')
-})
-
-it('clicking speed toggle cycles 1→1.5→2→1', () => {
-  usePlayerStore.setState({ episode: mockEpisode, speed: 1 })
-  render(<AudioPlayer />)
-  const btn = screen.getByRole('button', { name: /speed/i })
-  fireEvent.click(btn)
+  fireEvent.click(screen.getByRole('button', { name: /speed/i }))
   expect(usePlayerStore.getState().speed).toBe(1.5)
-  fireEvent.click(btn)
-  expect(usePlayerStore.getState().speed).toBe(2)
-  fireEvent.click(btn)
-  expect(usePlayerStore.getState().speed).toBe(1)
 })
 
-it('displays elapsed and remaining timestamps', () => {
-  usePlayerStore.setState({ episode: mockEpisode, currentTime: 65, duration: 120 })
+it('sets the --player-h CSS variable when an episode is present', () => {
+  // jsdom doesn't compute real layout (offsetHeight is always 0), so this
+  // only proves the wiring fires — the actual measured value is covered
+  // by AudioPlayerView.test.tsx's onHeightChange spy.
+  usePlayerStore.setState({ episode: mockEpisode })
   render(<AudioPlayer />)
-  expect(screen.getByText('1:05')).toBeInTheDocument()
-  expect(screen.getByText('-0:55')).toBeInTheDocument()
+  expect(document.documentElement.style.getPropertyValue('--player-h')).not.toBe('')
 })
 
-describe('mobile (< md)', () => {
-  afterEach(() => {
-    window.matchMedia = originalMatchMedia
-  })
-
-  it('renders a compact mini-bar by default, not the full transport controls', () => {
-    mockMobile()
-    usePlayerStore.setState({ episode: mockEpisode })
-    render(<AudioPlayer />)
-    expect(screen.getByText('Test Episode')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Skip to start' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /speed/i })).not.toBeInTheDocument()
-  })
-
-  it('title truncates correctly next to the play button (min-w-0 regression guard)', () => {
-    mockMobile()
-    usePlayerStore.setState({ episode: mockEpisode })
-    render(<AudioPlayer />)
-    const title = screen.getByText('Test Episode')
-    expect(title).toHaveClass('truncate')
-    expect(title.parentElement).toHaveClass('min-w-0')
-  })
-
-  it('tapping the mini-bar expands to the full-screen overlay with all transport controls', async () => {
-    const user = userEvent.setup()
-    mockMobile()
-    usePlayerStore.setState({ episode: mockEpisode })
-    render(<AudioPlayer />)
-    await user.click(screen.getByRole('button', { name: /now playing/i }))
-    expect(screen.getByRole('button', { name: 'Skip to start' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /speed/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Collapse now playing' })).toBeInTheDocument()
-  })
-
-  it('collapses back to the mini-bar when the collapse control is tapped', async () => {
-    const user = userEvent.setup()
-    mockMobile()
-    usePlayerStore.setState({ episode: mockEpisode })
-    render(<AudioPlayer />)
-    await user.click(screen.getByRole('button', { name: /now playing/i }))
-    await user.click(screen.getByRole('button', { name: 'Collapse now playing' }))
-    expect(screen.queryByRole('button', { name: 'Collapse now playing' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Skip to start' })).not.toBeInTheDocument()
-  })
-
-  it('mini-bar play/pause button toggles playing without expanding the overlay', () => {
-    mockMobile()
-    usePlayerStore.setState({ episode: mockEpisode, playing: false })
-    render(<AudioPlayer />)
-    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
-    expect(usePlayerStore.getState().playing).toBe(true)
-    expect(screen.queryByRole('button', { name: 'Collapse now playing' })).not.toBeInTheDocument()
-  })
+it('resets the --player-h CSS variable when there is no episode', () => {
+  usePlayerStore.setState({ episode: null })
+  render(<AudioPlayer />)
+  expect(document.documentElement.style.getPropertyValue('--player-h')).toBe('0px')
 })

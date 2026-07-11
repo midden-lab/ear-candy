@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi, beforeEach } from 'vitest'
-import { usePlayerStore } from '../store/playerStore'
+import { vi } from 'vitest'
 import EpisodeItem from '../components/EpisodeItem'
 import type { Episode } from '../types'
 
@@ -22,10 +21,6 @@ const episode: Episode = {
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
 }
-
-beforeEach(() => {
-  usePlayerStore.setState({ episode: null, playing: false, currentTime: 0, duration: 0, speed: 1 })
-})
 
 it('renders episode number, title, publish_date, duration, and guests', () => {
   render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
@@ -59,14 +54,17 @@ it('inactive state: no aria-current, no border-l-2', () => {
   expect(btn).not.toHaveClass('border-l-2')
 })
 
-it('shows EQ indicator when this episode is active and playing', () => {
-  usePlayerStore.setState({ episode, playing: true })
-  render(<EpisodeItem episode={episode} isActive={true} onClick={() => {}} />)
+it('shows EQ indicator when isPlaying is true', () => {
+  render(<EpisodeItem episode={episode} isActive={true} isPlaying={true} onClick={() => {}} />)
   expect(document.querySelector('.eq-bars')).toBeInTheDocument()
 })
 
-it('does not show EQ indicator when not playing', () => {
-  usePlayerStore.setState({ episode, playing: false })
+it('does not show EQ indicator when isPlaying is false', () => {
+  render(<EpisodeItem episode={episode} isActive={true} isPlaying={false} onClick={() => {}} />)
+  expect(document.querySelector('.eq-bars')).not.toBeInTheDocument()
+})
+
+it('does not show EQ indicator when isPlaying is omitted', () => {
   render(<EpisodeItem episode={episode} isActive={true} onClick={() => {}} />)
   expect(document.querySelector('.eq-bars')).not.toBeInTheDocument()
 })
