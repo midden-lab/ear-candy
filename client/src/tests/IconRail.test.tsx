@@ -26,12 +26,21 @@ it('renders an "Episodes" nav icon button', () => {
   expect(screen.getByRole('button', { name: 'Episodes' })).toBeInTheDocument()
 })
 
-it('renders a "Seasons" nav icon button', () => {
+// Seasons and Search are temporarily hidden (SEASONS_AND_SEARCH_ENABLED = false
+// in IconRail.tsx) since neither has any functionality wired up yet. Re-enable
+// these tests once that flag flips back to true.
+it.skip('renders a "Seasons" nav icon button', () => {
   render(<IconRail onAdminClick={() => {}} />)
   expect(screen.getByRole('button', { name: 'Seasons' })).toBeInTheDocument()
 })
 
-it('renders a "Search" nav icon button', () => {
+it.skip('renders a "Search" nav icon button', () => {
   render(<IconRail onAdminClick={() => {}} />)
   expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument()
+})
+
+it('does not render the Seasons/Search nav icons while they are disabled', () => {
+  render(<IconRail onAdminClick={() => {}} />)
+  expect(screen.queryByRole('button', { name: 'Seasons' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Search' })).not.toBeInTheDocument()
 })

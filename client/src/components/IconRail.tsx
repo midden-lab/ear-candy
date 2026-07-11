@@ -2,6 +2,12 @@ interface IconRailProps {
   onAdminClick: () => void
 }
 
+// Seasons and Search are not wired up to any functionality yet (no onClick
+// handlers). Hidden from listeners for now so half-built controls don't show
+// up in front of users/reviewers. Flip this back to true once those features
+// are implemented — the markup below is left intact for that purpose.
+const SEASONS_AND_SEARCH_ENABLED = false
+
 export default function IconRail({ onAdminClick }: IconRailProps) {
   return (
     <nav className="flex w-16 flex-col items-center gap-2 border-r border-zinc-800 py-4">
@@ -24,29 +30,33 @@ export default function IconRail({ onAdminClick }: IconRailProps) {
         </svg>
       </button>
 
-      {/* Seasons */}
-      <button
-        className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
-        aria-label="Seasons"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <rect x="3" y="3" width="7" height="7"/>
-          <rect x="14" y="3" width="7" height="7"/>
-          <rect x="14" y="14" width="7" height="7"/>
-          <rect x="3" y="14" width="7" height="7"/>
-        </svg>
-      </button>
+      {SEASONS_AND_SEARCH_ENABLED && (
+        <>
+          {/* Seasons */}
+          <button
+            className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+            aria-label="Seasons"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7"/>
+              <rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+          </button>
 
-      {/* Search */}
-      <button
-        className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
-        aria-label="Search"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <circle cx="11" cy="11" r="8"/>
-          <path d="m21 21-4.35-4.35"/>
-        </svg>
-      </button>
+          {/* Search */}
+          <button
+            className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+            aria-label="Search"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
+          </button>
+        </>
+      )}
 
       <div className="flex-1" />
 
