@@ -149,11 +149,10 @@ jobs:
         run: |
           COOKIE_SECRET=$(openssl rand -hex 32)
           HASH=$(docker run --rm \
-            -v "$PWD/server:/app" \
-            -w /app \
+            -w /tmp \
             -e PW="$PASSWORD" \
             node:20-alpine \
-            sh -c 'npm ci --quiet >/dev/null 2>&1 && node -e "const b=require(\"bcrypt\"); b.hash(process.env.PW, 10).then(h=>process.stdout.write(h))"')
+            sh -c 'npm install --no-save --quiet bcryptjs >/dev/null 2>&1 && node -e "const b=require(\"bcryptjs\"); process.stdout.write(b.hashSync(process.env.PW, 10))"')
           echo "::add-mask::$COOKIE_SECRET"
           echo "::add-mask::$HASH"
           echo "cookie_secret=$COOKIE_SECRET" >> "$GITHUB_OUTPUT"
