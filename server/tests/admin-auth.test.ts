@@ -32,6 +32,72 @@ describe('POST /api/admin/login', () => {
     const cookieHeader = Array.isArray(setCookie) ? setCookie.join('; ') : setCookie
     expect(cookieHeader).toContain('admin_session=')
     expect(cookieHeader).toContain('HttpOnly')
+    expect(cookieHeader).toContain('SameSite=Strict')
+  })
+
+  it('locks out after repeated FAILED login attempts', async () => {
+    const app = await makeApp()
+
+    // Limit is 10 failed attempts per 15 minutes.
+    for (let i = 0; i < 10; i++) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/login',
+        payload: { password: 'wrongpassword' }
+      })
+      expect(res.statusCode).toBe(401)
+    }
+
+    const limited = await app.inject({
+      method: 'POST',
+      url: '/api/admin/login',
+      payload: { password: 'wrongpassword' }
+    })
+    expect(limited.statusCode).toBe(429)
+  })
+
+  it('does not count successful logins against the failed-attempt limit', async () => {
+    const app = await makeApp()
+
+    // Repeatedly logging in with the CORRECT password (e.g. a test suite
+    // authenticating once per test) must never trip the brute-force guard.
+    for (let i = 0; i < 15; i++) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/login',
+        payload: { password: VALID_PASSWORD }
+      })
+      expect(res.statusCode).toBe(200)
+    }
+  })
+
+  it('a successful login resets the failed-attempt counter', async () => {
+    const app = await makeApp()
+
+    for (let i = 0; i < 9; i++) {
+      await app.inject({
+        method: 'POST',
+        url: '/api/admin/login',
+        payload: { password: 'wrongpassword' }
+      })
+    }
+
+    const success = await app.inject({
+      method: 'POST',
+      url: '/api/admin/login',
+      payload: { password: VALID_PASSWORD }
+    })
+    expect(success.statusCode).toBe(200)
+
+    // Counter should be cleared — another 9 failures shouldn't lock out yet.
+    for (let i = 0; i < 9; i++) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/login',
+        payload: { password: 'wrongpassword' }
+      })
+      expect(res.statusCode).toBe(401)
+    }
   })
 
   it('returns 401 on wrong password', async () => {
@@ -53,7 +119,8 @@ describe('POST /api/admin/login', () => {
       payload: { password: VALID_PASSWORD }
     })
     expect(res.statusCode).toBe(500)
-    expect(res.json()).toEqual({ error: 'Server misconfigured' })
+    // Generic message on the wire (EC-010) — the real reason is logged server-side.
+    expect(res.json()).toEqual({ error: 'Internal server error' })
   })
 })
 

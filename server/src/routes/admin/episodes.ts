@@ -1,6 +1,13 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Episode } from '../../types.js'
 import { requireAdmin } from '../../auth.js'
+import { isValidMediaPath } from '../../utils/validation.js'
+
+const ALLOWED_EPISODE_PATCH_FIELDS = new Set([
+  'season_id', 'number', 'title', 'description', 'guests', 'tags',
+  'cover_art_path', 'duration_seconds', 'publish_date', 'audio_type',
+  'audio_path', 'hidden'
+])
 
 export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
   app.post<{
@@ -24,6 +31,14 @@ export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
       description = '', guests = '', tags = '', cover_art_path = null,
       duration_seconds = 0, hidden = false
     } = req.body
+
+    if (!title.trim()) return reply.status(400).send({ error: 'title is required' })
+    if (duration_seconds < 0) return reply.status(400).send({ error: 'duration_seconds must not be negative' })
+    if (!isValidMediaPath(audio_path)) return reply.status(400).send({ error: 'Invalid audio_path' })
+    if (cover_art_path && !isValidMediaPath(cover_art_path)) return reply.status(400).send({ error: 'Invalid cover_art_path' })
+    const season = app.db.prepare('SELECT id FROM seasons WHERE id = ?').get(season_id)
+    if (!season) return reply.status(400).send({ error: 'season_id does not reference an existing season' })
+
     const result = app.db.prepare(`
       INSERT INTO episodes
         (season_id, number, title, description, guests, tags, cover_art_path,
@@ -58,6 +73,14 @@ export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
       description = '', guests = '', tags = '', cover_art_path = null,
       duration_seconds = 0, hidden = false
     } = req.body
+
+    if (!title.trim()) return reply.status(400).send({ error: 'title is required' })
+    if (duration_seconds < 0) return reply.status(400).send({ error: 'duration_seconds must not be negative' })
+    if (!isValidMediaPath(audio_path)) return reply.status(400).send({ error: 'Invalid audio_path' })
+    if (cover_art_path && !isValidMediaPath(cover_art_path)) return reply.status(400).send({ error: 'Invalid cover_art_path' })
+    const season = app.db.prepare('SELECT id FROM seasons WHERE id = ?').get(season_id)
+    if (!season) return reply.status(400).send({ error: 'season_id does not reference an existing season' })
+
     app.db.prepare(`
       UPDATE episodes SET
         season_id = ?, number = ?, title = ?, description = ?, guests = ?, tags = ?,
@@ -91,6 +114,28 @@ export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
     const id = parseInt(req.params.id, 10)
     const updates = req.body
     const fields = Object.keys(updates) as Array<keyof typeof updates>
+
+    const invalidFields = fields.filter(f => !ALLOWED_EPISODE_PATCH_FIELDS.has(f))
+    if (invalidFields.length > 0) {
+      return reply.status(400).send({ error: `Invalid field(s): ${invalidFields.join(', ')}` })
+    }
+
+    if (updates.title !== undefined && !updates.title.trim()) {
+      return reply.status(400).send({ error: 'title is required' })
+    }
+    if (updates.duration_seconds !== undefined && updates.duration_seconds < 0) {
+      return reply.status(400).send({ error: 'duration_seconds must not be negative' })
+    }
+    if (updates.audio_path !== undefined && !isValidMediaPath(updates.audio_path)) {
+      return reply.status(400).send({ error: 'Invalid audio_path' })
+    }
+    if (updates.cover_art_path && !isValidMediaPath(updates.cover_art_path)) {
+      return reply.status(400).send({ error: 'Invalid cover_art_path' })
+    }
+    if (updates.season_id !== undefined) {
+      const season = app.db.prepare('SELECT id FROM seasons WHERE id = ?').get(updates.season_id)
+      if (!season) return reply.status(400).send({ error: 'season_id does not reference an existing season' })
+    }
 
     const setClauses: string[] = fields.map(f => `${f} = ?`)
     const values: unknown[] = fields.map(f => {

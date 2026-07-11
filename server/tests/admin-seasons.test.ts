@@ -177,6 +177,28 @@ describe('Admin Seasons CRUD', () => {
 
       expect(res.statusCode).toBe(401)
     })
+
+    it('rejects a PATCH body containing a field not in the allowlist (SQL injection guard)', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/admin/seasons',
+        headers: { cookie },
+        payload: { number: 1, title: 'Original Title' }
+      })
+      const { id } = createRes.json()
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/api/admin/seasons/${id}`,
+        headers: { cookie },
+        payload: { 'title; DROP TABLE seasons; --': 'pwned' }
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
   })
 
   describe('DELETE /api/admin/seasons/:id', () => {
