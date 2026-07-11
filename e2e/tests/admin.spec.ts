@@ -162,4 +162,23 @@ test.describe('Admin panel — logout', () => {
     // Admin header is gone
     await expect(page.getByText('Ear Candy Admin')).not.toBeVisible()
   })
+
+  // Regression test: "Sign out" must invalidate the server-side session, not
+  // just reset client-side view state — otherwise the still-valid session
+  // cookie lets a later click on the admin icon bypass the password prompt.
+  base.test('signing out and reopening admin prompts for the password again', async ({ page }) => {
+    const pw = process.env.TEST_ADMIN_PASSWORD ?? 'changeme'
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await page.getByLabel('Password').fill(pw)
+    await page.getByRole('button', { name: 'Sign in' }).click()
+    await expect(page.getByText('Ear Candy Admin')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Sign out' }).click()
+    await expect(page.getByText('Ear Candy Admin')).not.toBeVisible()
+
+    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
+    await expect(page.getByText('Ear Candy Admin')).not.toBeVisible()
+  })
 })

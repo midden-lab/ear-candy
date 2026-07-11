@@ -1,5 +1,5 @@
 import { vi, beforeEach, describe, it, expect } from 'vitest'
-import { getSettings, getSeasons, getEpisodes, getEpisode, login, uploadAudio } from '../api'
+import { getSettings, getSeasons, getEpisodes, getEpisode, login, logout, uploadAudio } from '../api'
 import type { Settings, Season, Episode } from '../types'
 
 const mockSettings: Settings = {
@@ -133,6 +133,20 @@ describe('login', () => {
 
     mockFetch.mockResolvedValueOnce({ ok: false } as Response)
     await expect(login('wrong')).rejects.toThrow('Invalid password')
+  })
+})
+
+describe('logout', () => {
+  it('posts to /api/admin/logout with credentials included', async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce({ ok: true } as Response)
+    vi.stubGlobal('fetch', mockFetch)
+
+    await logout()
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/admin/logout', {
+      method: 'POST',
+      credentials: 'include',
+    })
   })
 })
 
