@@ -8,6 +8,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import type { Database } from 'better-sqlite3'
 import { initDb } from './db/index.js'
+import { healthRoute } from './routes/health.js'
 import { settingsRoute } from './routes/settings.js'
 import { seasonsRoute } from './routes/seasons.js'
 import { episodesRoute } from './routes/episodes.js'
@@ -125,6 +126,7 @@ export function buildApp(opts: AppOptions = {}) {
 
   app.addHook('onClose', () => { db.close() })
 
+  app.register(healthRoute, { prefix: '/api' })
   app.register(settingsRoute, { prefix: '/api' })
   app.register(seasonsRoute, { prefix: '/api' })
   app.register(episodesRoute, { prefix: '/api' })
