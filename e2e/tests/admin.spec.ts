@@ -71,7 +71,7 @@ test.describe('Admin panel — episode management', () => {
 
   test('create an episode — it appears in the season block', async ({ adminPage: page }) => {
     const lastSeason = page.getByTestId('season-card').last()
-    await lastSeason.getByRole('button', { name: '+ New Episode' }).click()
+    await lastSeason.getByRole('button', { name: 'New Episode' }).click()
     // Fill in the episode form panel
     await page.getByLabel('Title').fill('My Test Episode')
     await page.getByLabel('Episode #').fill('1')
@@ -84,7 +84,7 @@ test.describe('Admin panel — episode management', () => {
 
   test('create an episode with uploaded audio — it appears in the season block', async ({ adminPage: page }) => {
     const lastSeason = page.getByTestId('season-card').last()
-    await lastSeason.getByRole('button', { name: '+ New Episode' }).click()
+    await lastSeason.getByRole('button', { name: 'New Episode' }).click()
     // Fill in the episode form panel with upload
     await page.getByLabel('Title').fill('Uploaded Episode')
     await page.getByLabel('Episode #').fill('2')
@@ -100,7 +100,7 @@ test.describe('Admin panel — episode management', () => {
   test('edit an episode title — change is reflected in the list', async ({ adminPage: page }) => {
     // Create an episode first
     const lastSeason = page.getByTestId('season-card').last()
-    await lastSeason.getByRole('button', { name: '+ New Episode' }).click()
+    await lastSeason.getByRole('button', { name: 'New Episode' }).click()
     await page.getByLabel('Title').fill('Original Title')
     await page.getByLabel('Episode #').fill('1')
     await page.getByLabel('Publish Date').fill('2024-06-01')
@@ -120,7 +120,7 @@ test.describe('Admin panel — episode management', () => {
   test('delete an episode — it disappears from the list', async ({ adminPage: page }) => {
     // Create an episode first
     const lastSeason = page.getByTestId('season-card').last()
-    await lastSeason.getByRole('button', { name: '+ New Episode' }).click()
+    await lastSeason.getByRole('button', { name: 'New Episode' }).click()
     await page.getByLabel('Title').fill('Episode To Delete')
     await page.getByLabel('Episode #').fill('1')
     await page.getByLabel('Publish Date').fill('2024-06-01')

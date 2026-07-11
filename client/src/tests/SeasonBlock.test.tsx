@@ -61,7 +61,10 @@ const defaultProps = {
   onDeleteEpisode: vi.fn(),
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+})
 
 it('renders season title', () => {
   render(<SeasonBlock {...defaultProps} />)
@@ -82,16 +85,25 @@ it('clicking Edit season calls onEditSeason', async () => {
   expect(defaultProps.onEditSeason).toHaveBeenCalledWith(season)
 })
 
-it('clicking Delete season calls onDeleteSeason', async () => {
+it('clicking Delete season calls onDeleteSeason after confirmation', async () => {
   render(<SeasonBlock {...defaultProps} />)
   const deleteButtons = screen.getAllByText('Delete')
   await userEvent.click(deleteButtons[0])
+  expect(window.confirm).toHaveBeenCalled()
   expect(defaultProps.onDeleteSeason).toHaveBeenCalledWith(season.id)
+})
+
+it('does not call onDeleteSeason if confirmation is cancelled', async () => {
+  vi.spyOn(window, 'confirm').mockReturnValue(false)
+  render(<SeasonBlock {...defaultProps} />)
+  const deleteButtons = screen.getAllByText('Delete')
+  await userEvent.click(deleteButtons[0])
+  expect(defaultProps.onDeleteSeason).not.toHaveBeenCalled()
 })
 
 it('clicking "+ New Episode" calls onNewEpisode', async () => {
   render(<SeasonBlock {...defaultProps} />)
-  await userEvent.click(screen.getByText('+ New Episode'))
+  await userEvent.click(screen.getByText('New Episode'))
   expect(defaultProps.onNewEpisode).toHaveBeenCalledWith(season.id)
 })
 
@@ -103,10 +115,18 @@ it('clicking episode Edit calls onEditEpisode', async () => {
   expect(defaultProps.onEditEpisode).toHaveBeenCalledWith(episodes[0])
 })
 
-it('clicking episode Delete calls onDeleteEpisode', async () => {
+it('clicking episode Delete calls onDeleteEpisode after confirmation', async () => {
   render(<SeasonBlock {...defaultProps} />)
   const deleteButtons = screen.getAllByText('Delete')
   // deleteButtons[0] is season Delete, deleteButtons[1] is first episode Delete
   await userEvent.click(deleteButtons[1])
   expect(defaultProps.onDeleteEpisode).toHaveBeenCalledWith(episodes[0].id)
+})
+
+it('does not call onDeleteEpisode if confirmation is cancelled', async () => {
+  vi.spyOn(window, 'confirm').mockReturnValue(false)
+  render(<SeasonBlock {...defaultProps} />)
+  const deleteButtons = screen.getAllByText('Delete')
+  await userEvent.click(deleteButtons[1])
+  expect(defaultProps.onDeleteEpisode).not.toHaveBeenCalled()
 })
