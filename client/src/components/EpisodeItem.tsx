@@ -1,5 +1,4 @@
 import type { Episode } from '../types'
-import { usePlayerStore } from '../store/playerStore'
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600)
@@ -12,14 +11,12 @@ function formatDuration(seconds: number): string {
 interface EpisodeItemProps {
   episode: Episode
   isActive: boolean
+  /** Whether this episode is the one currently playing (not just selected). */
+  isPlaying?: boolean
   onClick: (episode: Episode) => void
 }
 
-export default function EpisodeItem({ episode, isActive, onClick }: EpisodeItemProps) {
-  const playing = usePlayerStore(state => state.playing)
-  const currentEpisode = usePlayerStore(state => state.episode)
-  const isPlaying = isActive && playing && currentEpisode?.id === episode.id
-
+export default function EpisodeItem({ episode, isActive, isPlaying = false, onClick }: EpisodeItemProps) {
   return (
     <button
       onClick={() => onClick(episode)}
