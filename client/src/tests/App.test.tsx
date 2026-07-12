@@ -11,6 +11,7 @@ vi.mock('../api', () => ({
     tagline: '',
     description: '',
     cover_art_path: null,
+    favicon_path: null,
     accent_color: '#ff0000',
   }),
   getSeasons: vi.fn().mockResolvedValue([]),
@@ -51,6 +52,7 @@ it('renders player view after settings load', async () => {
     tagline: '',
     description: '',
     cover_art_path: null,
+    favicon_path: null,
     accent_color: '#ff0000',
   })
   render(<App />)
@@ -66,6 +68,7 @@ it('navigates to admin login when admin button is clicked', async () => {
     tagline: '',
     description: '',
     cover_art_path: null,
+    favicon_path: null,
     accent_color: '#ff0000',
   })
   render(<App />)
@@ -97,6 +100,7 @@ describe('admin sign out', () => {
       tagline: '',
       description: '',
       cover_art_path: null,
+      favicon_path: null,
       accent_color: '#ff0000',
     })
     render(<App />)
@@ -116,6 +120,7 @@ describe('admin sign out', () => {
       tagline: '',
       description: '',
       cover_art_path: null,
+      favicon_path: null,
       accent_color: '#ff0000',
     })
     render(<App />)
@@ -134,11 +139,67 @@ it('applies accent color from settings to CSS variable', async () => {
     tagline: '',
     description: '',
     cover_art_path: null,
+    favicon_path: null,
     accent_color: '#ff0000',
   })
   render(<App />)
   await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#ff0000')
   )
-  expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#ff0000')
+})
+
+describe('document title and favicon', () => {
+  afterEach(() => {
+    document.querySelectorAll('link[rel="icon"]').forEach(el => el.remove())
+  })
+
+  it('sets document.title to the podcast_name from settings', async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      podcast_name: 'Positive Sex Ed',
+      tagline: '',
+      description: '',
+      cover_art_path: null,
+      favicon_path: null,
+      accent_color: '#ff0000',
+    })
+    render(<App />)
+    await waitFor(() => expect(document.title).toBe('Positive Sex Ed'))
+  })
+
+  it('injects a <link rel="icon"> pointing at favicon_path when set', async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      podcast_name: 'Test Pod',
+      tagline: '',
+      description: '',
+      cover_art_path: null,
+      favicon_path: '/images/favicon-abc.png',
+      accent_color: '#ff0000',
+    })
+    render(<App />)
+    await waitFor(() => {
+      const link = document.querySelector('link[rel="icon"]')
+      expect(link).toHaveAttribute('href', '/images/favicon-abc.png')
+    })
+  })
+
+  it('removes a previously-injected favicon link when favicon_path is null', async () => {
+    const link = document.createElement('link')
+    link.rel = 'icon'
+    link.href = '/images/stale-favicon.png'
+    document.head.appendChild(link)
+
+    vi.mocked(getSettings).mockResolvedValue({
+      podcast_name: 'Test Pod',
+      tagline: '',
+      description: '',
+      cover_art_path: null,
+      favicon_path: null,
+      accent_color: '#ff0000',
+    })
+    render(<App />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
+    )
+    expect(document.querySelector('link[rel="icon"]')).not.toBeInTheDocument()
+  })
 })

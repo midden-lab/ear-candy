@@ -10,7 +10,7 @@ describe('database migrations', () => {
     const row = db.prepare('SELECT * FROM settings').get() as Record<string, unknown>
     expect(row).toBeDefined()
     expect(row.accent_color).toBe('#5a3ef5')
-    expect(row.podcast_name).toBe('My Podcast')
+    expect(row.podcast_name).toBe('Ear Candy')
   })
 
   it('does not duplicate settings row on second init', () => {
@@ -41,7 +41,7 @@ describe('GET /api/settings', () => {
     const res = await app.inject({ method: 'GET', url: '/api/settings' })
     expect(res.statusCode).toBe(200)
     const body = res.json()
-    expect(body.podcast_name).toBe('My Podcast')
+    expect(body.podcast_name).toBe('Ear Candy')
     expect(body.accent_color).toBe('#5a3ef5')
   })
 })

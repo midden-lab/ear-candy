@@ -3,6 +3,7 @@ export interface Settings {
   tagline: string
   description: string
   cover_art_path: string | null
+  favicon_path: string | null
   accent_color: string
 }
 

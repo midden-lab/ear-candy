@@ -1,5 +1,5 @@
 import { vi, beforeEach, describe, it, expect } from 'vitest'
-import { getSettings, getSeasons, getEpisodes, getEpisode, login, logout, uploadAudio, uploadEpisodeArt } from '../api'
+import { getSettings, getSeasons, getEpisodes, getEpisode, login, logout, uploadAudio, uploadEpisodeArt, uploadFavicon } from '../api'
 import type { Settings, Season, Episode } from '../types'
 
 const mockSettings: Settings = {
@@ -7,6 +7,7 @@ const mockSettings: Settings = {
   tagline: 'A test tagline',
   description: 'A test description',
   cover_art_path: null,
+  favicon_path: null,
   accent_color: '#ff6600',
 }
 
@@ -210,5 +211,36 @@ describe('uploadEpisodeArt', () => {
     vi.stubGlobal('fetch', makeFetch(null, false, 500))
     const file = new File(['fake image'], 'cover.jpg', { type: 'image/jpeg' })
     await expect(uploadEpisodeArt(file)).rejects.toThrow('Upload failed: HTTP 500')
+  })
+})
+
+describe('uploadFavicon', () => {
+  it('posts FormData to /api/admin/upload/favicon with credentials and returns path', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ path: '/images/favicon-abc.png' }),
+    } as Response)
+
+    const file = new File(['fake favicon'], 'favicon.png', { type: 'image/png' })
+    const result = await uploadFavicon(file)
+
+    expect(result).toEqual({ path: '/images/favicon-abc.png' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/admin/upload/favicon')
+    expect(init?.method).toBe('POST')
+    expect(init?.credentials).toBe('include')
+    expect(init?.body).toBeInstanceOf(FormData)
+  })
+
+  it('throws on non-ok response', async () => {
+    vi.stubGlobal('fetch', makeFetch(null, false, 500))
+    const file = new File(['fake favicon'], 'favicon.png', { type: 'image/png' })
+    await expect(uploadFavicon(file)).rejects.toThrow('Upload failed: HTTP 500')
   })
 })

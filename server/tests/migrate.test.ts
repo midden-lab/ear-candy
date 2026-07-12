@@ -62,4 +62,35 @@ describe('runMigrations', () => {
     // Existing table's data-bearing columns are untouched by the migration.
     expect(columns(db, 'episodes')).toContain('cover_art_path')
   })
+
+  it('creates favicon_path on a fresh database', () => {
+    const db = new Database(':memory:')
+    runMigrations(db)
+    expect(columns(db, 'settings')).toContain('favicon_path')
+  })
+
+  it('adds favicon_path to a pre-existing settings table that predates the column', () => {
+    // Simulate a production DB created before this migration existed: the
+    // settings table exists (with a row already inserted) but lacks favicon_path.
+    const db = new Database(':memory:')
+    db.prepare(`
+      CREATE TABLE settings (
+        podcast_name   TEXT NOT NULL DEFAULT 'Ear Candy',
+        tagline        TEXT NOT NULL DEFAULT '',
+        description    TEXT NOT NULL DEFAULT '',
+        cover_art_path TEXT,
+        accent_color   TEXT NOT NULL DEFAULT '#5a3ef5'
+      )
+    `).run()
+    db.prepare('INSERT INTO settings DEFAULT VALUES').run()
+    expect(columns(db, 'settings')).not.toContain('favicon_path')
+
+    runMigrations(db)
+
+    expect(columns(db, 'settings')).toContain('favicon_path')
+    // The existing row survives the migration untouched, still a singleton.
+    const row = db.prepare('SELECT * FROM settings').get() as { podcast_name: string }
+    expect(row.podcast_name).toBe('Ear Candy')
+    expect(db.prepare('SELECT COUNT(*) as c FROM settings').get()).toEqual({ c: 1 })
+  })
 })

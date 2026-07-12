@@ -3,7 +3,7 @@ import type { Database } from 'better-sqlite3'
 export function runMigrations(db: Database): void {
   db.prepare(`
     CREATE TABLE IF NOT EXISTS settings (
-      podcast_name   TEXT NOT NULL DEFAULT 'My Podcast',
+      podcast_name   TEXT NOT NULL DEFAULT 'Ear Candy',
       tagline        TEXT NOT NULL DEFAULT '',
       description    TEXT NOT NULL DEFAULT '',
       cover_art_path TEXT,
@@ -46,6 +46,11 @@ export function runMigrations(db: Database): void {
   const episodeCols = db.prepare('PRAGMA table_info(episodes)').all() as { name: string }[]
   if (!episodeCols.some(c => c.name === 'cover_art_thumb_path')) {
     db.prepare('ALTER TABLE episodes ADD COLUMN cover_art_thumb_path TEXT').run()
+  }
+
+  const settingsCols = db.prepare('PRAGMA table_info(settings)').all() as { name: string }[]
+  if (!settingsCols.some(c => c.name === 'favicon_path')) {
+    db.prepare('ALTER TABLE settings ADD COLUMN favicon_path TEXT').run()
   }
 
   const { c } = db.prepare('SELECT COUNT(*) as c FROM settings').get() as { c: number }
