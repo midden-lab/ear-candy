@@ -3,22 +3,25 @@ import type { Settings } from '../../types.js'
 import { requireAdmin } from '../../auth.js'
 import { isValidMediaPath } from '../../utils/validation.js'
 
-const ALLOWED_SETTINGS_PATCH_FIELDS = new Set(['podcast_name', 'tagline', 'description', 'cover_art_path', 'accent_color'])
+const ALLOWED_SETTINGS_PATCH_FIELDS = new Set(['podcast_name', 'tagline', 'description', 'cover_art_path', 'favicon_path', 'browser_tab_title', 'accent_color'])
 
 export const adminSettingsRoute: FastifyPluginAsync = async (app) => {
   app.put<{
     Body: Settings
   }>('/admin/settings', { preHandler: requireAdmin }, async (req, reply) => {
-    const { podcast_name, tagline, description, cover_art_path, accent_color } = req.body
+    const { podcast_name, tagline, description, cover_art_path, favicon_path, browser_tab_title, accent_color } = req.body
     if (!podcast_name.trim()) return reply.status(400).send({ error: 'podcast_name is required' })
     if (cover_art_path && !isValidMediaPath(cover_art_path)) {
       return reply.status(400).send({ error: 'Invalid cover_art_path' })
     }
+    if (favicon_path && !isValidMediaPath(favicon_path)) {
+      return reply.status(400).send({ error: 'Invalid favicon_path' })
+    }
 
     app.db.prepare('DELETE FROM settings').run()
     app.db.prepare(
-      'INSERT INTO settings (podcast_name, tagline, description, cover_art_path, accent_color) VALUES (?, ?, ?, ?, ?)'
-    ).run(podcast_name, tagline, description, cover_art_path ?? null, accent_color)
+      'INSERT INTO settings (podcast_name, tagline, description, cover_art_path, favicon_path, browser_tab_title, accent_color) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(podcast_name, tagline, description, cover_art_path ?? null, favicon_path ?? null, browser_tab_title ?? null, accent_color)
 
     const row = app.db.prepare('SELECT * FROM settings').get() as Settings
     return row
@@ -43,6 +46,9 @@ export const adminSettingsRoute: FastifyPluginAsync = async (app) => {
     }
     if (updates.cover_art_path && !isValidMediaPath(updates.cover_art_path)) {
       return reply.status(400).send({ error: 'Invalid cover_art_path' })
+    }
+    if (updates.favicon_path && !isValidMediaPath(updates.favicon_path)) {
+      return reply.status(400).send({ error: 'Invalid favicon_path' })
     }
 
     const setClauses = fields.map(f => `${f} = ?`)

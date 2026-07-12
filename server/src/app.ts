@@ -17,6 +17,7 @@ import { adminSeasonsRoute } from './routes/admin/seasons.js'
 import { adminEpisodesRoute } from './routes/admin/episodes.js'
 import { adminUploadRoute } from './routes/admin/upload.js'
 import { adminUploadImageRoute } from './routes/admin/upload-image.js'
+import { adminUploadFaviconRoute } from './routes/admin/upload-favicon.js'
 import { adminSettingsRoute } from './routes/admin/settings.js'
 
 declare module 'fastify' {
@@ -151,6 +152,7 @@ export function buildApp(opts: AppOptions = {}) {
   app.register(adminEpisodesRoute, { prefix: '/api' })
   app.register(adminUploadRoute, { prefix: '/api' })
   app.register(adminUploadImageRoute, { prefix: '/api' })
+  app.register(adminUploadFaviconRoute, { prefix: '/api' })
   app.register(adminSettingsRoute, { prefix: '/api' })
 
   return app

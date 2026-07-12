@@ -166,7 +166,7 @@ test.describe('Admin panel — episode management', () => {
 test.describe('Admin panel — settings', () => {
   test.afterEach(async ({ adminPage: page }) => {
     await page.request.patch('/api/admin/settings', {
-      data: { podcast_name: 'My Podcast' },
+      data: { podcast_name: 'My Podcast', favicon_path: null },
     })
   })
 
@@ -179,6 +179,22 @@ test.describe('Admin panel — settings', () => {
     await page.getByLabel('Podcast Name').fill('My E2E Podcast')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByRole('status')).toContainText('Settings saved!')
+  })
+
+  test('upload a favicon — preview shows, saves, and the browser tab icon updates', async ({ adminPage: page }) => {
+    await page.getByRole('button', { name: 'Settings' }).click()
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
+
+    await page.getByLabel('Favicon').setInputFiles('fixtures/test-favicon.png')
+    await expect(page.getByAltText('Favicon preview')).toBeVisible()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('status')).toContainText('Settings saved!')
+
+    // Reload the public listener view and confirm the injected <link rel="icon">
+    // actually points at the uploaded favicon.
+    await page.goto('/')
+    const iconHref = await page.locator('link[rel="icon"]').getAttribute('href')
+    expect(iconHref).toMatch(/^\/images\/favicon-.*\.png$/)
   })
 })
 
