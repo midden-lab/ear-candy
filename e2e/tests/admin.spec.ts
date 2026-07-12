@@ -97,6 +97,43 @@ test.describe('Admin panel — episode management', () => {
     await expect(lastSeason.getByText('Uploaded Episode')).toBeVisible()
   })
 
+  test('creating an episode with uploaded audio auto-detects duration — shown in the listener episode list', async ({ adminPage: page }) => {
+    const lastSeason = page.getByTestId('season-card').last()
+    const seasonTitle = await lastSeason.locator('span').first().innerText()
+    await lastSeason.getByRole('button', { name: 'New Episode' }).click()
+    await page.getByLabel('Title').fill('Duration Detected Episode')
+    await page.getByLabel('Episode #').fill('4')
+    await page.getByLabel('Publish Date').fill('2024-06-04')
+    await page.getByLabel('Audio Type').selectOption('upload')
+    // test-audio.wav is a real, decodable 2-second silent WAV (unlike
+    // test-audio.mp3, a synthetic stub too short/headerless for a browser's
+    // media demuxer to open — fine for upload-plumbing tests, but useless
+    // for actually exercising duration detection).
+    await page.getByLabel('Audio File').setInputFiles('fixtures/test-audio.wav')
+    // The browser probes the real file's duration client-side (no manual
+    // entry) — confirm the form shows it was detected before saving.
+    await expect(page.getByText('Duration: 0:02')).toBeVisible()
+    await page.getByRole('button', { name: 'Save' }).click()
+
+    // Leave the admin panel to see how this episode renders in the public
+    // listener list, which is what surfaced the original bug: duration_seconds
+    // was never populated by the admin form, so the list always showed 0:00.
+    // The listener view defaults to the first season's tab, which isn't
+    // necessarily this one — select it explicitly (title is "S3: Season 3"
+    // in the admin header vs. just "Season 3" on the listener tab).
+    await page.goto('/')
+    const seasonName = seasonTitle.split(': ').slice(1).join(': ')
+    await page.getByRole('button', { name: seasonName }).click()
+    const item = page.locator('button', { hasText: 'Duration Detected Episode' })
+    await expect(item).toBeVisible()
+    await expect(item).toContainText('0:02')
+
+    // Return to the admin panel so the shared afterEach can find and clean
+    // up the season/episode created above.
+    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await expect(page.getByText('Ear Candy Admin')).toBeVisible()
+  })
+
   test('create an episode with cover art — thumbnail shows in the list, full image in the detail pane', async ({ adminPage: page }) => {
     const lastSeason = page.getByTestId('season-card').last()
     await lastSeason.getByRole('button', { name: 'New Episode' }).click()

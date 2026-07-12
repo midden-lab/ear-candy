@@ -35,12 +35,43 @@ const episode: Episode = {
   updated_at: '',
 }
 
+// jsdom doesn't implement real media loading, so probeAudioDuration's
+// `new Audio()` never actually fires loadedmetadata/error on its own.
+// Stub the constructor with a controllable fake so tests can drive those
+// events directly.
+class FakeAudio {
+  duration = 0
+  src = ''
+  private listeners: Record<string, Array<() => void>> = {}
+  addEventListener(event: string, cb: () => void) {
+    (this.listeners[event] ??= []).push(cb)
+  }
+  removeEventListener(event: string, cb: () => void) {
+    this.listeners[event] = (this.listeners[event] ?? []).filter(l => l !== cb)
+  }
+  emit(event: string) {
+    (this.listeners[event] ?? []).forEach(cb => cb())
+  }
+}
+let fakeAudioInstances: FakeAudio[] = []
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockUploadAudio.mockReset()
   mockUploadEpisodeArt.mockReset()
   mockCreateEpisode.mockResolvedValue({ id: 99 })
   mockUpdateEpisode.mockResolvedValue({ id: 10 })
+
+  fakeAudioInstances = []
+  vi.stubGlobal('Audio', vi.fn(() => {
+    const instance = new FakeAudio()
+    fakeAudioInstances.push(instance)
+    return instance
+  }))
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 it('renders "New Episode" heading when no episode prop', () => {
@@ -112,6 +143,114 @@ describe('audio type upload', () => {
   })
 })
 
+describe('duration auto-detection', () => {
+  it('detects duration from an uploaded file and includes it in the create payload', async () => {
+    mockUploadAudio.mockResolvedValue({ path: '/audio/test-123.mp3' })
+    render(<EpisodeFormPanel seasonId={1} onSave={vi.fn()} onCancel={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText(/title/i), 'New Ep')
+    await userEvent.type(screen.getByLabelText(/episode #/i), '1')
+    await userEvent.type(screen.getByLabelText(/publish date/i), '2024-01-01')
+    await userEvent.selectOptions(screen.getByLabelText(/audio type/i), 'upload')
+
+    const fileInput = screen.getByLabelText(/audio file/i)
+    const file = new File(['fake audio'], 'test.mp3', { type: 'audio/mpeg' })
+    await userEvent.upload(fileInput, file)
+
+    await waitFor(() => expect(fakeAudioInstances).toHaveLength(1))
+    fakeAudioInstances[0].duration = 754
+    fakeAudioInstances[0].emit('loadedmetadata')
+
+    await waitFor(() => {
+      expect(screen.getByText('Duration: 12:34')).toBeInTheDocument()
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(mockCreateEpisode).toHaveBeenCalledWith(expect.objectContaining({ duration_seconds: 754 }))
+    })
+  })
+
+  it('detects duration from an audio URL at submit time and includes it in the payload', async () => {
+    render(<EpisodeFormPanel seasonId={1} onSave={vi.fn()} onCancel={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText(/title/i), 'New Ep')
+    await userEvent.type(screen.getByLabelText(/episode #/i), '1')
+    await userEvent.type(screen.getByLabelText(/publish date/i), '2024-01-01')
+    await userEvent.type(screen.getByLabelText(/audio url/i), 'http://example.com/a.mp3')
+
+    // Probing happens as part of submit (not eagerly on blur — a real
+    // network fetch mid-typing was found to race with the Save click in
+    // practice), so trigger it by clicking Save.
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(fakeAudioInstances).toHaveLength(1))
+    fakeAudioInstances[0].duration = 90
+    fakeAudioInstances[0].emit('loadedmetadata')
+
+    await waitFor(() => {
+      expect(mockCreateEpisode).toHaveBeenCalledWith(expect.objectContaining({ duration_seconds: 90 }))
+    })
+  })
+
+  it('falls back to durationchange when loadedmetadata reports Infinity (real MP3 browser behavior)', async () => {
+    render(<EpisodeFormPanel seasonId={1} onSave={vi.fn()} onCancel={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText(/title/i), 'New Ep')
+    await userEvent.type(screen.getByLabelText(/episode #/i), '1')
+    await userEvent.type(screen.getByLabelText(/publish date/i), '2024-01-01')
+    await userEvent.type(screen.getByLabelText(/audio url/i), 'http://example.com/no-duration-header.mp3')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(fakeAudioInstances).toHaveLength(1))
+    fakeAudioInstances[0].duration = Infinity
+    fakeAudioInstances[0].emit('loadedmetadata')
+    expect(mockCreateEpisode).not.toHaveBeenCalled()
+
+    fakeAudioInstances[0].duration = 45
+    fakeAudioInstances[0].emit('durationchange')
+
+    await waitFor(() => {
+      expect(mockCreateEpisode).toHaveBeenCalledWith(expect.objectContaining({ duration_seconds: 45 }))
+    })
+  })
+
+  it('does not block saving when detection fails, and saves duration_seconds: 0', async () => {
+    render(<EpisodeFormPanel seasonId={1} onSave={vi.fn()} onCancel={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText(/title/i), 'New Ep')
+    await userEvent.type(screen.getByLabelText(/episode #/i), '1')
+    await userEvent.type(screen.getByLabelText(/publish date/i), '2024-01-01')
+    await userEvent.type(screen.getByLabelText(/audio url/i), 'http://example.com/unreachable.mp3')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(fakeAudioInstances).toHaveLength(1))
+    fakeAudioInstances[0].emit('error')
+
+    await waitFor(() => {
+      expect(mockCreateEpisode).toHaveBeenCalledWith(expect.objectContaining({ duration_seconds: 0 }))
+    })
+  })
+
+  it('a failed re-probe on edit does not clobber a previously-known-good duration', async () => {
+    render(<EpisodeFormPanel seasonId={1} episode={{ ...episode, duration_seconds: 200, audio_path: 'http://example.com/existing.mp3' }} onSave={vi.fn()} onCancel={vi.fn()} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(fakeAudioInstances).toHaveLength(1))
+    fakeAudioInstances[0].emit('error')
+
+    await waitFor(() => {
+      expect(mockUpdateEpisode).toHaveBeenCalledWith(10, expect.objectContaining({ duration_seconds: 200 }))
+    })
+  })
+
+  it('pre-fills duration from an existing episode without re-probing', () => {
+    render(<EpisodeFormPanel seasonId={1} episode={{ ...episode, duration_seconds: 120 }} onSave={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.getByText('Duration: 2:00')).toBeInTheDocument()
+    expect(fakeAudioInstances).toHaveLength(0)
+  })
+})
+
 describe('cover art', () => {
   it('uploads an image and shows a preview thumbnail on success', async () => {
     mockUploadEpisodeArt.mockResolvedValue({ thumb: '/images/abc-thumb.webp', detail: '/images/abc-detail.webp' })
@@ -169,6 +308,8 @@ describe('cover art', () => {
     await waitFor(() => expect(screen.getByAltText('Cover art preview')).toBeInTheDocument())
 
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(fakeAudioInstances).toHaveLength(1))
+    fakeAudioInstances[0].emit('error')
 
     await waitFor(() => {
       expect(mockCreateEpisode).toHaveBeenCalledWith(expect.objectContaining({
