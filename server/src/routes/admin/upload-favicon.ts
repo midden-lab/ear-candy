@@ -5,9 +5,13 @@ import fs from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { requireAdmin } from '../../auth.js'
 
-const ALLOWED_FAVICON_EXTENSIONS = new Set(['.png', '.ico', '.svg'])
+// SVG deliberately excluded: unlike PNG/ICO, an SVG can embed <script> and a
+// browser will execute it if the uploaded file is ever navigated to directly
+// (not just used as a favicon) — a real stored-XSS path for a format that
+// isn't needed here, since PNG/ICO already cover the favicon use case.
+const ALLOWED_FAVICON_EXTENSIONS = new Set(['.png', '.ico'])
 const ALLOWED_FAVICON_MIME_TYPES = new Set([
-  'image/png', 'image/x-icon', 'image/vnd.microsoft.icon', 'image/svg+xml'
+  'image/png', 'image/x-icon', 'image/vnd.microsoft.icon'
 ])
 
 // Favicons are tiny — a generous cap that's still far below the general
@@ -24,7 +28,7 @@ export const adminUploadFaviconRoute: FastifyPluginAsync = async (app) => {
     const ext = path.extname(data.filename).toLowerCase()
     if (!ALLOWED_FAVICON_EXTENSIONS.has(ext) || !ALLOWED_FAVICON_MIME_TYPES.has(data.mimetype)) {
       data.file.resume()
-      return reply.status(400).send({ error: 'Only PNG, ICO, or SVG favicon uploads are allowed' })
+      return reply.status(400).send({ error: 'Only PNG or ICO favicon uploads are allowed' })
     }
 
     const uploadsDir = path.resolve('data/uploads/images')

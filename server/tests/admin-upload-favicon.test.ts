@@ -71,7 +71,7 @@ describe('POST /api/admin/upload/favicon', () => {
       payload: multipartBody(boundary, 'evil.html', 'text/html', '<script>alert(1)</script>')
     })
     expect(res.statusCode).toBe(400)
-    expect(res.json()).toEqual({ error: 'Only PNG, ICO, or SVG favicon uploads are allowed' })
+    expect(res.json()).toEqual({ error: 'Only PNG or ICO favicon uploads are allowed' })
   })
 
   it('rejects an allowed extension with a mismatched mimetype', async () => {
@@ -86,13 +86,27 @@ describe('POST /api/admin/upload/favicon', () => {
       payload: multipartBody(boundary, 'disguised.png', 'text/html', '<script>alert(1)</script>')
     })
     expect(res.statusCode).toBe(400)
-    expect(res.json()).toEqual({ error: 'Only PNG, ICO, or SVG favicon uploads are allowed' })
+    expect(res.json()).toEqual({ error: 'Only PNG or ICO favicon uploads are allowed' })
+  })
+
+  it('rejects an SVG upload (stored-XSS risk — embedded <script> executes if the file URL is opened directly)', async () => {
+    const app = await makeApp()
+    const cookie = await getAuthCookie(app)
+    const boundary = '----testboundary'
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/upload/favicon',
+      headers: { cookie, 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: multipartBody(boundary, 'favicon.svg', 'image/svg+xml', '<svg onload="alert(1)"></svg>')
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({ error: 'Only PNG or ICO favicon uploads are allowed' })
   })
 
   it.each([
     ['favicon.png', 'image/png'],
     ['favicon.ico', 'image/x-icon'],
-    ['favicon.svg', 'image/svg+xml'],
   ])('accepts a valid %s upload and returns a path under /images/', async (filename, mimetype) => {
     const app = await makeApp()
     const cookie = await getAuthCookie(app)
@@ -107,7 +121,7 @@ describe('POST /api/admin/upload/favicon', () => {
 
     expect(res.statusCode).toBe(200)
     const json = res.json()
-    expect(json.path).toMatch(/^\/images\/favicon-[0-9a-f-]+\.(png|ico|svg)$/)
+    expect(json.path).toMatch(/^\/images\/favicon-[0-9a-f-]+\.(png|ico)$/)
 
     const savedPath = path.resolve('data/uploads/images', path.basename(json.path))
     expect(fs.existsSync(savedPath)).toBe(true)

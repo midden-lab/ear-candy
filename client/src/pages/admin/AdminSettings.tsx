@@ -91,7 +91,7 @@ export default function AdminSettings() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <input id="favicon" type="file" accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,.ico" onChange={e => void handleFaviconChange(e)}
+              <input id="favicon" type="file" accept="image/png,image/x-icon,image/vnd.microsoft.icon,.ico" onChange={e => void handleFaviconChange(e)}
                 className="w-full rounded bg-zinc-800 px-3 py-2 text-zinc-100" />
               {faviconUploading && <p className="text-sm text-zinc-400 mt-1">Uploading...</p>}
               {faviconUploadError && <p className="text-sm text-red-400 mt-1">{faviconUploadError}</p>}
