@@ -129,7 +129,7 @@ jobs:
     # not a slow/flaky test — those still fail via Playwright's own
     # per-test timeout) well short of GitHub's 6-hour default, so it fails
     # fast and stops burning CI minutes silently.
-    timeout-minutes: 15
+    timeout-minutes: 5 # TEMP: debugging a CI-only hang, restore to 15 after
     # Full e2e (with a real Docker image + Playwright) is reserved for the
     # main branch and PRs targeting it — the dev branch's safety net is
     # lint/test/build only, kept fast since it runs on every push there.
@@ -213,9 +213,14 @@ jobs:
         working-directory: ./e2e
         run: npx playwright install-deps chromium
 
+      # TEMP: debugging a CI-only hang (44 tests silently stall right after
+      # "Running 44 tests using 1 worker", never reproduces locally). Runs
+      # only the first, unrelated pre-existing test with verbose Playwright
+      # debug logging to see exactly what it's stuck on. Revert to `npm test`
+      # with no DEBUG env once diagnosed.
       - name: Run E2E tests
         working-directory: ./e2e
-        run: npm test
+        run: DEBUG=pw:api,pw:browser,pw:protocol npx playwright test --grep "wrong password shows error message" --timeout=60000
         env:
           TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'changeme' }}
           BASE_URL: http://localhost:3000
