@@ -12,6 +12,7 @@ vi.mock('../api', () => ({
     description: '',
     cover_art_path: null,
     favicon_path: null,
+    browser_tab_title: null,
     accent_color: '#ff0000',
   }),
   getSeasons: vi.fn().mockResolvedValue([]),
@@ -53,6 +54,7 @@ it('renders player view after settings load', async () => {
     description: '',
     cover_art_path: null,
     favicon_path: null,
+    browser_tab_title: null,
     accent_color: '#ff0000',
   })
   render(<App />)
@@ -69,6 +71,7 @@ it('navigates to admin login when admin button is clicked', async () => {
     description: '',
     cover_art_path: null,
     favicon_path: null,
+    browser_tab_title: null,
     accent_color: '#ff0000',
   })
   render(<App />)
@@ -101,6 +104,7 @@ describe('admin sign out', () => {
       description: '',
       cover_art_path: null,
       favicon_path: null,
+      browser_tab_title: null,
       accent_color: '#ff0000',
     })
     render(<App />)
@@ -121,6 +125,7 @@ describe('admin sign out', () => {
       description: '',
       cover_art_path: null,
       favicon_path: null,
+      browser_tab_title: null,
       accent_color: '#ff0000',
     })
     render(<App />)
@@ -140,6 +145,7 @@ it('applies accent color from settings to CSS variable', async () => {
     description: '',
     cover_art_path: null,
     favicon_path: null,
+    browser_tab_title: null,
     accent_color: '#ff0000',
   })
   render(<App />)
@@ -153,13 +159,28 @@ describe('document title and favicon', () => {
     document.querySelectorAll('link[rel="icon"]').forEach(el => el.remove())
   })
 
-  it('sets document.title to the podcast_name from settings', async () => {
+  it('sets document.title to the podcast_name from settings when browser_tab_title is unset', async () => {
     vi.mocked(getSettings).mockResolvedValue({
       podcast_name: 'Positive Sex Ed',
       tagline: '',
       description: '',
       cover_art_path: null,
       favicon_path: null,
+      browser_tab_title: null,
+      accent_color: '#ff0000',
+    })
+    render(<App />)
+    await waitFor(() => expect(document.title).toBe('Positive Sex Ed'))
+  })
+
+  it('sets document.title to browser_tab_title when set, overriding podcast_name', async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      podcast_name: 'Ear Candy',
+      tagline: '',
+      description: '',
+      cover_art_path: null,
+      favicon_path: null,
+      browser_tab_title: 'Positive Sex Ed',
       accent_color: '#ff0000',
     })
     render(<App />)
@@ -173,6 +194,7 @@ describe('document title and favicon', () => {
       description: '',
       cover_art_path: null,
       favicon_path: '/images/favicon-abc.png',
+      browser_tab_title: null,
       accent_color: '#ff0000',
     })
     render(<App />)
@@ -194,6 +216,7 @@ describe('document title and favicon', () => {
       description: '',
       cover_art_path: null,
       favicon_path: null,
+      browser_tab_title: null,
       accent_color: '#ff0000',
     })
     render(<App />)

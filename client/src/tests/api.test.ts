@@ -8,6 +8,7 @@ const mockSettings: Settings = {
   description: 'A test description',
   cover_art_path: null,
   favicon_path: null,
+  browser_tab_title: null,
   accent_color: '#ff6600',
 }
 

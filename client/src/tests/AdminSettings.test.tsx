@@ -10,6 +10,7 @@ vi.mock('../api', () => ({
     description: 'A description',
     cover_art_path: null,
     favicon_path: null,
+    browser_tab_title: null,
     accent_color: '#5a3ef5',
   }),
   updateSettings: vi.fn().mockResolvedValue({
@@ -18,6 +19,7 @@ vi.mock('../api', () => ({
     description: 'A description',
     cover_art_path: null,
     favicon_path: null,
+    browser_tab_title: null,
     accent_color: '#5a3ef5',
   }),
   uploadFavicon: vi.fn(),
@@ -43,6 +45,7 @@ describe('AdminSettings', () => {
       description: 'A description',
       cover_art_path: null,
       favicon_path: null,
+      browser_tab_title: null,
       accent_color: '#5a3ef5',
     })
     vi.mocked(api.updateSettings).mockResolvedValue({
@@ -51,6 +54,7 @@ describe('AdminSettings', () => {
       description: 'A description',
       cover_art_path: null,
       favicon_path: null,
+      browser_tab_title: null,
       accent_color: '#5a3ef5',
     })
   })
@@ -82,6 +86,7 @@ describe('AdminSettings', () => {
     await waitFor(() => {
       expect(api.updateSettings).toHaveBeenCalledWith({
         podcast_name: 'Updated Pod',
+        browser_tab_title: null,
         tagline: 'A tagline',
         description: 'A description',
         accent_color: '#5a3ef5',
@@ -156,11 +161,70 @@ describe('AdminSettings', () => {
         description: 'A description',
         cover_art_path: null,
         favicon_path: '/images/favicon-existing.ico',
+        browser_tab_title: null,
         accent_color: '#5a3ef5',
       })
       render(<AdminSettings />)
       await waitFor(() => {
         expect(screen.getByAltText('Favicon preview')).toHaveAttribute('src', '/images/favicon-existing.ico')
+      })
+    })
+  })
+
+  describe('browser tab title', () => {
+    it('pre-fills from the loaded settings browser_tab_title', async () => {
+      vi.mocked(api.getSettings).mockResolvedValue({
+        podcast_name: 'My Pod',
+        tagline: 'A tagline',
+        description: 'A description',
+        cover_art_path: null,
+        favicon_path: null,
+        browser_tab_title: 'Positive Sex Ed',
+        accent_color: '#5a3ef5',
+      })
+      render(<AdminSettings />)
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Positive Sex Ed')).toBeInTheDocument()
+      })
+    })
+
+    it('is blank by default and shows the Podcast Name as a placeholder', async () => {
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('My Pod')).toBeInTheDocument())
+      expect(screen.getByLabelText('Browser Tab Title')).toHaveValue('')
+      expect(screen.getByLabelText('Browser Tab Title')).toHaveAttribute('placeholder', 'My Pod')
+    })
+
+    it('includes the entered value in the save payload', async () => {
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('My Pod')).toBeInTheDocument())
+
+      fireEvent.change(screen.getByLabelText('Browser Tab Title'), { target: { value: 'Positive Sex Ed' } })
+      fireEvent.submit(screen.getByRole('button', { name: /save/i }).closest('form')!)
+
+      await waitFor(() => {
+        expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ browser_tab_title: 'Positive Sex Ed' }))
+      })
+    })
+
+    it('sends null, not an empty string, when the field is cleared', async () => {
+      vi.mocked(api.getSettings).mockResolvedValue({
+        podcast_name: 'My Pod',
+        tagline: 'A tagline',
+        description: 'A description',
+        cover_art_path: null,
+        favicon_path: null,
+        browser_tab_title: 'Old Title',
+        accent_color: '#5a3ef5',
+      })
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('Old Title')).toBeInTheDocument())
+
+      fireEvent.change(screen.getByLabelText('Browser Tab Title'), { target: { value: '  ' } })
+      fireEvent.submit(screen.getByRole('button', { name: /save/i }).closest('form')!)
+
+      await waitFor(() => {
+        expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ browser_tab_title: null }))
       })
     })
   })

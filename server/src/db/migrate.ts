@@ -52,6 +52,9 @@ export function runMigrations(db: Database): void {
   if (!settingsCols.some(c => c.name === 'favicon_path')) {
     db.prepare('ALTER TABLE settings ADD COLUMN favicon_path TEXT').run()
   }
+  if (!settingsCols.some(c => c.name === 'browser_tab_title')) {
+    db.prepare('ALTER TABLE settings ADD COLUMN browser_tab_title TEXT').run()
+  }
 
   const { c } = db.prepare('SELECT COUNT(*) as c FROM settings').get() as { c: number }
   if (c === 0) {

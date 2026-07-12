@@ -93,4 +93,40 @@ describe('runMigrations', () => {
     expect(row.podcast_name).toBe('Ear Candy')
     expect(db.prepare('SELECT COUNT(*) as c FROM settings').get()).toEqual({ c: 1 })
   })
+
+  it('creates browser_tab_title on a fresh database', () => {
+    const db = new Database(':memory:')
+    runMigrations(db)
+    expect(columns(db, 'settings')).toContain('browser_tab_title')
+  })
+
+  it('adds browser_tab_title to a pre-existing settings table that predates the column, preserving podcast_name', () => {
+    // Simulate a production DB with real data set before this migration
+    // existed: podcast_name and favicon_path already customized.
+    const db = new Database(':memory:')
+    db.prepare(`
+      CREATE TABLE settings (
+        podcast_name   TEXT NOT NULL DEFAULT 'Ear Candy',
+        tagline        TEXT NOT NULL DEFAULT '',
+        description    TEXT NOT NULL DEFAULT '',
+        cover_art_path TEXT,
+        favicon_path   TEXT,
+        accent_color   TEXT NOT NULL DEFAULT '#5a3ef5'
+      )
+    `).run()
+    db.prepare(
+      'INSERT INTO settings (podcast_name, favicon_path) VALUES (?, ?)'
+    ).run('Positive Sex Ed', '/images/favicon-real.png')
+    expect(columns(db, 'settings')).not.toContain('browser_tab_title')
+
+    runMigrations(db)
+
+    expect(columns(db, 'settings')).toContain('browser_tab_title')
+    const row = db.prepare('SELECT * FROM settings').get() as { podcast_name: string; favicon_path: string; browser_tab_title: string | null }
+    // Existing customized data survives untouched; new column starts null,
+    // which is exactly what makes the client-side fallback to podcast_name work.
+    expect(row.podcast_name).toBe('Positive Sex Ed')
+    expect(row.favicon_path).toBe('/images/favicon-real.png')
+    expect(row.browser_tab_title).toBeNull()
+  })
 })

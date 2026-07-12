@@ -132,6 +132,51 @@ describe('Admin Settings routes', () => {
 
       expect(res.statusCode).toBe(400)
     })
+
+    it('persists browser_tab_title independently of podcast_name', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'My Podcast',
+          browser_tab_title: 'My Business Name',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          accent_color: '#123456'
+        }
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.podcast_name).toBe('My Podcast')
+      expect(body.browser_tab_title).toBe('My Business Name')
+    })
+
+    it('sets browser_tab_title to null when not provided', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'No Tab Title',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          accent_color: '#123456'
+        }
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json().browser_tab_title).toBeNull()
+    })
   })
 
   describe('PATCH /api/admin/settings', () => {
@@ -244,6 +289,23 @@ describe('Admin Settings routes', () => {
         payload: { favicon_path: 'javascript:alert(1)' }
       })
       expect(badRes.statusCode).toBe(400)
+    })
+
+    it('patches browser_tab_title independently of podcast_name', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: { browser_tab_title: 'Positive Sex Ed' }
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.browser_tab_title).toBe('Positive Sex Ed')
+      expect(body.podcast_name).not.toBe('Positive Sex Ed')
     })
 
     it('rejects a PATCH body containing a field not in the allowlist (SQL injection guard)', async () => {

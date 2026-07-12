@@ -49,7 +49,7 @@ export default function App() {
 
   useEffect(() => {
     if (!settings) return
-    document.title = settings.podcast_name
+    document.title = settings.browser_tab_title || settings.podcast_name
 
     let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
     if (settings.favicon_path) {

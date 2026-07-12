@@ -4,6 +4,7 @@ export interface Settings {
   description: string
   cover_art_path: string | null
   favicon_path: string | null
+  browser_tab_title: string | null
   accent_color: string
 }
 
