@@ -47,16 +47,16 @@ it('renders each guest as a blue pill badge', () => {
   render(<DetailPane episode={mockEpisode} seasons={seasons} />)
   const janeEl = screen.getByText('Jane Doe')
   const johnEl = screen.getByText('John Smith')
-  expect(janeEl).toHaveClass('bg-blue-900')
-  expect(johnEl).toHaveClass('bg-blue-900')
+  expect(janeEl).toHaveClass('bg-blue-100', 'dark:bg-blue-900')
+  expect(johnEl).toHaveClass('bg-blue-100', 'dark:bg-blue-900')
 })
 
 it('renders each tag as a purple pill badge', () => {
   render(<DetailPane episode={mockEpisode} seasons={seasons} />)
   const comedyEl = screen.getByText('comedy')
   const dramaEl = screen.getByText('drama')
-  expect(comedyEl).toHaveClass('bg-purple-900')
-  expect(dramaEl).toHaveClass('bg-purple-900')
+  expect(comedyEl).toHaveClass('bg-purple-100', 'dark:bg-purple-900')
+  expect(dramaEl).toHaveClass('bg-purple-100', 'dark:bg-purple-900')
 })
 
 it('shows "About this episode" label before description', () => {

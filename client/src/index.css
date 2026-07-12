@@ -4,15 +4,15 @@
 
 :root {
   --accent: #5a3ef5;
+  --accent-contrast: #ffffff;
   /* Set by AudioPlayer to its own rendered height; consumed by AppShell's
      <main> padding-bottom so content is never hidden behind the fixed
      player bar, on any breakpoint. */
   --player-h: 0px;
 }
 
-/* Dark mode background/text defaults */
 body {
-  @apply bg-zinc-950 text-zinc-100;
+  @apply bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100;
 }
 
 @keyframes eq-bar {

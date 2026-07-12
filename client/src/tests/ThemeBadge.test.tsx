@@ -30,3 +30,10 @@ it('calls onToggle when clicked', async () => {
   await user.click(screen.getByRole('button'))
   expect(onToggle).toHaveBeenCalledTimes(1)
 })
+
+it('has a light-mode background with a dark: override, not a dark-only class', () => {
+  render(<ThemeBadge isDark={false} onToggle={() => {}} />)
+  const button = screen.getByRole('button')
+  expect(button.className).toContain('bg-white')
+  expect(button.className).toContain('dark:bg-zinc-800')
+})

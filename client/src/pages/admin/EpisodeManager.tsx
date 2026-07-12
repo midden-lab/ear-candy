@@ -85,7 +85,7 @@ export default function EpisodeManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold">Episodes</h2>
-        <button onClick={handleNewSeason} className="rounded bg-[var(--accent)] px-4 py-2 text-sm text-white hover:opacity-90">
+        <button onClick={handleNewSeason} className="rounded bg-[var(--accent)] px-4 py-2 text-sm text-[var(--accent-contrast)] hover:opacity-90">
           + New Season
         </button>
       </div>

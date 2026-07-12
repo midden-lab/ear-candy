@@ -102,7 +102,7 @@ export default function App() {
 
   if (settings === null) {
     return (
-      <div className="flex h-screen items-center justify-center text-zinc-400">
+      <div className="flex h-screen items-center justify-center text-zinc-500 dark:text-zinc-400">
         Loading…
       </div>
     )
@@ -115,16 +115,16 @@ export default function App() {
   if (view === 'admin') {
     return (
       <AdminLayout onLogout={() => void handleLogout()} onUnauthorized={() => setView('admin-login')}>
-        <div className="mb-6 flex gap-3 border-b border-zinc-800 pb-3">
+        <div className="mb-6 flex gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
           <button
             onClick={() => setAdminTab('episodes')}
-            className={`text-sm font-medium transition-colors ${adminTab === 'episodes' ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`text-sm font-medium transition-colors ${adminTab === 'episodes' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300'}`}
           >
             Episodes
           </button>
           <button
             onClick={() => setAdminTab('settings')}
-            className={`text-sm font-medium transition-colors ${adminTab === 'settings' ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`text-sm font-medium transition-colors ${adminTab === 'settings' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300'}`}
           >
             Settings
           </button>
