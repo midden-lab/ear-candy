@@ -31,8 +31,8 @@ function TransportControls({
   playing, onTogglePlay, onSkipStart, onSkipEnd, onBack15, onForward15, speed, onCycleSpeed, large,
 }: TransportControlsProps) {
   const btnClass = large
-    ? 'flex h-11 w-11 items-center justify-center rounded text-zinc-400 hover:text-zinc-100 transition-colors'
-    : 'rounded p-1 text-zinc-400 hover:text-zinc-100 transition-colors'
+    ? 'flex h-11 w-11 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors'
+    : 'rounded p-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors'
 
   return (
     <div className="flex items-center justify-center gap-3">
@@ -48,7 +48,7 @@ function TransportControls({
       </button>
       <button
         onClick={onTogglePlay}
-        className="rounded-full bg-[var(--accent)] p-3 text-white transition-opacity hover:opacity-90"
+        className="rounded-full bg-[var(--accent)] p-3 text-[var(--accent-contrast)] transition-opacity hover:opacity-90"
         aria-label={playing ? 'Pause' : 'Play'}
       >
         {playing ? (
@@ -73,7 +73,7 @@ function TransportControls({
       </button>
       <button
         onClick={onCycleSpeed}
-        className={`${large ? 'flex h-11 min-w-[2.75rem] items-center justify-center' : 'px-2 py-1 min-w-[2.5rem]'} rounded text-xs font-semibold text-zinc-400 hover:text-zinc-100 transition-colors text-center`}
+        className={`${large ? 'flex h-11 min-w-[2.75rem] items-center justify-center' : 'px-2 py-1 min-w-[2.5rem]'} rounded text-xs font-semibold text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors text-center`}
         aria-label="Playback speed"
       >
         {speed}×
@@ -215,7 +215,7 @@ export default function AudioPlayerView({
       <div
         ref={barRef}
         data-testid="player-bar"
-        className="fixed bottom-0 left-0 right-0 border-t border-zinc-800 bg-zinc-900"
+        className="fixed bottom-0 left-0 right-0 border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {audioEl}
@@ -225,8 +225,8 @@ export default function AudioPlayerView({
           aria-label={`Now playing: ${episode.title}. Tap to expand.`}
         >
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-zinc-100">{episode.title}</div>
-            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-zinc-800">
+            <div className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{episode.title}</div>
+            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
               <div
                 className="h-full bg-[var(--accent)]"
                 style={{ width: duration ? `${Math.min(100, (currentTime / duration) * 100)}%` : '0%' }}
@@ -240,7 +240,7 @@ export default function AudioPlayerView({
             onKeyDown={e => {
               if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); onTogglePlay() }
             }}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-contrast)]"
             aria-label={playing ? 'Pause' : 'Play'}
           >
             {playing ? (
@@ -262,14 +262,14 @@ export default function AudioPlayerView({
   if (!isDesktop && expanded) {
     return (
       <div
-        className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-zinc-950 transition-transform duration-300 motion-reduce:transition-none"
+        className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-zinc-50 dark:bg-zinc-950 transition-transform duration-300 motion-reduce:transition-none"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)', paddingTop: 'env(safe-area-inset-top)' }}
       >
         {audioEl}
         <div className="flex items-center px-4 py-3">
           <button
             onClick={() => setExpanded(false)}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-400 hover:text-zinc-100"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
             aria-label="Collapse now playing"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -283,14 +283,14 @@ export default function AudioPlayerView({
             detailPath={episode.cover_art_path}
             alt={episode.title}
             variant="responsive"
-            className="w-full max-w-xs aspect-square object-cover rounded-xl shadow-lg"
+            className="w-full max-w-xs aspect-square object-cover rounded-xl shadow-lg ring-1 ring-zinc-200 dark:ring-zinc-800"
           />
           <div className="w-full max-w-xs text-center">
-            <div className="truncate text-lg font-semibold text-zinc-100">{episode.title}</div>
+            <div className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-100">{episode.title}</div>
           </div>
           <div className="w-full max-w-xs space-y-2">
             <ProgressBar currentTime={currentTime} duration={duration} onSeek={handleSeek} />
-            <div className="flex items-center justify-between text-xs text-zinc-500">
+            <div className="flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(remaining, true)}</span>
             </div>
@@ -304,7 +304,7 @@ export default function AudioPlayerView({
   // Desktop: full player bar (also the default when isDesktop is unknown,
   // e.g. in tests that don't mock matchMedia).
   return (
-    <div ref={barRef} data-testid="player-bar" className="fixed bottom-0 left-0 right-0 border-t border-zinc-800 bg-zinc-900 px-6 py-3">
+    <div ref={barRef} data-testid="player-bar" className="fixed bottom-0 left-0 right-0 border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 px-6 py-3">
       {audioEl}
       <div className="mx-auto flex max-w-3xl items-center gap-3">
         <EpisodeCoverArt
@@ -312,12 +312,12 @@ export default function AudioPlayerView({
           detailPath={episode.cover_art_path}
           alt={episode.title}
           variant="thumb"
-          className="h-10 w-10 shrink-0 rounded object-cover"
+          className="h-10 w-10 shrink-0 rounded object-cover ring-1 ring-zinc-200 dark:ring-zinc-800"
         />
         <div className="min-w-0 flex-1 space-y-2">
-          <div className="truncate text-sm font-medium text-zinc-100">{episode.title}</div>
+          <div className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{episode.title}</div>
           <ProgressBar currentTime={currentTime} duration={duration} onSeek={handleSeek} />
-          <div className="flex items-center justify-between text-xs text-zinc-500">
+          <div className="flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(remaining, true)}</span>
           </div>

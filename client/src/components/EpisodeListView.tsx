@@ -28,15 +28,15 @@ export default function EpisodeListView({
   return (
     <div className="flex flex-col h-full">
       {/* Hidden on mobile: MobileHeader already shows the podcast name there. */}
-      <div className="hidden px-4 py-3 border-b border-zinc-800 md:block">
-        <h2 className="text-sm font-semibold text-zinc-100 truncate">{podcastName}</h2>
+      <div className="hidden px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 md:block">
+        <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{podcastName}</h2>
       </div>
       <SeasonTabs seasons={seasons} activeSeason={activeSeason} onSelect={onSeasonSelect} />
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {loading ? (
-          <p className="p-2 text-sm text-zinc-500">Loading…</p>
+          <p className="p-2 text-sm text-zinc-400 dark:text-zinc-500">Loading…</p>
         ) : episodes.length === 0 ? (
-          <p className="p-2 text-sm text-zinc-500">No episodes in this season yet.</p>
+          <p className="p-2 text-sm text-zinc-400 dark:text-zinc-500">No episodes in this season yet.</p>
         ) : (
           episodes.map(ep => (
             <EpisodeItem

@@ -34,6 +34,19 @@ it('renders rail, sidebar, and detail content', () => {
   expect(screen.getByText('Detail Content')).toBeInTheDocument()
 })
 
+it('has a light-mode page background with a dark: override, not a dark-only class', () => {
+  const { container } = render(
+    <AppShell
+      rail={<div>Rail Content</div>}
+      sidebar={<div>Sidebar Content</div>}
+      detail={<div>Detail Content</div>}
+    />
+  )
+  const root = container.firstChild as HTMLElement
+  expect(root.className).toContain('bg-zinc-50')
+  expect(root.className).toContain('dark:bg-zinc-950')
+})
+
 it('aside reserves the same bottom padding as main for the fixed player bar (regression: rail buttons must never sit under the player bar)', () => {
   render(
     <AppShell

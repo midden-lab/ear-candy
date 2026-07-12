@@ -26,12 +26,12 @@ export default function AdminLayout({ onLogout, onUnauthorized, children }: Admi
   if (authorized !== true) return null
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+      <header className="border-b border-zinc-200 dark:border-zinc-800 px-6 py-4 flex items-center justify-between">
         <h1 className="text-lg font-bold">Ear Candy Admin</h1>
         <button
           onClick={onLogout}
-          className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors"
+          className="text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors"
         >
           Sign out
         </button>
