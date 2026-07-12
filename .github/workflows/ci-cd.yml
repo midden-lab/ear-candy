@@ -124,6 +124,12 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     needs: build
+    # Healthy runs (image pull, container start, browser install, 44 tests)
+    # take ~4-6 minutes. This caps a genuine hang (browser/network stall,
+    # not a slow/flaky test — those still fail via Playwright's own
+    # per-test timeout) well short of GitHub's 6-hour default, so it fails
+    # fast and stops burning CI minutes silently.
+    timeout-minutes: 15
     # Full e2e (with a real Docker image + Playwright) is reserved for the
     # main branch and PRs targeting it — the dev branch's safety net is
     # lint/test/build only, kept fast since it runs on every push there.
