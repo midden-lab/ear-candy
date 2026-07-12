@@ -89,6 +89,94 @@ describe('Admin Settings routes', () => {
       const body = res.json()
       expect(body.cover_art_path).toBeNull()
     })
+
+    it('accepts a valid /images/ path for favicon_path', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'Faviconed',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          favicon_path: '/images/favicon-abc.png',
+          accent_color: '#123456'
+        }
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json().favicon_path).toBe('/images/favicon-abc.png')
+    })
+
+    it('rejects a javascript: URI as favicon_path', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'Bad Favicon',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          favicon_path: 'javascript:alert(1)',
+          accent_color: '#123456'
+        }
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
+
+    it('persists browser_tab_title independently of podcast_name', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'My Podcast',
+          browser_tab_title: 'My Business Name',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          accent_color: '#123456'
+        }
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.podcast_name).toBe('My Podcast')
+      expect(body.browser_tab_title).toBe('My Business Name')
+    })
+
+    it('sets browser_tab_title to null when not provided', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'No Tab Title',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          accent_color: '#123456'
+        }
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json().browser_tab_title).toBeNull()
+    })
   })
 
   describe('PATCH /api/admin/settings', () => {
@@ -179,6 +267,45 @@ describe('Admin Settings routes', () => {
 
       expect(res.statusCode).toBe(200)
       expect(res.json().cover_art_path).toBeNull()
+    })
+
+    it('patches favicon_path and rejects an invalid one', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const okRes = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: { favicon_path: '/images/favicon-xyz.ico' }
+      })
+      expect(okRes.statusCode).toBe(200)
+      expect(okRes.json().favicon_path).toBe('/images/favicon-xyz.ico')
+
+      const badRes = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: { favicon_path: 'javascript:alert(1)' }
+      })
+      expect(badRes.statusCode).toBe(400)
+    })
+
+    it('patches browser_tab_title independently of podcast_name', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: { browser_tab_title: 'Acme Media Co' }
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.browser_tab_title).toBe('Acme Media Co')
+      expect(body.podcast_name).not.toBe('Acme Media Co')
     })
 
     it('rejects a PATCH body containing a field not in the allowlist (SQL injection guard)', async () => {

@@ -251,15 +251,21 @@ ear-candy/
 
 ---
 
+## Branching & Workflow
+
+`main` is the production branch — every push to it deploys automatically (see CI/CD below). **Do not push directly to `main`.** All work happens on `dev` (or a branch off `dev`), then gets promoted to `main` via a PR that the maintainer reviews and merges by hand.
+
+This is convention, not a technical enforcement: GitHub branch protection rules require a paid plan (or a public repo) and this repo is private on the Free plan, so `main` isn't actually lockable via GitHub's API today. Treat it as protected anyway. If a bad push to `main` ever happens, `git reset --hard origin/main` on the working branch and re-derive from there — don't try to force-fix forward under pressure.
+
 ## CI/CD
 
-`.github/workflows/ci-cd.yml` runs on push/PR to `main`. Jobs run in this order:
+`.github/workflows/ci-cd.yml` triggers on push to `main` or `dev`, and on PRs targeting `main`. Jobs run in this order:
 
 1. `lint` — ESLint on server + client (parallel with `test`/`typecheck`)
-2. `test` — Vitest server (51 tests, node env) + client (117 tests, jsdom env)
+2. `test` — Vitest server + client
 3. `typecheck` — `tsc --noEmit` on client
 4. `build` — builds the root `Dockerfile` image, pushes to GHCR (needs lint+test+typecheck)
-5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build)
+5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit).
 6. `deploy` — only on `main`; SSHes to the production Droplet, pulls the new image by SHA tag, restarts the container, health-checks it (needs build+e2e)
 
 Note: CI's `e2e` job exercises the **production image**, not `docker compose up` — different from local `make e2e`, which requires the dev stack (`make up`).

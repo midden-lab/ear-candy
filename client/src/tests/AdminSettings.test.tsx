@@ -9,6 +9,8 @@ vi.mock('../api', () => ({
     tagline: 'A tagline',
     description: 'A description',
     cover_art_path: null,
+    favicon_path: null,
+    browser_tab_title: null,
     accent_color: '#5a3ef5',
   }),
   updateSettings: vi.fn().mockResolvedValue({
@@ -16,8 +18,11 @@ vi.mock('../api', () => ({
     tagline: 'A tagline',
     description: 'A description',
     cover_art_path: null,
+    favicon_path: null,
+    browser_tab_title: null,
     accent_color: '#5a3ef5',
   }),
+  uploadFavicon: vi.fn(),
   // stub rest
   getSeasons: vi.fn(),
   getEpisodes: vi.fn(),
@@ -39,6 +44,8 @@ describe('AdminSettings', () => {
       tagline: 'A tagline',
       description: 'A description',
       cover_art_path: null,
+      favicon_path: null,
+      browser_tab_title: null,
       accent_color: '#5a3ef5',
     })
     vi.mocked(api.updateSettings).mockResolvedValue({
@@ -46,6 +53,8 @@ describe('AdminSettings', () => {
       tagline: 'A tagline',
       description: 'A description',
       cover_art_path: null,
+      favicon_path: null,
+      browser_tab_title: null,
       accent_color: '#5a3ef5',
     })
   })
@@ -77,9 +86,11 @@ describe('AdminSettings', () => {
     await waitFor(() => {
       expect(api.updateSettings).toHaveBeenCalledWith({
         podcast_name: 'Updated Pod',
+        browser_tab_title: null,
         tagline: 'A tagline',
         description: 'A description',
         accent_color: '#5a3ef5',
+        favicon_path: null,
       })
     })
   })
@@ -94,6 +105,127 @@ describe('AdminSettings', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('status')).toHaveTextContent('Settings saved!')
+    })
+  })
+
+  describe('favicon', () => {
+    it('uploads a favicon and shows a preview on success', async () => {
+      vi.mocked(api.uploadFavicon).mockResolvedValue({ path: '/images/favicon-abc.png' })
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('My Pod')).toBeInTheDocument())
+
+      const file = new File(['fake favicon'], 'favicon.png', { type: 'image/png' })
+      fireEvent.change(screen.getByLabelText('Favicon'), { target: { files: [file] } })
+
+      await waitFor(() => {
+        expect(api.uploadFavicon).toHaveBeenCalledWith(file)
+        expect(screen.getByAltText('Favicon preview')).toHaveAttribute('src', '/images/favicon-abc.png')
+      })
+    })
+
+    it('shows an error when the favicon upload fails', async () => {
+      vi.mocked(api.uploadFavicon).mockRejectedValue(new Error('Upload failed'))
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('My Pod')).toBeInTheDocument())
+
+      const file = new File(['fake favicon'], 'favicon.png', { type: 'image/png' })
+      fireEvent.change(screen.getByLabelText('Favicon'), { target: { files: [file] } })
+
+      await waitFor(() => {
+        expect(screen.getByText(/upload failed/i)).toBeInTheDocument()
+      })
+    })
+
+    it('"Remove favicon" clears the preview and includes null in the save payload', async () => {
+      vi.mocked(api.uploadFavicon).mockResolvedValue({ path: '/images/favicon-abc.png' })
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('My Pod')).toBeInTheDocument())
+
+      const file = new File(['fake favicon'], 'favicon.png', { type: 'image/png' })
+      fireEvent.change(screen.getByLabelText('Favicon'), { target: { files: [file] } })
+      await waitFor(() => expect(screen.getByAltText('Favicon preview')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByRole('button', { name: /remove favicon/i }))
+      expect(screen.queryByAltText('Favicon preview')).not.toBeInTheDocument()
+
+      fireEvent.submit(screen.getByRole('button', { name: /save/i }).closest('form')!)
+      await waitFor(() => {
+        expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ favicon_path: null }))
+      })
+    })
+
+    it('pre-fills the preview from the loaded settings favicon_path', async () => {
+      vi.mocked(api.getSettings).mockResolvedValue({
+        podcast_name: 'My Pod',
+        tagline: 'A tagline',
+        description: 'A description',
+        cover_art_path: null,
+        favicon_path: '/images/favicon-existing.ico',
+        browser_tab_title: null,
+        accent_color: '#5a3ef5',
+      })
+      render(<AdminSettings />)
+      await waitFor(() => {
+        expect(screen.getByAltText('Favicon preview')).toHaveAttribute('src', '/images/favicon-existing.ico')
+      })
+    })
+  })
+
+  describe('browser tab title', () => {
+    it('pre-fills from the loaded settings browser_tab_title', async () => {
+      vi.mocked(api.getSettings).mockResolvedValue({
+        podcast_name: 'My Pod',
+        tagline: 'A tagline',
+        description: 'A description',
+        cover_art_path: null,
+        favicon_path: null,
+        browser_tab_title: 'Acme Media Co',
+        accent_color: '#5a3ef5',
+      })
+      render(<AdminSettings />)
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Acme Media Co')).toBeInTheDocument()
+      })
+    })
+
+    it('is blank by default and shows the Podcast Name as a placeholder', async () => {
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('My Pod')).toBeInTheDocument())
+      expect(screen.getByLabelText('Browser Tab Title')).toHaveValue('')
+      expect(screen.getByLabelText('Browser Tab Title')).toHaveAttribute('placeholder', 'My Pod')
+    })
+
+    it('includes the entered value in the save payload', async () => {
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('My Pod')).toBeInTheDocument())
+
+      fireEvent.change(screen.getByLabelText('Browser Tab Title'), { target: { value: 'Acme Media Co' } })
+      fireEvent.submit(screen.getByRole('button', { name: /save/i }).closest('form')!)
+
+      await waitFor(() => {
+        expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ browser_tab_title: 'Acme Media Co' }))
+      })
+    })
+
+    it('sends null, not an empty string, when the field is cleared', async () => {
+      vi.mocked(api.getSettings).mockResolvedValue({
+        podcast_name: 'My Pod',
+        tagline: 'A tagline',
+        description: 'A description',
+        cover_art_path: null,
+        favicon_path: null,
+        browser_tab_title: 'Old Title',
+        accent_color: '#5a3ef5',
+      })
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('Old Title')).toBeInTheDocument())
+
+      fireEvent.change(screen.getByLabelText('Browser Tab Title'), { target: { value: '  ' } })
+      fireEvent.submit(screen.getByRole('button', { name: /save/i }).closest('form')!)
+
+      await waitFor(() => {
+        expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ browser_tab_title: null }))
+      })
     })
   })
 })

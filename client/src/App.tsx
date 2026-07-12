@@ -47,6 +47,25 @@ export default function App() {
     }).catch(console.error)
   }, [])
 
+  useEffect(() => {
+    if (!settings) return
+    document.title = settings.browser_tab_title || settings.podcast_name
+
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+    if (settings.favicon_path) {
+      if (!link) {
+        link = document.createElement('link')
+        link.rel = 'icon'
+        document.head.appendChild(link)
+      }
+      link.href = settings.favicon_path
+    } else if (link) {
+      // No favicon configured — remove any previously-injected tag so the
+      // browser falls back to its own default rather than keeping a stale one.
+      link.remove()
+    }
+  }, [settings])
+
   const handleSeasonSelect = (seasonId: number) => {
     setActiveSeason(seasonId)
     setEpisodesLoading(true)

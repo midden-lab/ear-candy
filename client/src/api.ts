@@ -89,3 +89,15 @@ export async function uploadEpisodeArt(file: File): Promise<{ thumb: string; det
   if (!res.ok) throw new Error(`Upload failed: HTTP ${res.status}`)
   return res.json() as Promise<{ thumb: string; detail: string }>
 }
+
+export async function uploadFavicon(file: File): Promise<{ path: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await fetch('/api/admin/upload/favicon', {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  })
+  if (!res.ok) throw new Error(`Upload failed: HTTP ${res.status}`)
+  return res.json() as Promise<{ path: string }>
+}
