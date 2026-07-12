@@ -51,18 +51,21 @@ export default function App() {
     if (!settings) return
     document.title = settings.browser_tab_title || settings.podcast_name
 
-    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+    const existingLinks = document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]')
     if (settings.favicon_path) {
-      if (!link) {
-        link = document.createElement('link')
-        link.rel = 'icon'
-        document.head.appendChild(link)
-      }
+      // Collapse to a single tag even if more than one somehow ended up in
+      // the document, so stale tags never linger alongside the current one.
+      const [link, ...extras] = existingLinks.length > 0
+        ? Array.from(existingLinks)
+        : [document.createElement('link')]
+      extras.forEach(el => el.remove())
+      link.rel = 'icon'
       link.href = settings.favicon_path
-    } else if (link) {
-      // No favicon configured — remove any previously-injected tag so the
+      if (!link.isConnected) document.head.appendChild(link)
+    } else {
+      // No favicon configured — remove any previously-injected tag(s) so the
       // browser falls back to its own default rather than keeping a stale one.
-      link.remove()
+      existingLinks.forEach(el => el.remove())
     }
   }, [settings])
 
