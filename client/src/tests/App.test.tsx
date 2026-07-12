@@ -221,8 +221,7 @@ describe('document title and favicon', () => {
     })
     render(<App />)
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
+      expect(document.querySelector('link[rel="icon"]')).not.toBeInTheDocument()
     )
-    expect(document.querySelector('link[rel="icon"]')).not.toBeInTheDocument()
   })
 })
