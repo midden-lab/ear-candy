@@ -4,6 +4,7 @@ import { useTheme } from '../hooks/useTheme'
 describe('useTheme', () => {
   afterEach(() => {
     document.documentElement.style.removeProperty('--accent')
+    document.documentElement.style.removeProperty('--accent-contrast')
     document.documentElement.classList.remove('dark')
     localStorage.clear()
   })
@@ -11,6 +12,16 @@ describe('useTheme', () => {
   it('sets --accent CSS custom property on mount', () => {
     renderHook(() => useTheme('#ff6600'))
     expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#ff6600')
+  })
+
+  it('sets --accent-contrast based on the accent color luminance', () => {
+    renderHook(() => useTheme('#000000'))
+    expect(document.documentElement.style.getPropertyValue('--accent-contrast')).toBe('#ffffff')
+  })
+
+  it('updates --accent-contrast to black text for a pale admin-set accent', () => {
+    renderHook(() => useTheme('#ffff00'))
+    expect(document.documentElement.style.getPropertyValue('--accent-contrast')).toBe('#000000')
   })
 
   it('updates --accent when accentColor changes', () => {
@@ -27,7 +38,13 @@ describe('useTheme', () => {
     expect(result.current.isDark).toBe(true)
   })
 
-  it('initializes isDark=false when localStorage is empty', () => {
+  it('initializes isDark=true when localStorage is empty (dark is the default)', () => {
+    const { result } = renderHook(() => useTheme('#5a3ef5'))
+    expect(result.current.isDark).toBe(true)
+  })
+
+  it('initializes isDark=false when localStorage has theme=light', () => {
+    localStorage.setItem('theme', 'light')
     const { result } = renderHook(() => useTheme('#5a3ef5'))
     expect(result.current.isDark).toBe(false)
   })
@@ -39,6 +56,7 @@ describe('useTheme', () => {
   })
 
   it('toggleDark flips isDark and updates DOM class', () => {
+    localStorage.setItem('theme', 'light')
     const { result } = renderHook(() => useTheme('#5a3ef5'))
     act(() => { result.current.toggleDark() })
     expect(result.current.isDark).toBe(true)
@@ -49,6 +67,7 @@ describe('useTheme', () => {
   })
 
   it('persists dark preference to localStorage on toggle', () => {
+    localStorage.setItem('theme', 'light')
     const { result } = renderHook(() => useTheme('#5a3ef5'))
     act(() => { result.current.toggleDark() })
     expect(localStorage.getItem('theme')).toBe('dark')

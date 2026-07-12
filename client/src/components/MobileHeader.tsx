@@ -22,12 +22,12 @@ export default function MobileHeader({ podcastName, onAdminClick, themeBadge }: 
   }, [menuOpen])
 
   return (
-    <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-      <h1 className="truncate text-sm font-semibold text-zinc-100">{podcastName}</h1>
+    <header className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-4 py-3">
+      <h1 className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{podcastName}</h1>
       <div ref={menuRef} className="relative">
         <button
           onClick={() => setMenuOpen(o => !o)}
-          className="flex h-11 w-11 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+          className="flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
           aria-label="More options"
           aria-expanded={menuOpen}
         >
@@ -38,16 +38,16 @@ export default function MobileHeader({ podcastName, onAdminClick, themeBadge }: 
           </svg>
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-full z-40 mt-2 w-48 rounded-lg border border-zinc-800 bg-zinc-900 p-1 shadow-xl">
+          <div className="absolute right-0 top-full z-40 mt-2 w-48 rounded-lg border border-zinc-200 bg-white p-1 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
             <button
               onClick={() => { setMenuOpen(false); onAdminClick() }}
-              className="flex w-full items-center rounded-md px-3 py-2.5 text-left text-sm text-zinc-300 hover:bg-zinc-800"
+              className="flex w-full items-center rounded-md px-3 py-2.5 text-left text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               Admin
             </button>
             {themeBadge && (
               <div className="flex items-center justify-between px-3 py-2.5">
-                <span className="text-sm text-zinc-300">Theme</span>
+                <span className="text-sm text-zinc-600 dark:text-zinc-300">Theme</span>
                 {themeBadge}
               </div>
             )}

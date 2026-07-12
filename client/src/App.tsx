@@ -51,18 +51,21 @@ export default function App() {
     if (!settings) return
     document.title = settings.browser_tab_title || settings.podcast_name
 
-    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+    const existingLinks = document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]')
     if (settings.favicon_path) {
-      if (!link) {
-        link = document.createElement('link')
-        link.rel = 'icon'
-        document.head.appendChild(link)
-      }
+      // Collapse to a single tag even if more than one somehow ended up in
+      // the document, so stale tags never linger alongside the current one.
+      const [link, ...extras] = existingLinks.length > 0
+        ? Array.from(existingLinks)
+        : [document.createElement('link')]
+      extras.forEach(el => el.remove())
+      link.rel = 'icon'
       link.href = settings.favicon_path
-    } else if (link) {
-      // No favicon configured — remove any previously-injected tag so the
+      if (!link.isConnected) document.head.appendChild(link)
+    } else {
+      // No favicon configured — remove any previously-injected tag(s) so the
       // browser falls back to its own default rather than keeping a stale one.
-      link.remove()
+      existingLinks.forEach(el => el.remove())
     }
   }, [settings])
 
@@ -99,7 +102,7 @@ export default function App() {
 
   if (settings === null) {
     return (
-      <div className="flex h-screen items-center justify-center text-zinc-400">
+      <div className="flex h-screen items-center justify-center text-zinc-500 dark:text-zinc-400">
         Loading…
       </div>
     )
@@ -112,16 +115,16 @@ export default function App() {
   if (view === 'admin') {
     return (
       <AdminLayout onLogout={() => void handleLogout()} onUnauthorized={() => setView('admin-login')}>
-        <div className="mb-6 flex gap-3 border-b border-zinc-800 pb-3">
+        <div className="mb-6 flex gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
           <button
             onClick={() => setAdminTab('episodes')}
-            className={`text-sm font-medium transition-colors ${adminTab === 'episodes' ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`text-sm font-medium transition-colors ${adminTab === 'episodes' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300'}`}
           >
             Episodes
           </button>
           <button
             onClick={() => setAdminTab('settings')}
-            className={`text-sm font-medium transition-colors ${adminTab === 'settings' ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`text-sm font-medium transition-colors ${adminTab === 'settings' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300'}`}
           >
             Settings
           </button>
