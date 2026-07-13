@@ -135,6 +135,15 @@ export default function AudioPlayerView({
     if (!audio || !episode) return
     audio.src = episode.audio_path
     audio.load()
+    // A same-value `playing: true -> true` write (e.g. switching episodes
+    // while already playing) never re-triggers the [playing] effect below,
+    // so without this, load()'s implicit pause is never followed by a real
+    // play() call — the store still says playing, but the element sits
+    // paused. Reads `playing` intentionally without depending on it: this
+    // effect must fire only on an actual episode swap, not on every
+    // play/pause toggle (that's the [playing] effect's job below).
+    if (playing) void audio.play()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [episode])
 
   useEffect(() => {
