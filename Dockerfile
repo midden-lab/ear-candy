@@ -1,5 +1,5 @@
 # Stage 1: Build React client
-FROM node:20-alpine AS client-builder
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS client-builder
 WORKDIR /client
 COPY client/package*.json ./
 RUN npm ci
@@ -9,7 +9,7 @@ ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # Stage 2: Build Fastify server TypeScript (no native addons)
-FROM node:20-alpine AS server-builder
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS server-builder
 WORKDIR /server
 COPY server/package*.json ./
 RUN npm ci --ignore-scripts
@@ -19,14 +19,14 @@ RUN npm run build
 # Stage 3: Install production deps, compiling native addons (bcrypt,
 # better-sqlite3) here. Build tools live only in this stage so they never
 # reach the final image.
-FROM node:20-alpine AS deps
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS deps
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY server/package*.json ./
 RUN npm ci --omit=dev
 
 # Stage 4: Production runner — compiled output only, no compilers
-FROM node:20-alpine AS runner
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS runner
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY server/package*.json ./

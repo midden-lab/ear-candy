@@ -28,7 +28,7 @@ setup:
 		-v $(PWD)/server:/app \
 		-w /app \
 		-e PW=$(PASSWORD) \
-		node:20-alpine \
+		node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 \
 		sh -c 'npm ci --quiet >/dev/null 2>&1 && node -e "const b=require(\"bcrypt\"); b.hash(process.env.PW, 10).then(h=>process.stdout.write(h))"' \
 	) && \
 	printf 'ADMIN_PASSWORD_HASH=%s\nCOOKIE_SECRET=dev-local-secret-change-me\n' "$$(echo "$$HASH" | sed 's/\$$/$$$$/g')" > .env

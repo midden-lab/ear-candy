@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import bcrypt from 'bcrypt'
 import { buildTestApp } from './helpers.js'
-import { requireAdmin } from '../src/auth.js'
+import { requireAdmin, SESSION_MAX_AGE_MS } from '../src/auth.js'
 
 const VALID_PASSWORD = 'supersecret'
 
@@ -33,6 +33,7 @@ describe('POST /api/admin/login', () => {
     expect(cookieHeader).toContain('admin_session=')
     expect(cookieHeader).toContain('HttpOnly')
     expect(cookieHeader).toContain('SameSite=Strict')
+    expect(cookieHeader).toMatch(/Max-Age=86400\b/)
   })
 
   it('locks out after repeated FAILED login attempts', async () => {
@@ -195,5 +196,60 @@ describe('requireAdmin preHandler', () => {
     })
     expect(res.statusCode).toBe(401)
     expect(res.json()).toEqual({ error: 'Unauthorized' })
+  })
+
+  it('returns 401 once the session is older than SESSION_MAX_AGE_MS (issue #30)', async () => {
+    const app = buildTestApp()
+    app.get('/test-protected', { preHandler: requireAdmin }, async () => ({ ok: true }))
+
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/admin/login',
+      payload: { password: VALID_PASSWORD }
+    })
+    const setCookie = loginRes.headers['set-cookie'] as string | string[]
+    const cookieStr = Array.isArray(setCookie) ? setCookie[0] : setCookie
+    const cookieValue = cookieStr.split(';')[0]
+
+    const realDateNow = Date.now
+    try {
+      Date.now = () => realDateNow() + SESSION_MAX_AGE_MS + 1000
+      const res = await app.inject({
+        method: 'GET',
+        url: '/test-protected',
+        headers: { cookie: cookieValue }
+      })
+      expect(res.statusCode).toBe(401)
+      expect(res.json()).toEqual({ error: 'Unauthorized' })
+    } finally {
+      Date.now = realDateNow
+    }
+  })
+
+  it('still accepts a session well within SESSION_MAX_AGE_MS', async () => {
+    const app = buildTestApp()
+    app.get('/test-protected', { preHandler: requireAdmin }, async () => ({ ok: true }))
+
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/admin/login',
+      payload: { password: VALID_PASSWORD }
+    })
+    const setCookie = loginRes.headers['set-cookie'] as string | string[]
+    const cookieStr = Array.isArray(setCookie) ? setCookie[0] : setCookie
+    const cookieValue = cookieStr.split(';')[0]
+
+    const realDateNow = Date.now
+    try {
+      Date.now = () => realDateNow() + SESSION_MAX_AGE_MS / 2
+      const res = await app.inject({
+        method: 'GET',
+        url: '/test-protected',
+        headers: { cookie: cookieValue }
+      })
+      expect(res.statusCode).toBe(200)
+    } finally {
+      Date.now = realDateNow
+    }
   })
 })
