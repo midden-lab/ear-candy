@@ -87,6 +87,7 @@ jobs:
       packages: write
     outputs:
       sha_tag: ${{ steps.export_sha.outputs.sha_tag }}
+      image_digest: ${{ steps.resolve_digest.outputs.digest }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -126,6 +127,26 @@ jobs:
         env:
           IMAGE_TAG: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         run: echo "sha_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      # docker/build-push-action's own `digest` output has documented
+      # reliability issues in some configs (upstream issues #461, #579,
+      # #770 — it can report the local image ID rather than the actual
+      # pushed manifest digest). Read the digest back from the registry
+      # itself instead of trusting the action's output, so deploy can pull
+      # by digest with a real cryptographic guarantee rather than a value
+      # that might not match what's actually stored (issue #33).
+      - name: Resolve authoritative image digest
+        id: resolve_digest
+        env:
+          IMAGE_TAG: ${{ steps.export_sha.outputs.sha_tag }}
+        run: |
+          DIGEST=$(docker buildx imagetools inspect "$IMAGE_TAG" | awk '/^Digest:/ {print $2}')
+          if [ -z "$DIGEST" ]; then
+            echo "Failed to resolve image digest from registry" >&2
+            exit 1
+          fi
+          echo "Resolved digest: $DIGEST"
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
 
   e2e:
     runs-on: ubuntu-latest
@@ -264,7 +285,7 @@ jobs:
         env:
           DEPLOY_REGISTRY: ${{ env.REGISTRY }}
           DEPLOY_IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          DEPLOY_IMAGE_SHA: ${{ github.sha }}
+          DEPLOY_IMAGE_DIGEST: ${{ needs.build.outputs.image_digest }}
           DEPLOY_GHCR_PAT: ${{ secrets.GHCR_PAT }}
           DEPLOY_GHCR_ACTOR: ${{ github.actor }}
           DEPLOY_COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
@@ -279,18 +300,26 @@ jobs:
           # script text via ${{ }}. Splicing would make any value containing
           # shell metacharacters execute as literal script on a job that
           # holds root SSH access to production (issue #31).
-          envs: DEPLOY_REGISTRY,DEPLOY_IMAGE_NAME,DEPLOY_IMAGE_SHA,DEPLOY_GHCR_PAT,DEPLOY_GHCR_ACTOR,DEPLOY_COOKIE_SECRET,DEPLOY_ADMIN_PASSWORD_HASH
+          envs: DEPLOY_REGISTRY,DEPLOY_IMAGE_NAME,DEPLOY_IMAGE_DIGEST,DEPLOY_GHCR_PAT,DEPLOY_GHCR_ACTOR,DEPLOY_COOKIE_SECRET,DEPLOY_ADMIN_PASSWORD_HASH
           script: |
             set -e
-            IMAGE="$DEPLOY_REGISTRY/$DEPLOY_IMAGE_NAME:$DEPLOY_IMAGE_SHA"
-            echo "Pulling image: $IMAGE"
+            if [ -z "$DEPLOY_IMAGE_DIGEST" ]; then
+              echo "No image digest from the build job — refusing to deploy" >&2
+              exit 1
+            fi
+
+            # Pulling by digest (not tag) IS the integrity check — Docker
+            # verifies the content hash as part of the pull itself, so a
+            # tampered/wrong image simply fails to pull rather than needing
+            # a separate, easily-faked "verification" step after the fact
+            # (the old `docker inspect ... > /dev/null` here asserted
+            # nothing — see issue #33).
+            IMAGE="$DEPLOY_REGISTRY/$DEPLOY_IMAGE_NAME@$DEPLOY_IMAGE_DIGEST"
+            echo "Pulling image by digest: $IMAGE"
 
             echo "$DEPLOY_GHCR_PAT" | docker login "$DEPLOY_REGISTRY" -u "$DEPLOY_GHCR_ACTOR" --password-stdin
 
             docker pull "$IMAGE"
-
-            echo "Verifying image digest..."
-            docker inspect "$IMAGE" --format='{{.RepoDigests}}' > /dev/null
 
             echo "Stopping old container..."
             docker stop ear-candy || true
