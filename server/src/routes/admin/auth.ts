@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify'
 import bcrypt from 'bcrypt'
-import { requireAdmin } from '../../auth.js'
+import { requireAdmin, buildSessionCookieValue, SESSION_MAX_AGE_MS } from '../../auth.js'
 
 const MAX_FAILED_ATTEMPTS = 10
 const LOCKOUT_WINDOW_MS = 15 * 60 * 1000
@@ -53,12 +53,13 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
     }
 
     failedAttempts.delete(req.ip)
-    reply.setCookie('admin_session', 'authenticated', {
+    reply.setCookie('admin_session', buildSessionCookieValue(), {
       signed: true,
       httpOnly: true,
       sameSite: 'strict',
       secure: process.env.NODE_ENV === 'production',
-      path: '/'
+      path: '/',
+      maxAge: SESSION_MAX_AGE_MS / 1000 // @fastify/cookie expects seconds
     })
     return { ok: true }
   })
