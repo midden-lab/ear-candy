@@ -265,7 +265,7 @@ This is convention, not a technical enforcement: GitHub branch protection rules 
 2. `test` — Vitest server + client
 3. `typecheck` — `tsc --noEmit` on client
 4. `build` — builds the root `Dockerfile` image, pushes to GHCR (needs lint+test+typecheck)
-5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit).
+5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit). Capped at `timeout-minutes: 15` (healthy runs take ~4-6 min) so a genuine hang (browser/network stall) fails fast instead of silently running for hours.
 6. `deploy` — only on `main`; SSHes to the production Droplet, pulls the new image by SHA tag, restarts the container, health-checks it (needs build+e2e)
 
 Note: CI's `e2e` job exercises the **production image**, not `docker compose up` — different from local `make e2e`, which requires the dev stack (`make up`).

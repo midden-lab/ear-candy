@@ -9,6 +9,57 @@ interface EpisodeFormPanelProps {
   onCancel: () => void
 }
 
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = Math.round(seconds % 60)
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+/**
+ * Reads real audio duration from the browser's own media metadata, so the
+ * episode list (which displays the stored duration_seconds column) matches
+ * what the player shows (which reads live from the <audio> element) without
+ * requiring an admin to measure and type it in by hand. Resolves 0 on any
+ * failure (unreadable format, CORS-blocked remote URL, etc.) rather than
+ * rejecting, so a failed probe never blocks saving the episode.
+ *
+ * Listens for both loadedmetadata and durationchange: for MP3s without a
+ * proper duration header, Chrome reports `duration: Infinity` on
+ * loadedmetadata and only resolves the real value afterward via a
+ * durationchange event once it finishes estimating.
+ */
+function probeAudioDuration(src: string, timeoutMs = 8000): Promise<number> {
+  return new Promise(resolve => {
+    const audio = new Audio()
+    let settled = false
+
+    const finish = (seconds: number) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(seconds)
+    }
+    const checkDuration = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        finish(Math.round(audio.duration))
+      }
+    }
+    const onError = () => finish(0)
+    const timeoutId = setTimeout(() => finish(0), timeoutMs)
+    const cleanup = () => {
+      audio.removeEventListener('loadedmetadata', checkDuration)
+      audio.removeEventListener('durationchange', checkDuration)
+      audio.removeEventListener('error', onError)
+      clearTimeout(timeoutId)
+    }
+
+    audio.addEventListener('loadedmetadata', checkDuration)
+    audio.addEventListener('durationchange', checkDuration)
+    audio.addEventListener('error', onError)
+    audio.src = src
+  })
+}
+
 export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }: EpisodeFormPanelProps) {
   const [title, setTitle] = useState(episode?.title ?? '')
   const [number, setNumber] = useState(episode?.number?.toString() ?? '')
@@ -24,12 +75,26 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
   const [coverArtThumbPath, setCoverArtThumbPath] = useState(episode?.cover_art_thumb_path ?? null)
   const [artUploading, setArtUploading] = useState(false)
   const [artUploadError, setArtUploadError] = useState('')
+  const [durationSeconds, setDurationSeconds] = useState(episode?.duration_seconds ?? 0)
+  const [detectingDuration, setDetectingDuration] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
     setUploadError('')
+
+    // Probe the local file directly (object URL, no network round-trip or
+    // CORS concerns) in parallel with the actual upload.
+    const objectUrl = URL.createObjectURL(file)
+    setDetectingDuration(true)
+    void probeAudioDuration(objectUrl).then(seconds => {
+      setDurationSeconds(seconds)
+      setDetectingDuration(false)
+      URL.revokeObjectURL(objectUrl)
+    })
+
     try {
       const result = await uploadAudio(file)
       setAudioPath(result.path)
@@ -64,22 +129,46 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const formData: Partial<Episode> = {
-      title,
-      number: Number(number),
-      publish_date: publishDate,
-      audio_type: audioType,
-      audio_path: audioPath,
-      description,
-      guests,
-      tags,
-      cover_art_path: coverArtPath,
-      cover_art_thumb_path: coverArtThumbPath,
+    setSubmitting(true)
+    try {
+      // URL-based audio is probed here, at submit time, rather than eagerly
+      // on blur — probing on blur meant a real network fetch (with its own
+      // async re-renders) could land mid-click on an admin trying to save,
+      // and it has no benefit over probing once right before saving anyway.
+      let detectedDuration = durationSeconds
+      if (audioType === 'url' && audioPath) {
+        setDetectingDuration(true)
+        const probed = await probeAudioDuration(audioPath)
+        setDetectingDuration(false)
+        // A failed probe (0) shouldn't clobber a previously-known-good
+        // duration on a simple metadata edit — only adopt it when it
+        // actually resolved to something real.
+        if (probed > 0) {
+          detectedDuration = probed
+          setDurationSeconds(probed)
+        }
+      }
+
+      const formData: Partial<Episode> = {
+        title,
+        number: Number(number),
+        publish_date: publishDate,
+        audio_type: audioType,
+        audio_path: audioPath,
+        description,
+        guests,
+        tags,
+        cover_art_path: coverArtPath,
+        cover_art_thumb_path: coverArtThumbPath,
+        duration_seconds: detectedDuration,
+      }
+      const result = episode
+        ? await updateEpisode(episode.id, formData)
+        : await createEpisode({ ...formData, season_id: seasonId })
+      onSave(result)
+    } finally {
+      setSubmitting(false)
     }
-    const result = episode
-      ? await updateEpisode(episode.id, formData)
-      : await createEpisode({ ...formData, season_id: seasonId })
-    onSave(result)
   }
 
   return (
@@ -117,6 +206,10 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
             <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1" htmlFor="ep-audio-path">Audio URL</label>
             <input id="ep-audio-path" type="text" value={audioPath} onChange={e => setAudioPath(e.target.value)} required
               className="w-full rounded bg-zinc-100 dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
+            {detectingDuration && <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Detecting duration...</p>}
+            {!detectingDuration && durationSeconds > 0 && (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Duration: {formatDuration(durationSeconds)}</p>
+            )}
           </div>
         ) : (
           <div>
@@ -127,6 +220,10 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
             {uploadError && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{uploadError}</p>}
             {audioPath && !uploading && (
               <p className="text-sm text-green-600 dark:text-green-400 mt-1">Uploaded: {audioPath}</p>
+            )}
+            {detectingDuration && <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Detecting duration...</p>}
+            {!detectingDuration && durationSeconds > 0 && (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Duration: {formatDuration(durationSeconds)}</p>
             )}
           </div>
         )}
@@ -167,8 +264,8 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
             className="w-full rounded bg-zinc-100 dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
         </div>
         <div className="flex gap-3 pt-2">
-          <button type="submit" className="flex-1 rounded bg-[var(--accent)] py-2 text-[var(--accent-contrast)] font-medium hover:opacity-90">
-            Save
+          <button type="submit" disabled={submitting} className="flex-1 rounded bg-[var(--accent)] py-2 text-[var(--accent-contrast)] font-medium hover:opacity-90 disabled:opacity-50">
+            {submitting ? 'Saving…' : 'Save'}
           </button>
           <button type="button" onClick={onCancel} className="flex-1 rounded bg-zinc-200 py-2 text-zinc-700 hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
             Cancel

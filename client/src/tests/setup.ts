@@ -51,3 +51,31 @@ if (typeof window.ResizeObserver === 'undefined') {
   }
   window.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver
 }
+
+// jsdom implements neither URL.createObjectURL/revokeObjectURL nor real
+// media loading (used by EpisodeFormPanel to auto-detect audio duration).
+if (typeof URL.createObjectURL === 'undefined') {
+  URL.createObjectURL = () => 'blob:mock-url'
+}
+if (typeof URL.revokeObjectURL === 'undefined') {
+  URL.revokeObjectURL = () => {}
+}
+
+// jsdom never fires loadedmetadata/durationchange/error on <audio> — setting
+// `.src` is a no-op as far as events go. Any code awaiting one of those
+// events (EpisodeFormPanel's duration auto-detection) would otherwise hang
+// for the full length of its own internal timeout on every test run. Patch
+// the src setter to fire `error` asynchronously by default, matching jsdom's
+// real inability to load audio. Tests that need control over the resolved
+// duration (EpisodeFormPanel.test.tsx) replace window.Audio wholesale via
+// vi.stubGlobal, which bypasses this prototype patch entirely.
+const mediaSrcDescriptor = Object.getOwnPropertyDescriptor(window.HTMLMediaElement.prototype, 'src')
+if (mediaSrcDescriptor?.set) {
+  Object.defineProperty(window.HTMLMediaElement.prototype, 'src', {
+    ...mediaSrcDescriptor,
+    set(this: HTMLMediaElement, value: string) {
+      mediaSrcDescriptor.set!.call(this, value)
+      setTimeout(() => this.dispatchEvent(new Event('error')), 0)
+    },
+  })
+}
