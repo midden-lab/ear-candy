@@ -15,6 +15,12 @@
 // Env vars (defaults match the layout inside the production container):
 //   DB_PATH      default: data/db.sqlite
 //   UPLOADS_DIR  default: data/uploads
+//
+// STATUS: already run against production on 2026-07-13 (--apply). Fixed
+// episodes #96-#100 (all upload-type episodes with duration_seconds = 0 at
+// the time). Safe to re-run if the gap ever resurfaces — it's idempotent,
+// only touching rows still at duration_seconds = 0/NULL — but no further
+// action is expected under normal operation.
 
 import Database from 'better-sqlite3'
 import { parseFile } from 'music-metadata'
