@@ -33,7 +33,16 @@ interface AppOptions {
 }
 
 export function buildApp(opts: AppOptions = {}) {
-  const app = Fastify({ logger: opts.logger ?? true })
+  // Production sits behind Caddy on the same host, reverse-proxying over
+  // loopback (see scripts/setup-droplet.sh) — without trustProxy, Fastify's
+  // req.ip is the direct TCP peer, which in production is always Caddy's
+  // loopback address, collapsing every real visitor into one shared IP for
+  // things like the login lockout counter (issue #33: one attacker's failed
+  // attempts could lock out the real admin too). Trusting only loopback
+  // means req.ip reflects the real client from X-Forwarded-For when the
+  // immediate connection is from Caddy, while still refusing to trust
+  // forwarded headers from any address that isn't the local reverse proxy.
+  const app = Fastify({ logger: opts.logger ?? true, trustProxy: ['127.0.0.1', '::1'] })
   const dbPath = opts.dbPath ?? path.resolve('data/db.sqlite')
   const db = initDb(dbPath)
 
