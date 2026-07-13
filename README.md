@@ -4,10 +4,10 @@ A self-hostable podcast webapp. Each deployment hosts a single podcast. Listener
 
 ## Stack
 
-- **Server**: Fastify 4 + SQLite (via `better-sqlite3`) + TypeScript
+- **Server**: Fastify 5 + SQLite (via `better-sqlite3`) + TypeScript
 - **Client**: React 19 + Vite 5 + Tailwind CSS + Zustand
 - **Auth**: Single admin password stored as a bcrypt hash in an environment variable
-- **Storage**: SQLite database + local audio file uploads, both in `server/data/`
+- **Storage**: SQLite database + local audio/image file uploads, both in `server/data/`
 
 ---
 
@@ -17,7 +17,20 @@ A self-hostable podcast webapp. Each deployment hosts a single podcast. Listener
 
 - Docker and Docker Compose
 
-### 1. Generate a password hash
+### Quickest path: Makefile
+
+```bash
+make setup PASSWORD=yourpassword   # generates .env (bcrypt hash + cookie secret), Docker-only, no local Node needed
+make up                            # docker compose up --build
+```
+
+Run `make help` for the full list of shortcuts (`test`, `lint`, `e2e`, `e2e-ui`, `build-prod`, `up-prod`, ...).
+
+### Manual path
+
+If you'd rather not use the Makefile:
+
+**1. Generate a password hash**
 
 ```bash
 cd server
@@ -33,7 +46,7 @@ Or use the helper script (requires Node + bcrypt installed locally):
 ./scripts/hash-password.sh your-password
 ```
 
-### 2. Set environment variables
+**2. Set environment variables**
 
 Create a `.env` file in the project root:
 
@@ -42,7 +55,7 @@ ADMIN_PASSWORD_HASH=$2b$12$...   # output from step 1
 COOKIE_SECRET=a-long-random-string
 ```
 
-### 3. Start
+**3. Start**
 
 ```bash
 docker compose up
@@ -65,7 +78,9 @@ Both services hot-reload on file changes.
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-The client is served by nginx on port 80, which also proxies `/api/` and `/audio/` to the server container. The server container compiles native addons (bcrypt, better-sqlite3) for Alpine Linux at build time.
+This builds and runs the root `Dockerfile` — a single multi-stage image where the Fastify server serves the built client directly (`SERVE_CLIENT=true`) on port 3000, no separate nginx container involved. Native addons (bcrypt, better-sqlite3) are compiled for Alpine Linux in an intermediate build stage; the final image ships only the compiled output, no compilers.
+
+The live production deployment (via GitHub Actions, see `.github/workflows/ci-cd.yml`) doesn't use `docker-compose.prod.yml` directly — it builds the same `Dockerfile`, pushes it to GHCR, and runs it with a plain `docker run` on the target host. Functionally equivalent; `docker-compose.prod.yml` is the convenient local/manual equivalent of that same image.
 
 ### Required environment variables
 
@@ -95,10 +110,12 @@ Navigate to the listener UI and click the gear icon (bottom of the left rail) to
 
 From the admin panel you can:
 
-- **Episodes tab**: Create and manage seasons and episodes, set episode metadata (guests, tags, publish date, audio source)
-- **Settings tab**: Update the podcast name, tagline, description, and accent color
+- **Episodes tab**: Create and manage seasons and episodes, set episode metadata (guests, tags, publish date, audio source, cover art). Episode duration is detected automatically from the audio file/URL — no manual entry.
+- **Settings tab**: Update the podcast name, a separate browser-tab title (falls back to the podcast name if unset), tagline, description, accent color, and site favicon.
 
-Audio can be provided as an external URL or uploaded directly through the episode form.
+Audio can be provided as an external URL or uploaded directly through the episode form; the same is true for episode cover art (resized to thumbnail + detail sizes automatically) and the site favicon (PNG/ICO only).
+
+Listeners can toggle light/dark mode via the theme badge — dark is the default.
 
 ---
 
@@ -110,6 +127,7 @@ All public endpoints are under `/api`. Admin endpoints require a valid session c
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/api/health` | Liveness/health check |
 | `GET` | `/api/settings` | Podcast metadata |
 | `GET` | `/api/seasons` | All visible seasons, ordered by number |
 | `GET` | `/api/episodes` | All visible episodes; accepts `?season_id=N` |
@@ -121,9 +139,12 @@ All public endpoints are under `/api`. Admin endpoints require a valid session c
 |--------|------|-------------|
 | `POST` | `/api/admin/login` | Authenticate; sets session cookie |
 | `POST` | `/api/admin/logout` | Clear session cookie |
+| `GET` | `/api/admin/session` | Check whether the current session is authenticated |
 | `POST/PUT/PATCH/DELETE` | `/api/admin/seasons/:id` | Season CRUD |
 | `POST/PUT/PATCH/DELETE` | `/api/admin/episodes/:id` | Episode CRUD |
 | `POST` | `/api/admin/upload` | Upload an audio file |
+| `POST` | `/api/admin/upload/image` | Upload episode cover art (returns thumb + detail WebP paths) |
+| `POST` | `/api/admin/upload/favicon` | Upload the site favicon (PNG/ICO only) |
 | `PUT/PATCH` | `/api/admin/settings` | Update podcast settings |
 
 ---
@@ -140,15 +161,17 @@ ear-candy/
 │   │   ├── types.ts            # Shared TypeScript types
 │   │   ├── db/
 │   │   │   ├── index.ts        # DB initialisation
-│   │   │   └── migrate.ts      # Schema migrations
-│   │   └── routes/
-│   │       ├── settings.ts
-│   │       ├── seasons.ts
-│   │       ├── episodes.ts
-│   │       └── admin/          # Auth, CRUD, upload, settings
+│   │   │   └── migrate.ts      # Schema creation + guarded ALTER TABLE migrations
+│   │   ├── routes/
+│   │   │   ├── health.ts
+│   │   │   ├── settings.ts
+│   │   │   ├── seasons.ts
+│   │   │   ├── episodes.ts
+│   │   │   └── admin/          # Auth, CRUD, audio/image/favicon upload, settings
+│   │   └── utils/               # duration parsing, media path validation
+│   ├── scripts/                 # One-off maintenance scripts (see CLAUDE.md)
 │   ├── tests/
-│   ├── data/                   # SQLite DB + uploaded audio (gitignored)
-│   ├── Dockerfile              # Production multi-stage build
+│   ├── data/                   # SQLite DB + uploaded audio/images (gitignored)
 │   └── Dockerfile.dev
 ├── client/
 │   ├── src/
@@ -158,38 +181,48 @@ ear-candy/
 │   │   ├── store/
 │   │   │   └── playerStore.ts  # Zustand audio player state
 │   │   ├── hooks/
-│   │   │   └── useTheme.ts     # CSS accent colour hook
-│   │   ├── components/         # Listener UI components
-│   │   └── pages/              # AdminLogin, admin/ layout + pages
-│   ├── Dockerfile              # Production: Vite build → nginx
-│   └── nginx.conf              # SPA fallback + API proxy
+│   │   │   ├── useTheme.ts       # Dark/light mode + accent color/contrast
+│   │   │   └── useBreakpoint.ts  # Responsive layout hook
+│   │   ├── utils/
+│   │   │   └── color.ts        # Accent-color contrast computation
+│   │   ├── components/         # Listener UI: player, episode list/detail, cover art, theme toggle, etc.
+│   │   └── pages/               # AdminLogin, admin/ layout + pages
+│   └── Dockerfile.dev
 ├── scripts/
 │   └── hash-password.sh        # bcrypt password hash helper
 ├── docker-compose.yml          # Dev
-└── docker-compose.prod.yml     # Production
+├── docker-compose.prod.yml     # Production (builds/runs the root Dockerfile)
+└── Dockerfile                  # The actual production image (multi-stage; server serves client directly)
 ```
+
+Note: `client/Dockerfile` and `client/nginx.conf` also exist in the repo but are unused — they describe an alternate nginx-fronted deployment that nothing currently builds or runs. Production uses the root `Dockerfile` only.
 
 ---
 
 ## CI/CD
 
-`.github/workflows/ci-cd.yml` runs on every push/PR to `main`:
+`.github/workflows/ci-cd.yml` runs on push to `main` or `dev`, and on PRs targeting `main`. Doc-only commits (touching only `*.md` files) skip the whole pipeline.
 
 1. `lint` — ESLint on server + client
 2. `test` — Vitest server (node) + client (jsdom)
 3. `typecheck` — `tsc --noEmit` on client
 4. `build` — builds the production Docker image and pushes it to GHCR
-5. `e2e` — runs the built image, waits for it to be healthy, then runs Playwright against it
+5. `e2e` — runs the built image, waits for it to be healthy, then runs Playwright against it. Only on `main` pushes or PRs targeting `main` — `dev` pushes get the fast lint/test/build safety net without the slower e2e stage.
 6. `deploy` (main only) — SSHes to the production host, pulls the new image, and restarts the container
+
+All work happens on `dev`, promoted to `main` via a reviewed PR — see `CLAUDE.md` for the full workflow convention.
 
 ## Testing
 
 ```bash
-# Server (51 tests)
+# Server (100 tests)
 cd server && npm test
 
-# Client (117 tests)
+# Client (200 tests + 2 skipped)
 cd client && npm test
+
+# E2E (43 tests, requires the dev stack running — see `make e2e`)
+cd e2e && npm test
 ```
 
 Lint:
