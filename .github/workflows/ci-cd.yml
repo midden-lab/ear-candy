@@ -124,6 +124,12 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     needs: build
+    # Healthy runs (image pull, container start, browser install, 44 tests)
+    # take ~4-6 minutes. This caps a genuine hang (browser/network stall,
+    # not a slow/flaky test — those still fail via Playwright's own
+    # per-test timeout) well short of GitHub's 6-hour default, so it fails
+    # fast and stops burning CI minutes silently.
+    timeout-minutes: 15
     # Full e2e (with a real Docker image + Playwright) is reserved for the
     # main branch and PRs targeting it — the dev branch's safety net is
     # lint/test/build only, kept fast since it runs on every push there.
@@ -207,9 +213,13 @@ jobs:
         working-directory: ./e2e
         run: npx playwright install-deps chromium
 
+      # Invoked directly (not via `npm test`) so log output streams in real
+      # time — the npm wrapper was found to buffer all output until the
+      # child process exits normally, which hid a real ~20-minute cascading
+      # failure behind what looked like a silent hang.
       - name: Run E2E tests
         working-directory: ./e2e
-        run: npm test
+        run: npx playwright test
         env:
           TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'changeme' }}
           BASE_URL: http://localhost:3000
