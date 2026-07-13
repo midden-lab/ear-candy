@@ -44,7 +44,7 @@ All commands should be run from the repo root unless noted.
 
 **Per-package commands:**
 
-- **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 100 tests), `npm run lint` (eslint)
+- **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 102 tests), `npm run lint` (eslint)
 - **Client:** `cd client && npm run dev` (vite), `npm test` (vitest + jsdom, 200 tests + 2 skipped), `npm run lint` (eslint), `npm run typecheck` (tsc --noEmit)
 - **E2E:** `cd e2e && npm test` (playwright, 43 tests), `npm run test:ui` (playwright --ui)
 
@@ -112,7 +112,7 @@ ear-candy/
 │   │       ├── duration.ts     # parseDuration, formatDuration
 │   │       └── validation.ts   # isValidMediaPath and friends (accepts /audio/, /images/, http(s) URLs)
 │   ├── scripts/                # One-off maintenance scripts (see Docker & Deployment gotchas)
-│   ├── tests/                  # Vitest tests (node env, globals), 100 tests
+│   ├── tests/                  # Vitest tests (node env, globals), 102 tests
 │   │   └── helpers.ts          # buildTestApp(), buildTestDb()
 │   └── data/                   # SQLite DB + uploads (gitignored)
 │
@@ -186,7 +186,7 @@ ear-candy/
 
 ## Testing Approach
 
-### Server Tests (`server/tests/`) — 100 tests
+### Server Tests (`server/tests/`) — 102 tests
 
 - **Runner:** Vitest with `environment: 'node'`, `globals: true`.
 - **Test DB:** `:memory:` SQLite via `buildTestApp()` helper (`tests/helpers.ts`).
@@ -232,7 +232,7 @@ ear-candy/
 
 ### Auth / Security
 
-9. **Admin session is a signed cookie.** `@fastify/cookie` with `signed: true`. The cookie value is literally `'authenticated'` — the signature is what matters. `requireAdmin` unsigns and checks validity.
+9. **Admin session is a signed cookie with a 24h server-enforced expiry.** `@fastify/cookie` with `signed: true`. The signed value is `authenticated:<issued-at-epoch-ms>` (see `buildSessionCookieValue` in `server/src/auth.ts`) — `requireAdmin` unsigns it, then independently checks the embedded timestamp against `SESSION_MAX_AGE_MS` (24h), not just the browser-side cookie `maxAge` (a replayed/manipulated client could otherwise ignore that). A cookie issued before this change (plain `'authenticated'`, no timestamp) still passes signature validation but fails the format check cleanly (401, not a crash) — so deploying this fix force-logs-out whoever was already signed in, which is the intended effect (issue #30 — unbounded-lifetime sessions were the problem being fixed).
 10. **No user model.** There is no users table. Only one admin password hash, stored in `ADMIN_PASSWORD_HASH` env var. Changing it currently requires regenerating the hash and redeploying — there's no in-app "change password" flow yet.
 11. **`AdminLayout` re-checks the session on mount** (`GET /api/admin/session`), as defense-in-depth against a forced/stale client-side `view` state rendering a broken admin shell whose data fetches would just 401. The real access boundary is still the server-side `requireAdmin` check on every admin API call.
 12. **Favicon uploads deliberately exclude SVG.** Unlike PNG/ICO, an SVG can embed `<script>`/event handlers that execute if the uploaded file's URL is ever opened directly — a stored-XSS vector. Only `.png`/`.ico` are accepted.
@@ -314,13 +314,18 @@ This is convention, not a technical enforcement: GitHub branch protection rules 
 Jobs run in this order:
 
 1. `lint` — ESLint on server + client (parallel with `test`/`typecheck`)
-2. `test` — Vitest server (100 tests) + client (200 tests + 2 skipped)
+2. `test` — Vitest server (102 tests) + client (200 tests + 2 skipped)
 3. `typecheck` — `tsc --noEmit` on client
 4. `build` — builds the root `Dockerfile` image, pushes to GHCR (needs lint+test+typecheck)
 5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright (43 tests) against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit). Capped at `timeout-minutes: 15` (healthy runs take ~4-6 min) so a genuine hang (browser/network stall) fails fast instead of silently running for hours. Invoked directly as `npx playwright test`, not `npm test` — the npm wrapper was found to buffer all output until the child process exits normally, which hid a real ~20-minute cascading test failure behind what looked like total silence.
-6. `deploy` — only on `main`; SSHes to the production Droplet, pulls the new image by SHA tag, restarts the container, health-checks it (needs build+e2e)
+6. `deploy` — only on `main`; SSHes to the production Droplet, pulls the new image **by digest** (not tag — see below), restarts the container, health-checks it (needs build+e2e)
 
 Note: CI's `e2e` job exercises the **production image**, not `docker compose up` — different from local `make e2e`, which requires the dev stack (`make up`).
+
+**Security hardening conventions (established fixing issues #30-#33):**
+- **Every `uses:` action and `node:20-alpine` base image is pinned to a full commit SHA / digest, not a mutable tag** (e.g. `actions/checkout@34e114...  # v4`) — a re-pointed tag on any pinned action would otherwise let a compromised upstream repo execute code with access to every secret in this workflow (`GHCR_PAT`, `SSH_PRIVATE_KEY`, `COOKIE_SECRET`, `ADMIN_PASSWORD_HASH`). When bumping a version, resolve the new tag's SHA via `git ls-remote --tags <repo> | grep refs/tags/vX` (cross-check with the GitHub API) — never hand-type a SHA.
+- **No `${{ }}` is ever spliced directly into `run:`/`script:` text.** Every interpolated value (secrets, `github.sha`, etc.) goes through a step-level `env:` block and is referenced as `"$VAR"` inside the script — GitHub's own text-splicing would otherwise let a value containing shell metacharacters execute as literal script. For the `deploy` job's `appleboy/ssh-action` step specifically, this also requires the action's `envs:` input to forward the named vars into the *remote* script's shell environment — a plain `env:` block alone only sets vars in the local runner's context, not the SSH session.
+- **`deploy` pulls by digest, not tag.** The `build` job resolves the pushed image's real digest from the registry itself via `docker buildx imagetools inspect` (not `docker/build-push-action`'s own `digest` output, which has documented reliability issues in some configs — upstream issues #461/#579/#770) and passes it to `deploy` as a job output. Pulling `image@sha256:...` makes the pull itself the integrity check — Docker verifies the content hash as part of pulling, so a tampered/wrong image simply fails to pull, rather than relying on a separate post-pull assertion that's easy to write as a no-op (the previous `docker inspect ... > /dev/null` pattern asserted nothing).
 
 ## Design Documents
 

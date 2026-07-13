@@ -8,3 +8,6 @@ server/data/uploads/*
 !.env.example
 .superpowers/
 *.sqlite
+
+# Generated planning reports (red-team/security/DR audits) — kept locally, not tracked
+planning/*.html
