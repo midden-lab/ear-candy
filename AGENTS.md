@@ -243,11 +243,30 @@ ear-candy/
 26. **Production compose mounts `./data` for persistence.** Without this, the SQLite DB and uploads are lost on container restart.
 27. **nginx in production compose serves the client.** The `docker-compose.prod.yml` uses nginx to serve the built client and proxy `/api/` and `/audio/` to the server. The monolithic `Dockerfile` (root level) builds everything into one image where the server serves the client directly.
 28. **Bcrypt hashes contain `$` characters.** When passing `ADMIN_PASSWORD_HASH` or `COOKIE_SECRET` to `docker run` in shell scripts (e.g., GitHub Actions deploy), always use single quotes (`'...'`) to prevent bash from interpreting `$` as variable expansion. Double quotes will corrupt the hash and login will fail silently.
+29. **One-off maintenance scripts live in `server/scripts/`, run against production via a throwaway container.** E.g. `backfill-durations.mjs` populates `duration_seconds` for upload-type episodes that predate the auto-detect-on-save feature (URL-type episodes self-heal on their own — the form re-probes the URL on every save, but upload-type only re-probes when a new file is explicitly re-selected). Pattern for running one of these against production:
+    ```bash
+    # from local machine, with an SSH config alias set up for the Droplet:
+    scp server/scripts/backfill-durations.mjs earcandy:/opt/ear-candy/
+    ssh earcandy
+    # on the Droplet — mounts the real data dir into a disposable container
+    # sharing the already-deployed image; never touches the live `ear-candy`
+    # container itself:
+    docker run --rm \
+      -v /opt/ear-candy/data:/app/data \
+      -v /opt/ear-candy/backfill-durations.mjs:/app/backfill-durations.mjs \
+      -w /app \
+      $(docker inspect ear-candy --format='{{.Config.Image}}') \
+      sh -c 'npm install music-metadata --no-save && node backfill-durations.mjs'   # dry run
+    # review the printed list, then re-run the same command with --apply appended
+    # to node backfill-durations.mjs to actually write. Delete the copied script
+    # from /opt/ear-candy/ afterward — it's not meant to persist there.
+    ```
+    `music-metadata` (reads real audio duration from the file on disk, no native compile needed) is a devDependency only — it's never part of the production image, since the Dockerfile's `deps` stage runs `npm ci --omit=dev`.
 
 ### Linting
 
-28. **Both server and client use `typescript-eslint` recommended.** Server config is minimal. Client adds `eslint-plugin-react` and `eslint-plugin-react-hooks`.
-29. **`argsIgnorePattern: '^_'`** is configured for `@typescript-eslint/no-unused-vars` in both packages.
+30. **Both server and client use `typescript-eslint` recommended.** Server config is minimal. Client adds `eslint-plugin-react` and `eslint-plugin-react-hooks`.
+31. **`argsIgnorePattern: '^_'`** is configured for `@typescript-eslint/no-unused-vars` in both packages.
 
 ---
 
@@ -259,7 +278,9 @@ This is convention, not a technical enforcement: GitHub branch protection rules 
 
 ## CI/CD
 
-`.github/workflows/ci-cd.yml` triggers on push to `main` or `dev`, and on PRs targeting `main`. Jobs run in this order:
+`.github/workflows/ci-cd.yml` triggers on push to `main` or `dev`, and on PRs targeting `main`. Commits touching only `**.md` files (`paths-ignore`) skip the entire pipeline — no lint/test/build/e2e/deploy — since there's no code to validate. A commit mixing docs with code changes still runs everything normally (`paths-ignore` only skips when *every* changed file matches).
+
+Jobs run in this order:
 
 1. `lint` — ESLint on server + client (parallel with `test`/`typecheck`)
 2. `test` — Vitest server + client
