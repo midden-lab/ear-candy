@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ear Candy — Red Team Security Review (2026-07-13)</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #12151d;
+    --panel-2: #171b26;
+    --border: #262b38;
+    --text: #e6e9f0;
+    --muted: #93a0b4;
+    --accent: #7c9cff;
+    --critical: #ff4d5e;
+    --high: #ff9f43;
+    --medium: #ffd166;
+    --low: #6bd39c;
+    --info: #7c9cff;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+  header.report-header {
+    background: linear-gradient(135deg, #171b26, #0f1420);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+  }
+  header.report-header h1 { margin: 0 0 0.4rem; font-size: 1.9rem; }
+  header.report-header .subtitle { color: var(--muted); font-size: 1rem; }
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .meta-item {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+  }
+  .meta-item .label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .meta-item .value { font-size: 1.05rem; margin-top: 0.25rem; }
+
+  .severity-summary { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 1.5rem 0 2.5rem; }
+  .sev-pill {
+    display: flex; align-items: center; gap: 0.5rem;
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 0.5rem 1rem; font-size: 0.9rem; background: var(--panel);
+  }
+  .sev-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .sev-count { font-weight: 700; }
+
+  h2.section-title {
+    font-size: 1.3rem;
+    margin: 2.5rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .callout {
+    background: linear-gradient(135deg, rgba(124,156,255,0.12), rgba(124,156,255,0.03));
+    border: 1px solid rgba(124,156,255,0.35);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin: 1.5rem 0;
+  }
+  .callout .callout-label {
+    text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em;
+    color: var(--accent); font-weight: 700; margin-bottom: 0.4rem;
+  }
+
+  table.triage {
+    width: 100%; border-collapse: collapse; margin: 1rem 0 2rem;
+    font-size: 0.92rem;
+  }
+  table.triage th, table.triage td {
+    border: 1px solid var(--border);
+    padding: 0.6rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  table.triage th { background: var(--panel-2); color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  table.triage tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  table.triage td.id-cell { font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+
+  .badge {
+    display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .badge-critical { background: rgba(255,77,94,0.18); color: var(--critical); border: 1px solid rgba(255,77,94,0.4); }
+  .badge-high { background: rgba(255,159,67,0.18); color: var(--high); border: 1px solid rgba(255,159,67,0.4); }
+  .badge-medium { background: rgba(255,209,102,0.18); color: var(--medium); border: 1px solid rgba(255,209,102,0.4); }
+  .badge-low { background: rgba(107,211,156,0.18); color: var(--low); border: 1px solid rgba(107,211,156,0.4); }
+  .badge-info { background: rgba(124,156,255,0.18); color: var(--info); border: 1px solid rgba(124,156,255,0.4); }
+
+  .finding {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left-width: 4px;
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.1rem;
+  }
+  .finding.sev-critical { border-left-color: var(--critical); }
+  .finding.sev-high { border-left-color: var(--high); }
+  .finding.sev-medium { border-left-color: var(--medium); }
+  .finding.sev-low { border-left-color: var(--low); }
+  .finding.sev-info { border-left-color: var(--info); }
+
+  .finding-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+  .finding-head h3 { margin: 0; font-size: 1.05rem; }
+  .finding-id { font-family: var(--mono); color: var(--muted); font-size: 0.8rem; }
+
+  .finding dl { margin: 0.75rem 0 0; }
+  .finding dt { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; margin-top: 0.8rem; }
+  .finding dd { margin: 0.3rem 0 0; }
+  .finding code, .finding .loc {
+    font-family: var(--mono); font-size: 0.85rem; background: rgba(255,255,255,0.04);
+    padding: 0.1rem 0.4rem; border-radius: 5px; color: #b9c6e0;
+  }
+
+  .confirmed-solid { list-style: none; margin: 0; padding: 0; }
+  .confirmed-solid li {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--low);
+    border-radius: 10px;
+    padding: 0.9rem 1.2rem;
+    margin-bottom: 0.7rem;
+    font-size: 0.94rem;
+  }
+  .confirmed-solid li strong { color: var(--low); }
+
+  footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+  .panel-list { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.75rem; }
+  .panel-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1.1rem; flex: 1 1 220px; }
+  .panel-card .role { font-weight: 700; color: var(--accent); font-size: 0.9rem; }
+  .panel-card .scope { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="report-header">
+    <h1>Ear Candy — Red Team Security Review</h1>
+    <div class="subtitle">Adversarial multi-persona security audit of the current codebase (dev/main in sync, post episode-duration &amp; docs-consolidation work)</div>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="label">Date</div><div class="value">2026-07-13</div></div>
+      <div class="meta-item"><div class="label">Scope</div><div class="value">Security only</div></div>
+      <div class="meta-item"><div class="label">Panel size</div><div class="value">3 specialist reviewers</div></div>
+      <div class="meta-item"><div class="label">Total findings</div><div class="value">16 (0 Critical / 4 High / 5 Medium / 6 Low / 1 Info)</div></div>
+    </div>
+  </header>
+
+  <h2 class="section-title">Review Panel</h2>
+  <div class="panel-list">
+    <div class="panel-card">
+      <div class="role">AppSec Reviewer</div>
+      <div class="scope">Input validation, upload handling, XSS/injection, CSRF, rate limiting, dependency risk</div>
+    </div>
+    <div class="panel-card">
+      <div class="role">Auth &amp; Session Specialist</div>
+      <div class="scope">Single-admin model, cookie mechanics, session lifecycle, brute-force protection, password rotation</div>
+    </div>
+    <div class="panel-card">
+      <div class="role">Infra &amp; Deploy Reviewer</div>
+      <div class="scope">CI/CD secrets handling, deploy pipeline integrity, container hardening, backup posture, supply chain</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">Cross-referenced finding</div>
+    The Auth reviewer flagged the shared-IP login-lockout risk as <em>hypothetical</em> — contingent on this app ever being deployed behind a reverse proxy. Independently, the Infra reviewer confirmed via the DR runbook that <strong>Caddy is already the production reverse proxy</strong> (TLS termination via Let's Encrypt). Combining both: this is a <strong>live production issue today</strong>, not a future risk — see <strong>H4</strong> below. Neither reviewer alone had enough context to know this; it only surfaced by running the panel in parallel and synthesizing.
+  </div>
+
+  <h2 class="section-title">Priority Triage</h2>
+  <table class="triage">
+    <thead>
+      <tr><th>ID</th><th>Severity</th><th>Finding</th><th>Area</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="id-cell">H1</td><td><span class="badge badge-high">High</span></td><td>No absolute session expiry — a stolen cookie is valid forever</td><td>Auth</td></tr>
+      <tr><td class="id-cell">H2</td><td><span class="badge badge-high">High</span></td><td>GitHub Actions script injection via unescaped <code>${{ }}</code> interpolation</td><td>Infra</td></tr>
+      <tr><td class="id-cell">H3</td><td><span class="badge badge-high">High</span></td><td>Third-party Actions &amp; base images pinned to mutable tags, not SHAs</td><td>Infra</td></tr>
+      <tr><td class="id-cell">H4</td><td><span class="badge badge-high">High</span></td><td>Shared login-lockout bucket in production — Caddy sits in front, <code>trustProxy</code> not configured</td><td>Auth + Infra</td></tr>
+      <tr><td class="id-cell">M1</td><td><span class="badge badge-medium">Medium</span></td><td>No way to revoke a specific session ("sign out everywhere")</td><td>Auth</td></tr>
+      <tr><td class="id-cell">M2</td><td><span class="badge badge-medium">Medium</span></td><td>Deploy's "image digest verification" step doesn't actually verify anything</td><td>Infra</td></tr>
+      <tr><td class="id-cell">M3</td><td><span class="badge badge-medium">Medium</span></td><td>Production container runs as root</td><td>Infra</td></tr>
+      <tr><td class="id-cell">M4</td><td><span class="badge badge-medium">Medium</span></td><td>Backups exist but aren't offsite — same-host single point of failure</td><td>Infra</td></tr>
+      <tr><td class="id-cell">M5</td><td><span class="badge badge-medium">Medium</span></td><td>Audio/favicon uploads skip content-based (magic-byte) validation, unlike cover art</td><td>AppSec</td></tr>
+      <tr><td class="id-cell">L1</td><td><span class="badge badge-low">Low</span></td><td><code>isValidMediaPath</code> checks prefix only, no traversal/pattern check</td><td>AppSec</td></tr>
+      <tr><td class="id-cell">L2</td><td><span class="badge badge-low">Low</span></td><td>No minimum entropy/length check on <code>COOKIE_SECRET</code></td><td>Auth</td></tr>
+      <tr><td class="id-cell">L3</td><td><span class="badge badge-low">Low</span></td><td>No in-app password rotation (process risk, redeploy required)</td><td>Auth</td></tr>
+      <tr><td class="id-cell">L4</td><td><span class="badge badge-low">Low</span></td><td>No workflow-level default <code>permissions:</code> block</td><td>Infra</td></tr>
+      <tr><td class="id-cell">L5</td><td><span class="badge badge-low">Low</span></td><td>No automated dependency vulnerability scanning (no Dependabot)</td><td>Infra</td></tr>
+      <tr><td class="id-cell">L6</td><td><span class="badge badge-low">Low</span></td><td>TLS/reverse-proxy (Caddy) config lives outside version control</td><td>Infra</td></tr>
+      <tr><td class="id-cell">I1</td><td><span class="badge badge-info">Info</span></td><td>Default <code>TEST_ADMIN_PASSWORD=changeme</code> in CI (ephemeral, no real risk)</td><td>Auth</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="section-title">High Severity</h2>
+
+  <div class="finding sev-high">
+    <div class="finding-head"><h3>H1 — No absolute session expiry</h3><span class="finding-id">Auth</span></div>
+    <dl>
+      <dt>Location</dt><dd><span class="loc">server/src/routes/admin/auth.ts</span> (<code>reply.setCookie</code>, login handler)</dd>
+      <dt>Scenario</dt><dd>The <code>admin_session</code> cookie is set with no <code>maxAge</code>/<code>expires</code>. It's a browser-session cookie in theory, but the signed value carries no timestamp, so <code>requireAdmin</code> accepts it indefinitely as long as the signature validates. A cookie exfiltrated via XSS, a shared/compromised machine, or a browser that restores sessions across restarts remains valid with no time bound and no server-side way to force-expire it.</dd>
+      <dt>Remediation</dt><dd>Set a <code>maxAge</code> (e.g. 12–24h) on the cookie, and/or embed an issued-at timestamp in the signed value that <code>requireAdmin</code> checks against a max session age.</dd>
+    </dl>
+  </div>
+
+  <div class="finding sev-high">
+    <div class="finding-head"><h3>H2 — GitHub Actions script injection via unescaped interpolation</h3><span class="finding-id">Infra</span></div>
+    <dl>
+      <dt>Location</dt><dd><span class="loc">.github/workflows/ci-cd.yml</span> — <code>deploy</code> job script block and the <code>e2e</code> job's "Start test container" step</dd>
+      <dt>Scenario</dt><dd>Secrets and context values (<code>secrets.GHCR_PAT</code>, <code>secrets.COOKIE_SECRET</code>, <code>secrets.ADMIN_PASSWORD_HASH</code>, <code>github.sha</code>, <code>github.actor</code>) are spliced directly into <code>script:</code>/<code>run:</code> text via <code>${{ }}</code>, rather than passed through <code>env:</code> and referenced as <code>$VAR</code>. This is GitHub's documented script-injection anti-pattern: if any interpolated value ever contains shell metacharacters, it becomes literal shell syntax with full execution rights on the job holding <code>SSH_PRIVATE_KEY</code> to the production Droplet. Current secret formats don't contain breaking characters today, but nothing prevents a future value from doing so, and the pattern is fragile by construction.</dd>
+      <dt>Remediation</dt><dd>Pass every interpolated value via a step-level <code>env:</code> block and reference it as <code>"$VAR_NAME"</code> inside the script — never splice <code>${{ }}</code> directly into script text.</dd>
+    </dl>
+  </div>
+
+  <div class="finding sev-high">
+    <div class="finding-head"><h3>H3 — Third-party Actions &amp; base images pinned to mutable tags</h3><span class="finding-id">Infra</span></div>
+    <dl>
+      <dt>Location</dt><dd>Every <code>uses:</code> line in <span class="loc">.github/workflows/ci-cd.yml</span> (notably <code>appleboy/ssh-action@v1.0.3</code>, which executes the entire deploy script); <code>node:20-alpine</code> throughout the <span class="loc">Dockerfile</span></dd>
+      <dt>Scenario</dt><dd>Tags are mutable. If any pinned action's upstream repo were compromised and its tag re-pointed, the next CI run silently executes attacker code with access to every secret in the workflow — <code>GHCR_PAT</code>, <code>SSH_PRIVATE_KEY</code>, <code>DROPLET_IP</code>, <code>COOKIE_SECRET</code>, <code>ADMIN_PASSWORD_HASH</code>. That's full production root access plus registry write in one compromise, concentrated in <code>appleboy/ssh-action</code> specifically. Rated High (not Medium) because of the unusually high secret concentration this pipeline carries relative to a typical CI job.</dd>
+      <dt>Remediation</dt><dd>Pin <code>appleboy/ssh-action</code> — ideally all actions — to a full commit SHA with a comment noting the version. Use Dependabot/Renovate to keep SHA pins current. Pin <code>node:20-alpine</code> to a digest for reproducible builds.</dd>
+    </dl>
+  </div>
+
+  <div class="finding sev-high">
+    <div class="finding-head"><h3>H4 — Shared login-lockout bucket behind the production reverse proxy</h3><span class="finding-id">Auth + Infra (cross-referenced)</span></div>
+    <dl>
+      <dt>Location</dt><dd><span class="loc">server/src/routes/admin/auth.ts</span> (lockout logic, keyed on <code>req.ip</code>); <span class="loc">server/src/app.ts</span> (no <code>trustProxy</code> configured); production Caddy reverse proxy per <span class="loc">planning/2026-07-10-do-droplet-setup.md</span></dd>
+      <dt>Scenario</dt><dd>Fastify defaults to <code>trustProxy: false</code>, so <code>req.ip</code> reflects the direct TCP peer — which, in production, is Caddy, not the real client. Every request arrives from Caddy's address, collapsing every real visitor into <strong>one shared lockout bucket</strong>. Ten failed login attempts from anywhere on the internet locks out the legitimate admin too — a trivial, unauthenticated denial-of-service against the only account that can manage the site. This was flagged by the Auth reviewer as a future/hypothetical risk ("if a reverse proxy is ever introduced") but the Infra reviewer independently confirmed Caddy is already deployed in production today, making this a live issue, not a forward-looking one.</dd>
+      <dt>Remediation</dt><dd>Configure Fastify's <code>trustProxy</code> to trust only Caddy's specific address (loopback/internal network), then verify <code>req.ip</code> correctly reflects the real client IP from <code>X-Forwarded-For</code> in production. Do not blanket-trust all proxy headers.</dd>
+    </dl>
+  </div>
+
+  <h2 class="section-title">Medium Severity</h2>
+
+  <div class="finding sev-medium">
+    <div class="finding-head"><h3>M1 — No way to revoke a specific session</h3><span class="finding-id">Auth</span></div>
+    <dl>
+      <dt>Location</dt><dd><span class="loc">server/src/routes/admin/auth.ts</span> (<code>/admin/logout</code>)</dd>
+      <dt>Scenario</dt><dd><code>logout</code> only clears the current browser's cookie. There's no server-side session store, so a stolen/duplicated cookie held elsewhere remains valid — logging out locally does nothing to revoke a copy an attacker holds. Rotating <code>COOKIE_SECRET</code> invalidates everything, but that's a blunt, whole-secret rotation requiring a redeploy, not a targeted "sign out everywhere."</dd>
+      <dt>Remediation</dt><dd>Track a session version/generation number (e.g. a new <code>settings</code> column) embedded in and checked against the signed cookie, bumpable on demand for a real mass-invalidate without a redeploy.</dd>
+    </dl>
+  </div>
+
+  <div class="finding sev-medium">
+    <div class="finding-head"><h3>M2 — Deploy's image-digest "verification" doesn't verify anything</h3><span class="finding-id">Infra</span></div>
+    <dl>
+      <dt>Location</dt><dd><span class="loc">.github/workflows/ci-cd.yml</span>, <code>deploy</code> job, "Verifying image digest..." step</dd>
+      <dt>Scenario</dt><dd><code>docker inspect "$IMAGE" --format='{{.RepoDigests}}' &gt; /dev/null</code> discards its own output and compares against nothing. It proves the image has <em>some</em> digest, not that it's the <em>correct, untampered</em> one — a misleading log line implying a real integrity gate exists when it doesn't. A compromised registry or credential would deploy a malicious image with zero real gate.</dd>
+      <dt>Remediation</dt><dd>Either remove the misleading step or make it real: pass the digest produced by the <code>build</code> job through as a job output and assert equality in <code>deploy</code> before running the image.</dd>
+    </dl>
+  </div>
+
+  <div class="finding sev-medium">
+    <div class="finding-head"><h3>M3 — Production container runs as root</h3><span class="finding-id">Infra</span></div>
+    <dl>
+      <dt>Location</dt><dd><span class="loc">Dockerfile</span>, final <code>runner</code> stage — no <code>USER</code> directive</dd>
+      <dt>Scenario</dt><dd>The Fastify process runs as root inside the container. A remote-code-execution bug in the app or a dependency would grant root inside the container immediately, skipping the privilege-escalation step an attacker would otherwise need.</dd>
+      <dt>Remediation</dt><dd>Add a non-root user in the runner stage and switch to it with <code>USER</code>; verify <code>data/uploads</code> ownership/permissions still allow writes.</dd>
+    </dl>
+  </div>
+
+  <div class="finding sev-medium">
+    <div class="finding-head"><h3>M4 — Backups exist but aren't offsite</h3><span class="finding-id">Infra</span></div>
+    <dl>
+      <dt>Location</dt><dd><code>backup.sh</code> cron job (daily, 3 AM, 14-day retention) per <span class="loc">planning/2026-07-10-deploy-do-gitlab.md</span></dd>
+      <dt>Scenario</dt><dd>Backups genuinely exist (confirmed, not assumed away) but live on the same Droplet as the primary data. Total disk failure, a compromised root SSH key, or Droplet/account loss destroys both primary data and backups simultaneously — this is same-host snapshotting, not real disaster recovery.</dd>
+      <dt>Remediation</dt><dd>Ship backups offsite on a schedule (S3/Spaces/Backblaze, or a second Droplet/region) — even adding a simple <code>rclone</code>/<code>s3 cp</code> to the existing cron script closes this gap.</dd>
+    </dl>
+  </div>
+
+  <div class="finding sev-medium">
+    <div class="finding-head"><h3>M5 — Audio/favicon uploads skip content-based validation</h3><span class="finding-id">AppSec</span></div>
+    <dl>
+      <dt>Location</dt><dd><span class="loc">server/src/routes/admin/upload.ts</span>, <span class="loc">upload-favicon.ts</span></dd>
+      <dt>Scenario</dt><dd>Both routes accept a file based solely on client-supplied filename extension and multipart <code>Content-Type</code> — both fully attacker-controlled via a raw crafted request. Unlike <code>upload-image.ts</code>, which runs <code>sharp(buffer).metadata()</code> as a magic-byte check, audio/favicon uploads never verify the bytes match the claimed type. Mitigated by <code>X-Content-Type-Options: nosniff</code> and extension-derived static serving (not an XSS path), but a real inconsistency letting junk content persist under a trusted-looking path.</dd>
+      <dt>Remediation</dt><dd>Apply the same magic-byte validation already used for cover art (or a lightweight check via a library like <code>file-type</code>) to audio and favicon uploads.</dd>
+    </dl>
+  </div>
+
+  <h2 class="section-title">Low Severity</h2>
+
+  <div class="finding sev-low">
+    <div class="finding-head"><h3>L1 — <code>isValidMediaPath</code> checks prefix only</h3><span class="finding-id">AppSec</span></div>
+    <dl>
+      <dt>Location</dt><dd><span class="loc">server/src/utils/validation.ts</span></dd>
+      <dt>Scenario</dt><dd>Validates <code>favicon_path</code>/<code>cover_art_path</code> via <code>startsWith('/images/')</code> or <code>startsWith('/audio/')</code> only — no check for <code>..</code> traversal or matching the expected UUID-filename shape. Likely not exploitable end-to-end since <code>@fastify/static</code> independently blocks traversal, but provides no real app-level defense-in-depth.</dd>
+      <dt>Remediation</dt><dd>Also reject <code>..</code> segments and/or match the generated-filename pattern exactly.</dd>
+    </dl>
+  </div>
+
+  <div class="finding sev-low">
+    <div class="finding-head"><h3>L2 — No minimum entropy/length check on <code>COOKIE_SECRET</code></h3><span class="finding-id">Auth</span></div>
+    <dl>
+      <dt>Location</dt><dd><span class="loc">server/src/app.ts</span> (startup validation)</dd>
+      <dt>Scenario</dt><dd>Only checked for presence, not strength. An operator manually editing <code>.env</code> could set a trivially short/guessable secret, letting an attacker forge valid session cookies offline via HMAC brute-force.</dd>
+      <dt>Remediation</dt><dd>Reject startup if <code>COOKIE_SECRET.length</code> is below a reasonable floor (e.g. 32 chars); <code>make setup</code>'s generated secrets already satisfy this.</dd>
+    </dl>
+  </div>
+
+  <div class="finding sev-low">
+    <div class="finding-head"><h3>L3 — No in-app password rotation</h3><span class="finding-id">Auth</span></div>
+    <dl>
+      <dt>Location</dt><dd><span class="loc">server/src/routes/admin/auth.ts</span> (<code>ADMIN_PASSWORD_HASH</code> env var)</dd>
+      <dt>Scenario</dt><dd>Rotation requires regenerating a bcrypt hash and updating a GitHub secret, then redeploying — slow enough that rotation likely happens rarely, widening the exposure window after any suspected compromise. Already tracked separately as a known product gap; bundled here with M1 since neither has a way to force a mass-logout on rotation either.</dd>
+      <dt>Remediation</dt><dd>Already scoped as a follow-up feature; pair it with a session-invalidation mechanism (see M1) when implemented.</dd>
+    </dl>
+  </div>
+
+  <div class="finding sev-low">
+    <div class="finding-head"><h3>L4 — No workflow-level default <code>permissions:</code></h3><span class="finding-id">Infra</span></div>
+    <dl>
+      <dt>Location</dt><dd><span class="loc">.github/workflows/ci-cd.yml</span> (top level)</dd>
+      <dt>Scenario</dt><dd>Only <code>build</code> explicitly scopes its token. <code>lint</code>/<code>test</code>/<code>typecheck</code>/<code>e2e</code>/<code>deploy</code> inherit the repo's default <code>GITHUB_TOKEN</code> permissions, likely broader than needed since none of them call the GitHub API. Defense-in-depth gap, not an active exploit path.</dd>
+      <dt>Remediation</dt><dd>Add a top-level <code>permissions: contents: read</code> default, overriding per-job only where write access is genuinely required.</dd>
+    </dl>
+  </div>
+
+  <div class="finding sev-low">
+    <div class="finding-head"><h3>L5 — No automated dependency vulnerability scanning</h3><span class="finding-id">Infra</span></div>
+    <dl>
+      <dt>Location</dt><dd>Repo-wide — no Dependabot config</dd>
+      <dt>Scenario</dt><dd><code>npm audit</code> isn't run in CI and nothing opens PRs for vulnerable transitive dependencies across a nontrivial dependency tree (sharp, bcrypt, better-sqlite3, Fastify plugins). Vulnerabilities can sit unnoticed indefinitely.</dd>
+      <dt>Remediation</dt><dd>Add Dependabot/Renovate config for both <code>server/</code> and <code>client/</code> npm ecosystems; optionally add an <code>npm audit --audit-level=high</code> step to CI.</dd>
+    </dl>
+  </div>
+
+  <div class="finding sev-low">
+    <div class="finding-head"><h3>L6 — Caddy/TLS config lives outside version control</h3><span class="finding-id">Infra</span></div>
+    <dl>
+      <dt>Location</dt><dd>Provisioned manually per <span class="loc">planning/2026-07-10-do-droplet-setup.md</span> — no <code>Caddyfile</code> tracked in-repo</dd>
+      <dt>Scenario</dt><dd>HTTPS termination is real (confirmed, not assumed) via Caddy + Let's Encrypt, but the config isn't versioned. Recreating it after a Droplet loss depends entirely on a human correctly following a markdown runbook, with no drift detection if hand-edited later.</dd>
+      <dt>Remediation</dt><dd>Commit the <code>Caddyfile</code> to this repo even if applied manually, and note the manual-apply step explicitly in the DR runbook.</dd>
+    </dl>
+  </div>
+
+  <h2 class="section-title">Informational</h2>
+  <div class="finding sev-info">
+    <div class="finding-head"><h3>I1 — Default <code>TEST_ADMIN_PASSWORD=changeme</code> in CI</h3><span class="finding-id">Auth</span></div>
+    <dl>
+      <dt>Location</dt><dd><span class="loc">.github/workflows/ci-cd.yml</span> (e2e job credential generation)</dd>
+      <dt>Scenario</dt><dd>Only affects the ephemeral CI test container with fresh creds generated per run — no real risk today. Flagged only so this pattern doesn't get copy-pasted into a context with real data.</dd>
+      <dt>Remediation</dt><dd>None needed currently.</dd>
+    </dl>
+  </div>
+
+  <h2 class="section-title">Confirmed Solid (Not Findings)</h2>
+  <p style="color: var(--muted); margin-top: -0.5rem;">Explicitly verified by the panel and found sound — listed so this reads as a real audit trail, not a one-sided list of problems.</p>
+  <ul class="confirmed-solid">
+    <li><strong>Stored-XSS SVG favicon fix</strong> — verified still in place and correct in <code>upload-favicon.ts</code>.</li>
+    <li><strong>SQL injection</strong> — all three PATCH handlers (episodes, seasons, settings) enforce an allowlist before building dynamic <code>SET</code> clauses; no way found to smuggle an unlisted field into raw SQL.</li>
+    <li><strong>CSRF</strong> — <code>admin_session</code> cookie uses <code>sameSite: 'strict'</code> + <code>httpOnly</code>, the strongest practical cookie-based mitigation; no separate CSRF token needed.</li>
+    <li><strong>XSS via admin text fields</strong> — zero <code>dangerouslySetInnerHTML</code>/<code>innerHTML</code> usage anywhere client-side; React's default escaping applies universally. <code>accent_color</code> is applied via <code>CSSStyleDeclaration.setProperty</code>, not string-concatenated into a stylesheet — no CSS-injection breakout even with adversarial input.</li>
+    <li><strong>Content-Security-Policy</strong> — strict and well-reasoned: <code>script-src 'self'</code> (no <code>unsafe-inline</code>/<code>eval</code>), <code>object-src 'none'</code>, <code>frame-ancestors 'none'</code>.</li>
+    <li><strong><code>pull_request</code> (not <code>pull_request_target</code>)</strong> used for the PR trigger, and the repo is private — the classic "malicious fork PR steals secrets" vulnerability class doesn't apply here.</li>
+    <li><strong>Backups exist</strong> — daily cron with 14-day retention (corrects an assumption the Infra reviewer would otherwise have made from the repo alone; see M4 for the offsite gap that remains).</li>
+    <li><strong>TLS exists in production</strong> — Caddy + Let's Encrypt (corrects an assumption the reviewer would otherwise have made; see L6 for the config-versioning gap that remains).</li>
+    <li><strong><code>AdminLayout</code>'s session-check-on-mount</strong> is genuine defense-in-depth, not a false sense of security — the server still enforces <code>requireAdmin</code> on every real admin API call regardless.</li>
+    <li><strong>Dependency versions</strong> (Fastify 5.10, sharp 0.35, better-sqlite3 12.x, React 19) all current in a manual skim (a full <code>npm audit</code> run is recommended per L5, not performed as part of this pass).</li>
+  </ul>
+
+  <footer>
+    Methodology: three independent, parallel adversarial reviews (AppSec / Auth &amp; Session / Infra &amp; Deploy), each investigating the actual current repository state rather than relying on prior assumptions, synthesized into this single prioritized report. No files were modified as part of this review.
+  </footer>
+
+</div>
+</body>
+</html>
