@@ -123,7 +123,9 @@ jobs:
 
       - name: Export SHA tag
         id: export_sha
-        run: echo "sha_tag=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+        env:
+          IMAGE_TAG: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        run: echo "sha_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
   e2e:
     runs-on: ubuntu-latest
@@ -152,8 +154,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull built image
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         run: |
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
           echo "Pulling: $IMAGE"
           docker pull "$IMAGE"
           docker tag "$IMAGE" ear-candy:test
@@ -175,6 +178,9 @@ jobs:
           PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'changeme' }}
 
       - name: Start test container
+        env:
+          COOKIE_SECRET: ${{ steps.creds.outputs.cookie_secret }}
+          ADMIN_PASSWORD_HASH: ${{ steps.creds.outputs.admin_password_hash }}
         run: |
           docker run -d \
             --name ear-candy-test \
@@ -182,8 +188,8 @@ jobs:
             -e NODE_ENV=production \
             -e SERVE_CLIENT=true \
             -e PORT=3000 \
-            -e COOKIE_SECRET='${{ steps.creds.outputs.cookie_secret }}' \
-            -e ADMIN_PASSWORD_HASH='${{ steps.creds.outputs.admin_password_hash }}' \
+            -e COOKIE_SECRET="$COOKIE_SECRET" \
+            -e ADMIN_PASSWORD_HASH="$ADMIN_PASSWORD_HASH" \
             ear-candy:test
 
       - name: Wait for test app
@@ -255,16 +261,31 @@ jobs:
     steps:
       - name: Deploy to Droplet via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DEPLOY_REGISTRY: ${{ env.REGISTRY }}
+          DEPLOY_IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          DEPLOY_IMAGE_SHA: ${{ github.sha }}
+          DEPLOY_GHCR_PAT: ${{ secrets.GHCR_PAT }}
+          DEPLOY_GHCR_ACTOR: ${{ github.actor }}
+          DEPLOY_COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
+          DEPLOY_ADMIN_PASSWORD_HASH: ${{ secrets.ADMIN_PASSWORD_HASH }}
         with:
           host: ${{ secrets.DROPLET_IP }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # Values are passed via the `env:` block above and forwarded into
+          # the remote script's shell environment by name here, then
+          # referenced as "$VAR" below — never spliced directly into the
+          # script text via ${{ }}. Splicing would make any value containing
+          # shell metacharacters execute as literal script on a job that
+          # holds root SSH access to production (issue #31).
+          envs: DEPLOY_REGISTRY,DEPLOY_IMAGE_NAME,DEPLOY_IMAGE_SHA,DEPLOY_GHCR_PAT,DEPLOY_GHCR_ACTOR,DEPLOY_COOKIE_SECRET,DEPLOY_ADMIN_PASSWORD_HASH
           script: |
             set -e
-            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+            IMAGE="$DEPLOY_REGISTRY/$DEPLOY_IMAGE_NAME:$DEPLOY_IMAGE_SHA"
             echo "Pulling image: $IMAGE"
 
-            echo "${{ secrets.GHCR_PAT }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+            echo "$DEPLOY_GHCR_PAT" | docker login "$DEPLOY_REGISTRY" -u "$DEPLOY_GHCR_ACTOR" --password-stdin
 
             docker pull "$IMAGE"
 
@@ -284,8 +305,8 @@ jobs:
               -e NODE_ENV=production \
               -e SERVE_CLIENT=true \
               -e PORT=3000 \
-              -e COOKIE_SECRET='${{ secrets.COOKIE_SECRET }}' \
-              -e ADMIN_PASSWORD_HASH='${{ secrets.ADMIN_PASSWORD_HASH }}' \
+              -e COOKIE_SECRET="$DEPLOY_COOKIE_SECRET" \
+              -e ADMIN_PASSWORD_HASH="$DEPLOY_ADMIN_PASSWORD_HASH" \
               "$IMAGE"
 
             echo "Pruning dangling images..."
