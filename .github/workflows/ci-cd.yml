@@ -129,7 +129,7 @@ jobs:
     # not a slow/flaky test — those still fail via Playwright's own
     # per-test timeout) well short of GitHub's 6-hour default, so it fails
     # fast and stops burning CI minutes silently.
-    timeout-minutes: 25 # TEMP: widened while diagnosing a CI-only slowdown, restore to 15 after
+    timeout-minutes: 15
     # Full e2e (with a real Docker image + Playwright) is reserved for the
     # main branch and PRs targeting it — the dev branch's safety net is
     # lint/test/build only, kept fast since it runs on every push there.
@@ -213,12 +213,10 @@ jobs:
         working-directory: ./e2e
         run: npx playwright install-deps chromium
 
-      # TEMP: `npm test` (npm-wrapped) appears to buffer all output until the
-      # child process exits normally — two prior runs showed zero log output
-      # at all before hitting the timeout and being canceled, vs. a direct
-      # `npx playwright test` invocation which streamed real-time progress.
-      # Invoking Playwright directly here to see what's actually happening.
-      # Revert to `npm test` once diagnosed.
+      # Invoked directly (not via `npm test`) so log output streams in real
+      # time — the npm wrapper was found to buffer all output until the
+      # child process exits normally, which hid a real ~20-minute cascading
+      # failure behind what looked like a silent hang.
       - name: Run E2E tests
         working-directory: ./e2e
         run: npx playwright test
