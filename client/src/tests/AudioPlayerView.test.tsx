@@ -167,6 +167,162 @@ it('reports its rendered height via onHeightChange', () => {
   expect(typeof onHeightChange.mock.calls[0][0]).toBe('number')
 })
 
+describe('switching episodes mid-playback (regression)', () => {
+  const secondEpisode: Episode = {
+    ...mockEpisode,
+    id: 2,
+    title: 'Second Episode',
+    audio_path: 'https://example.com/second.mp3',
+  }
+
+  // The play/pause/load mocks are module-level (assigned once at the top of
+  // this file) and never reset between tests in this suite, so assertions
+  // here use call-count deltas rather than absolute counts — robust
+  // regardless of how many prior tests in the file already touched them.
+  function callCount(fn: unknown): number {
+    return (fn as ReturnType<typeof vi.fn>).mock.calls.length
+  }
+
+  it('calls play() again when switching to a new episode while already playing', () => {
+    const playCallsBeforeMount = callCount(HTMLMediaElement.prototype.play)
+    const { rerender } = render(
+      <AudioPlayerView
+        episode={mockEpisode}
+        playing={true}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    // On initial mount with playing already true, both the [episode] effect
+    // (now conditionally calling play(), per this fix) and the pre-existing
+    // [playing] effect fire together and each call play() once — a harmless,
+    // idempotent double-call (browsers no-op a second play() on media that's
+    // already playing/pending), not the bug under test. Just assert mounting
+    // triggered play() at all; the real regression check is the switch below.
+    expect(callCount(HTMLMediaElement.prototype.play)).toBeGreaterThan(playCallsBeforeMount)
+
+    // `playing` stays `true` across this rerender — the exact scenario from
+    // the reported bug (UI shows "playing", but the underlying <audio>
+    // element never actually got a fresh play() call for the new source).
+    const playCallsBeforeSwitch = callCount(HTMLMediaElement.prototype.play)
+    rerender(
+      <AudioPlayerView
+        episode={secondEpisode}
+        playing={true}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    expect(callCount(HTMLMediaElement.prototype.play)).toBe(playCallsBeforeSwitch + 1)
+  })
+
+  it('does not reload the element on a plain pause/resume toggle (position-preservation guard)', () => {
+    const loadCallsBeforeMount = callCount(HTMLMediaElement.prototype.load)
+    const { rerender } = render(
+      <AudioPlayerView
+        episode={mockEpisode}
+        playing={true}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    expect(callCount(HTMLMediaElement.prototype.load)).toBe(loadCallsBeforeMount + 1)
+
+    const loadCallsBeforeToggling = callCount(HTMLMediaElement.prototype.load)
+    rerender(
+      <AudioPlayerView
+        episode={mockEpisode}
+        playing={false}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    rerender(
+      <AudioPlayerView
+        episode={mockEpisode}
+        playing={true}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    // Same episode throughout — the [episode] effect (and its load() call)
+    // must not fire again just because `playing` toggled.
+    expect(callCount(HTMLMediaElement.prototype.load)).toBe(loadCallsBeforeToggling)
+  })
+
+  it('does not autoplay when switching episodes while playing is false', () => {
+    const playCallsBeforeMount = callCount(HTMLMediaElement.prototype.play)
+    const { rerender } = render(
+      <AudioPlayerView
+        episode={mockEpisode}
+        playing={false}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    expect(callCount(HTMLMediaElement.prototype.play)).toBe(playCallsBeforeMount)
+
+    rerender(
+      <AudioPlayerView
+        episode={secondEpisode}
+        playing={false}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    expect(callCount(HTMLMediaElement.prototype.play)).toBe(playCallsBeforeMount)
+  })
+})
+
 describe('mobile (< md)', () => {
   afterEach(() => {
     window.matchMedia = originalMatchMedia
