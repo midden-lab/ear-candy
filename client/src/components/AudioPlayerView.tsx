@@ -88,6 +88,11 @@ export interface AudioPlayerViewProps {
   currentTime: number
   duration: number
   speed: number
+  /** Position (seconds) to seek to when this episode is first loaded, e.g. a
+   *  previously-saved partial-listen position. Only applied once, right when
+   *  `episode` changes — never re-applied on later re-renders of the same
+   *  episode. Omit/0 for "start from the beginning". */
+  resumeTime?: number
   /** Fired after the view has moved the underlying <audio> element's playhead. */
   onSeek: (time: number) => void
   onTogglePlay: () => void
@@ -112,7 +117,7 @@ export interface AudioPlayerViewProps {
  * management — the host wires it to whatever store it likes.
  */
 export default function AudioPlayerView({
-  episode, playing, currentTime, duration, speed,
+  episode, playing, currentTime, duration, speed, resumeTime,
   onSeek, onTogglePlay, onSpeedChange, onTimeUpdate, onDurationChange, onEnded, onHeightChange,
 }: AudioPlayerViewProps) {
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -135,6 +140,13 @@ export default function AudioPlayerView({
     if (!audio || !episode) return
     audio.src = episode.audio_path
     audio.load()
+    // Browsers queue a currentTime assignment made before metadata has
+    // loaded and apply it once it does — no need to wait for
+    // `loadedmetadata` here. Reads `resumeTime` intentionally without
+    // depending on it: this must apply once per actual episode swap, not
+    // re-fire as `resumeTime` keeps changing for the same playing episode
+    // (it's recomputed from ever-advancing saved progress).
+    if (resumeTime) audio.currentTime = resumeTime
     // A same-value `playing: true -> true` write (e.g. switching episodes
     // while already playing) never re-triggers the [playing] effect below,
     // so without this, load()'s implicit pause is never followed by a real
