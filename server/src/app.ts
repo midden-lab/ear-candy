@@ -19,6 +19,8 @@ import { adminUploadRoute } from './routes/admin/upload.js'
 import { adminUploadImageRoute } from './routes/admin/upload-image.js'
 import { adminUploadFaviconRoute } from './routes/admin/upload-favicon.js'
 import { adminSettingsRoute } from './routes/admin/settings.js'
+import { isKnownCrawler, renderEpisodeOgHtml } from './utils/crawler.js'
+import type { Episode, Settings } from './types.js'
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -134,6 +136,39 @@ export function buildApp(opts: AppOptions = {}) {
     process.env.SERVE_CLIENT === 'true' ? path.resolve('dist/client') : null
   )
   if (clientDist && fs.existsSync(clientDist)) {
+    // Shared-episode links (?episode=X&t=Y) need a real preview card when a
+    // social platform's bot fetches them — those bots never execute the
+    // client bundle, so they'd otherwise always see the generic app shell.
+    // This must run as an onRequest hook, not inside setNotFoundHandler
+    // below: @fastify/static registers a real route for the exact path
+    // `/`, which serves index.html directly and never falls through to the
+    // not-found handler at all. onRequest fires before route matching, so
+    // it's the only hook that sees every request regardless of which route
+    // (if any) ends up handling it. Real browsers are completely
+    // unaffected — this only short-circuits for a known crawler user agent
+    // with a resolvable, visible episode id in the query string.
+    app.addHook('onRequest', async (req, reply) => {
+      // Scoped to exactly `/` — without this, a request to any other route
+      // (e.g. an API endpoint) from a UA that happens to match the crawler
+      // regex would be silently short-circuited into an OG-HTML response
+      // instead of its real handler.
+      if (req.method !== 'GET' || req.url.split('?')[0] !== '/') return
+      if (!isKnownCrawler(req.headers['user-agent'])) return
+      const episodeIdRaw = (req.query as Record<string, string> | undefined)?.episode
+      const episodeId = episodeIdRaw !== undefined ? parseInt(episodeIdRaw, 10) : NaN
+      if (isNaN(episodeId)) return
+      const episode = app.db.prepare(`
+        SELECT e.* FROM episodes e
+        JOIN seasons s ON s.id = e.season_id
+        WHERE e.id=? AND e.hidden=0 AND s.hidden=0
+      `).get(episodeId) as Episode | undefined
+      const settings = app.db.prepare('SELECT * FROM settings').get() as Settings | undefined
+      if (!episode || !settings) return
+      const origin = `${req.protocol}://${req.hostname}`
+      const shareUrl = `${origin}${req.url}`
+      await reply.code(200).type('text/html').send(renderEpisodeOgHtml(episode, settings, shareUrl, origin))
+    })
+
     app.register(staticPlugin, {
       root: clientDist,
       prefix: '/',

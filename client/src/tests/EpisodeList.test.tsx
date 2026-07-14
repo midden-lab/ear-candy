@@ -162,3 +162,42 @@ it('shows an empty state when the season has no episodes', () => {
   )
   expect(screen.getByText('No episodes in this season yet.')).toBeInTheDocument()
 })
+
+describe('URL sync on episode selection', () => {
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('updates the URL with the selected episode id', async () => {
+    const user = userEvent.setup()
+    render(
+      <EpisodeList
+        podcastName="Test Show"
+        seasons={seasons}
+        episodes={episodes}
+        activeSeason={1}
+        onSeasonSelect={() => {}}
+      />
+    )
+    await user.click(screen.getByText('First Episode'))
+    expect(new URLSearchParams(window.location.search).get('episode')).toBe('10')
+  })
+
+  it('drops any existing t param on a plain click', async () => {
+    window.history.replaceState(null, '', '/?episode=99&t=42')
+    const user = userEvent.setup()
+    render(
+      <EpisodeList
+        podcastName="Test Show"
+        seasons={seasons}
+        episodes={episodes}
+        activeSeason={1}
+        onSeasonSelect={() => {}}
+      />
+    )
+    await user.click(screen.getByText('Second Episode'))
+    const params = new URLSearchParams(window.location.search)
+    expect(params.get('episode')).toBe('11')
+    expect(params.has('t')).toBe(false)
+  })
+})

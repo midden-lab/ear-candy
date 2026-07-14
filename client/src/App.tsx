@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getSettings, getSeasons, getEpisodes, logout } from './api'
+import { getSettings, getSeasons, getEpisodes, getEpisode, logout } from './api'
 import { useTheme } from './hooks/useTheme'
 import { usePlayerStore } from './store/playerStore'
 import type { Settings, Season, Episode } from './types'
@@ -10,6 +10,7 @@ import MobileHeader from './components/MobileHeader'
 import EpisodeList from './components/EpisodeList'
 import DetailPane from './components/DetailPane'
 import AudioPlayer from './components/AudioPlayer'
+import type { SharedStart } from './components/AudioPlayer'
 import AdminLogin from './pages/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
 import EpisodeManager from './pages/admin/EpisodeManager'
@@ -32,18 +33,49 @@ export default function App() {
   // gives this visual effect below the `md` breakpoint.
   const [focusedPane, setFocusedPane] = useState<'list' | 'detail'>('list')
   const episode = usePlayerStore(s => s.episode)
+  const [sharedStart, setSharedStart] = useState<SharedStart | undefined>(undefined)
 
   const { isDark, toggleDark } = useTheme(settings?.accent_color ?? '#5a3ef5')
 
   useEffect(() => {
     void getSettings().then(setSettings).catch(console.error)
-    void getSeasons().then(s => {
+
+    // A shared episode link looks like `?episode=123&t=754` (see
+    // utils/shareUrl.ts). `t` is only meaningful alongside a valid
+    // `episode` id, and both are parsed once at boot — this app has no
+    // client-side router, so the URL is only ever read here, not watched.
+    const params = new URLSearchParams(window.location.search)
+    const sharedEpisodeId = parseInt(params.get('episode') ?? '', 10)
+    const sharedTime = parseInt(params.get('t') ?? '', 10)
+
+    void getSeasons().then(async s => {
       setSeasons(s)
-      if (s.length > 0) {
-        setActiveSeason(s[0].id)
-        setEpisodesLoading(true)
-        void getEpisodes(s[0].id).then(setEpisodes).catch(console.error).finally(() => setEpisodesLoading(false))
+      if (s.length === 0) return
+
+      if (!isNaN(sharedEpisodeId)) {
+        try {
+          const ep = await getEpisode(sharedEpisodeId)
+          usePlayerStore.getState().setEpisode(ep)
+          usePlayerStore.getState().setPlaying(false)
+          setFocusedPane('detail')
+          if (!isNaN(sharedTime) && sharedTime >= 0) {
+            setSharedStart({ episodeId: ep.id, time: sharedTime })
+          }
+          setActiveSeason(ep.season_id)
+          setEpisodesLoading(true)
+          await getEpisodes(ep.season_id).then(setEpisodes).catch(console.error)
+          setEpisodesLoading(false)
+          return
+        } catch {
+          // Invalid, hidden, or deleted episode in the shared link — fall
+          // through to the normal default-season view below, same as a
+          // plain visit with no query params.
+        }
       }
+
+      setActiveSeason(s[0].id)
+      setEpisodesLoading(true)
+      void getEpisodes(s[0].id).then(setEpisodes).catch(console.error).finally(() => setEpisodesLoading(false))
     }).catch(console.error)
   }, [])
 
@@ -165,7 +197,7 @@ export default function App() {
           onBack={() => setFocusedPane('list')}
         />
       }
-      player={<AudioPlayer />}
+      player={<AudioPlayer sharedStart={sharedStart} />}
       themeBadge={themeBadge}
     />
   )
