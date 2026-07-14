@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { buildShareUrl, buildTweetIntentUrl, buildFacebookIntentUrl, buildBlueskyIntentUrl } from '../utils/shareUrl'
+import { buildShareUrl, buildBlueskyIntentUrl } from '../utils/shareUrl'
+// Facebook/X are temporarily disabled below pending user research — see
+// the commented-out share-icon block further down. Re-import these when
+// re-enabling: buildTweetIntentUrl, buildFacebookIntentUrl
 import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 
 export interface ShareDialogProps {
@@ -206,17 +209,22 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
             <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Share to</p>
             <div className="flex gap-3">
               <a
-                href={buildTweetIntentUrl(shareUrl, episodeTitle)}
+                href={buildBlueskyIntentUrl(shareUrl, episodeTitle)}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleSocialClick}
-                aria-label="Share to X"
+                aria-label="Share to Bluesky"
                 className={socialBtnClass}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M18.9 2H22l-7.6 8.7L23.3 22h-6.9l-5.4-7-6.2 7H1.7l8.1-9.3L1 2h7l4.9 6.4L18.9 2Zm-1.2 18h1.9L7.4 4H5.4l12.3 16Z" />
+                  <path d="M12 8.5C10.6 5.7 8.2 3.6 6 3c-2 0-3 1.1-3 2.9 0 3.9 2 8.1 4.5 9.6-2 .3-3.5 1.7-2.4 3.5 1 1.7 4 1.5 6.3-1.5.4-.5.7-1 .9-1.5.2.5.5 1 .9 1.5 2.3 3 5.3 3.2 6.3 1.5 1.1-1.8-.4-3.2-2.4-3.5C19 14 21 9.8 21 5.9 21 4.1 20 3 18 3c-2.2.6-4.6 2.7-6 5.5Z" />
                 </svg>
               </a>
+              {/*
+                Facebook and X are temporarily hidden/disabled pending user
+                research on which platforms our audience actually wants —
+                keep the working implementation in place (including their
+                tests) so re-enabling is just uncommenting this block.
               <a
                 href={buildFacebookIntentUrl(shareUrl)}
                 target="_blank"
@@ -230,17 +238,18 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
                 </svg>
               </a>
               <a
-                href={buildBlueskyIntentUrl(shareUrl, episodeTitle)}
+                href={buildTweetIntentUrl(shareUrl, episodeTitle)}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleSocialClick}
-                aria-label="Share to Bluesky"
+                aria-label="Share to X"
                 className={socialBtnClass}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M12 8.5C10.6 5.7 8.2 3.6 6 3c-2 0-3 1.1-3 2.9 0 3.9 2 8.1 4.5 9.6-2 .3-3.5 1.7-2.4 3.5 1 1.7 4 1.5 6.3-1.5.4-.5.7-1 .9-1.5.2.5.5 1 .9 1.5 2.3 3 5.3 3.2 6.3 1.5 1.1-1.8-.4-3.2-2.4-3.5C19 14 21 9.8 21 5.9 21 4.1 20 3 18 3c-2.2.6-4.6 2.7-6 5.5Z" />
+                  <path d="M18.9 2H22l-7.6 8.7L23.3 22h-6.9l-5.4-7-6.2 7H1.7l8.1-9.3L1 2h7l4.9 6.4L18.9 2Zm-1.2 18h1.9L7.4 4H5.4l12.3 16Z" />
                 </svg>
               </a>
+              */}
             </div>
           </div>
         </div>,

@@ -18,16 +18,33 @@ it('renders a closed dialog by default', () => {
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
 
-it('opens the dialog on trigger click, showing copy/X/Facebook/Bluesky options', async () => {
+it('opens the dialog on trigger click, showing copy and Bluesky options', async () => {
   const user = userEvent.setup()
   render(<ShareDialog episodeId={1} episodeTitle="Test Episode" />)
   await user.click(screen.getByRole('button'))
   expect(screen.getByRole('dialog')).toBeInTheDocument()
   expect(screen.getByText('Share episode')).toBeInTheDocument()
   expect(screen.getByText('Copy')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Share to Bluesky' })).toBeInTheDocument()
+})
+
+// Facebook and X are temporarily disabled in the component (pending user
+// research on which platforms to support) — re-enable these assertions
+// alongside uncommenting the corresponding block in ShareDialog.tsx.
+it.skip('shows Facebook and X share options', async () => {
+  const user = userEvent.setup()
+  render(<ShareDialog episodeId={1} episodeTitle="Test Episode" />)
+  await user.click(screen.getByRole('button'))
   expect(screen.getByRole('link', { name: 'Share to X' })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Share to Facebook' })).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Share to Bluesky' })).toBeInTheDocument()
+})
+
+it('does not currently show Facebook or X share options', async () => {
+  const user = userEvent.setup()
+  render(<ShareDialog episodeId={1} episodeTitle="Test Episode" />)
+  await user.click(screen.getByRole('button'))
+  expect(screen.queryByRole('link', { name: 'Share to X' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: 'Share to Facebook' })).not.toBeInTheDocument()
 })
 
 it('does not show a timestamp option when currentTime is omitted', async () => {
@@ -85,19 +102,11 @@ it('shows brief "Copied" confirmation after copying', async () => {
   expect(screen.getByText('Copied')).toBeInTheDocument()
 })
 
-it('builds correct X, Facebook, and Bluesky share intent links', async () => {
+it('builds a correct Bluesky share intent link', async () => {
   const user = userEvent.setup()
   render(<ShareDialog episodeId={42} episodeTitle="Cool Episode" />)
   await user.click(screen.getByRole('button'))
   const shareUrl = `${window.location.origin}/?episode=42`
-  expect(screen.getByRole('link', { name: 'Share to X' })).toHaveAttribute(
-    'href',
-    `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent('Listening to "Cool Episode"')}`
-  )
-  expect(screen.getByRole('link', { name: 'Share to Facebook' })).toHaveAttribute(
-    'href',
-    `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`
-  )
   expect(screen.getByRole('link', { name: 'Share to Bluesky' })).toHaveAttribute(
     'href',
     `https://bsky.app/intent/compose?text=${encodeURIComponent(`Listening to "Cool Episode"\n${shareUrl}`)}`
