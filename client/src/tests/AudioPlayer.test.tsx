@@ -137,3 +137,34 @@ describe('per-episode resume position', () => {
     expect(usePlayerStore.getState().currentTime).toBe(0)
   })
 })
+
+describe('shared-link start time', () => {
+  it('resumes at the shared timestamp when there is no locally-saved progress', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: false })
+    render(<AudioPlayer sharedStart={{ episodeId: 1, time: 75 }} />)
+    expect(usePlayerStore.getState().currentTime).toBe(75)
+  })
+
+  it('ignores the shared timestamp when it is for a different episode', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: false })
+    render(<AudioPlayer sharedStart={{ episodeId: 999, time: 75 }} />)
+    expect(usePlayerStore.getState().currentTime).toBe(0)
+  })
+
+  it("prefers the listener's own saved progress over the shared timestamp once it exists", () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true })
+    const { unmount } = render(<AudioPlayer sharedStart={{ episodeId: 1, time: 75 }} />)
+
+    const audio = document.querySelector('audio')!
+    Object.defineProperty(audio, 'currentTime', { value: 200, configurable: true })
+    fireEvent.timeUpdate(audio)
+    unmount()
+
+    // Second activation of the same episode within the session: the
+    // listener's own more-recent progress (200s) wins over the original
+    // shared moment (75s).
+    usePlayerStore.setState({ episode: mockEpisode })
+    render(<AudioPlayer sharedStart={{ episodeId: 1, time: 75 }} />)
+    expect(usePlayerStore.getState().currentTime).toBe(200)
+  })
+})

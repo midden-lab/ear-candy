@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { vi, beforeEach, afterEach, describe } from 'vitest'
 import App from '../App'
 import { usePlayerStore } from '../store/playerStore'
-import { getSettings, logout } from '../api'
+import { getSettings, getSeasons, getEpisodes, getEpisode, logout } from '../api'
+import type { Season, Episode } from '../types'
 
 vi.mock('../api', () => ({
   getSettings: vi.fn().mockResolvedValue({
@@ -223,5 +224,62 @@ describe('document title and favicon', () => {
     await waitFor(() =>
       expect(document.querySelector('link[rel="icon"]')).not.toBeInTheDocument()
     )
+  })
+})
+
+describe('deep-linked shared episode (?episode=X&t=Y)', () => {
+  const season: Season = {
+    id: 1, number: 1, title: 'Season One', description: '', cover_art_path: null, hidden: false, created_at: '2024-01-01T00:00:00Z',
+  }
+  const otherSeason: Season = { ...season, id: 2, number: 2, title: 'Season Two' }
+  const sharedEpisode: Episode = {
+    id: 55, season_id: 2, number: 3, title: 'Shared Episode', description: '', guests: '', tags: '',
+    cover_art_path: null, cover_art_thumb_path: null, duration_seconds: 1000, publish_date: '2024-05-01',
+    audio_type: 'url', audio_path: 'https://example.com/ep.mp3', hidden: false,
+    created_at: '2024-05-01T00:00:00Z', updated_at: '2024-05-01T00:00:00Z',
+  }
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('loads the shared episode into the player, paused, without needing its season to be first', async () => {
+    window.history.replaceState(null, '', '/?episode=55&t=120')
+    vi.mocked(getSeasons).mockResolvedValue([season, otherSeason])
+    vi.mocked(getEpisode).mockResolvedValue(sharedEpisode)
+    vi.mocked(getEpisodes).mockResolvedValue([sharedEpisode])
+
+    render(<App />)
+
+    await waitFor(() => expect(usePlayerStore.getState().episode?.id).toBe(55))
+    expect(usePlayerStore.getState().playing).toBe(false)
+    expect(getEpisode).toHaveBeenCalledWith(55)
+    // Episode list for the deep-linked episode's own season is fetched, not
+    // whatever season happens to sort first.
+    await waitFor(() => expect(getEpisodes).toHaveBeenCalledWith(2))
+  })
+
+  it('falls through to the default first season when the shared episode id is invalid or inaccessible', async () => {
+    window.history.replaceState(null, '', '/?episode=999')
+    vi.mocked(getSeasons).mockResolvedValue([season, otherSeason])
+    vi.mocked(getEpisode).mockRejectedValue(new Error('HTTP 404'))
+    vi.mocked(getEpisodes).mockResolvedValue([])
+
+    render(<App />)
+
+    await waitFor(() => expect(getEpisodes).toHaveBeenCalledWith(1))
+    expect(usePlayerStore.getState().episode).toBeNull()
+  })
+
+  it('ignores a non-numeric episode param and behaves like a plain visit', async () => {
+    window.history.replaceState(null, '', '/?episode=not-a-number')
+    vi.mocked(getSeasons).mockResolvedValue([season])
+    vi.mocked(getEpisodes).mockResolvedValue([])
+
+    render(<App />)
+
+    await waitFor(() => expect(getEpisodes).toHaveBeenCalledWith(1))
+    expect(getEpisode).not.toHaveBeenCalled()
+    expect(usePlayerStore.getState().episode).toBeNull()
   })
 })
