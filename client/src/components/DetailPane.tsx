@@ -1,6 +1,7 @@
 import type { Episode, Season } from '../types'
 import PillBadge from './PillBadge'
 import EpisodeCoverArt from './EpisodeCoverArt'
+import ShareMenu from './ShareMenu'
 
 interface DetailPaneProps {
   episode: Episode | null
@@ -48,8 +49,13 @@ export default function DetailPane({ episode, seasons, onBack }: DetailPaneProps
         variant="responsive"
         className="mb-6 w-48 aspect-square object-cover rounded-xl shadow-lg ring-1 ring-zinc-200 dark:ring-zinc-800"
       />
-      <p className="mb-1 text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{seasonLabel}</p>
-      <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{episode.title}</h1>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="mb-1 text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{seasonLabel}</p>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{episode.title}</h1>
+        </div>
+        <ShareMenu episodeId={episode.id} episodeTitle={episode.title} variant="labeled" className="shrink-0" />
+      </div>
       <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{episode.publish_date}</p>
 
       {guestList.length > 0 && (

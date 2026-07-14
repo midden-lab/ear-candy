@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Episode } from '../types'
 import ProgressBar from './ProgressBar'
 import EpisodeCoverArt from './EpisodeCoverArt'
+import ShareMenu from './ShareMenu'
 import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 
 function formatTime(seconds: number, showSign = false): string {
@@ -287,7 +288,7 @@ export default function AudioPlayerView({
         style={{ paddingBottom: 'env(safe-area-inset-bottom)', paddingTop: 'env(safe-area-inset-top)' }}
       >
         {audioEl}
-        <div className="flex items-center px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3">
           <button
             onClick={() => setExpanded(false)}
             className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
@@ -297,6 +298,7 @@ export default function AudioPlayerView({
               <path d="m6 9 6 6 6-6"/>
             </svg>
           </button>
+          <ShareMenu episodeId={episode.id} episodeTitle={episode.title} currentTime={currentTime} className="[&>button]:h-11 [&>button]:w-11 [&>button]:justify-center" />
         </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-8 px-6 pb-6">
           <EpisodeCoverArt
@@ -344,6 +346,7 @@ export default function AudioPlayerView({
           </div>
           <TransportControls {...transportProps} />
         </div>
+        <ShareMenu episodeId={episode.id} episodeTitle={episode.title} currentTime={currentTime} className="shrink-0 self-center" />
       </div>
     </div>
   )

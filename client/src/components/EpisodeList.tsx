@@ -29,6 +29,14 @@ export default function EpisodeList({
   function handleEpisodeClick(ep: Episode) {
     setEpisode(ep)
     setPlaying(true)
+    // Keep the URL deep-linkable to whatever's currently selected, so
+    // reloading or copying the address bar URL lands back on this episode.
+    // A plain click always starts fresh, so any shared-link `t` param is
+    // dropped rather than carried over to an unrelated selection.
+    const url = new URL(window.location.href)
+    url.searchParams.set('episode', String(ep.id))
+    url.searchParams.delete('t')
+    window.history.replaceState(null, '', url)
     onEpisodeSelect?.()
   }
 

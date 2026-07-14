@@ -81,7 +81,7 @@ it('does not render img when cover_art_path is null', () => {
 
 it('does not render a back button when onBack is not provided', () => {
   render(<DetailPane episode={mockEpisode} seasons={seasons} />)
-  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  expect(screen.queryByText('Back to episodes')).not.toBeInTheDocument()
 })
 
 it('renders a back button and calls onBack when clicked, given onBack', async () => {

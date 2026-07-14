@@ -123,6 +123,11 @@ it('renders all transport buttons', () => {
   expect(screen.getByRole('button', { name: 'Skip to end' })).toBeInTheDocument()
 })
 
+it('renders a share button on the desktop bar', () => {
+  renderView({ episode: mockEpisode })
+  expect(screen.getByRole('button', { name: /share/i })).toBeInTheDocument()
+})
+
 it('renders speed toggle showing current speed', () => {
   renderView({ episode: mockEpisode, speed: 1 })
   expect(screen.getByRole('button', { name: /speed/i })).toHaveTextContent('1×')
@@ -420,6 +425,20 @@ describe('mobile (< md)', () => {
     expect(screen.getByText('Test Episode')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Skip to start' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /speed/i })).not.toBeInTheDocument()
+  })
+
+  it('does not show a share button on the collapsed mini-bar', () => {
+    mockMobile()
+    renderView({ episode: mockEpisode })
+    expect(screen.queryByRole('button', { name: /share/i })).not.toBeInTheDocument()
+  })
+
+  it('shows a share button in the expanded full-screen overlay', async () => {
+    const user = userEvent.setup()
+    mockMobile()
+    renderView({ episode: mockEpisode })
+    await user.click(screen.getByRole('button', { name: /now playing/i }))
+    expect(screen.getByRole('button', { name: /share/i })).toBeInTheDocument()
   })
 
   it('title truncates correctly next to the play button (min-w-0 regression guard)', () => {
