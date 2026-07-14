@@ -185,14 +185,20 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
 
             <button
               onClick={() => void handleCopy()}
+              aria-label="Copy link"
               className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-[var(--accent-contrast)] transition-opacity hover:opacity-90"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M10 13a5 5 0 0 0 7.07 0l1.93-1.93a5 5 0 0 0-7.07-7.07L10.5 5.5" />
                 <path d="M14 11a5 5 0 0 0-7.07 0l-1.93 1.93a5 5 0 0 0 7.07 7.07L13.5 18.5" />
               </svg>
-              <span aria-live="polite">{copied ? 'Copied' : 'Copy'}</span>
+              <span aria-hidden="true">{copied ? 'Copied' : 'Copy'}</span>
             </button>
+            {/* Separate from the button's own (stable) aria-label — an
+                aria-live region whose text lives on the very element that
+                was just clicked/focused is a known spotty case for
+                screen-reader + browser combos not reliably announcing. */}
+            <span role="status" aria-live="polite" className="sr-only">{copied ? 'Copied to clipboard' : ''}</span>
 
             {offersTimestamp && (
               <label className="mb-4 flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
@@ -206,7 +212,7 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
               </label>
             )}
 
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Share to</p>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-500">Share to</p>
             <div className="flex gap-3">
               <a
                 href={buildBlueskyIntentUrl(shareUrl, episodeTitle)}

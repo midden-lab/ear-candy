@@ -113,4 +113,45 @@ describe('shared-episode OG tags for known crawlers', () => {
     expect(res.body).not.toContain('<script>alert(1)</script>')
     expect(res.body).toContain('&lt;script&gt;')
   })
+
+  it('resolves a relative cover_art_path to an absolute og:image URL', async () => {
+    const season = app.db.prepare(`INSERT INTO seasons (number, title) VALUES (3, 'Season Three')`).run()
+    const withArt = app.db.prepare(`
+      INSERT INTO episodes (season_id, number, title, cover_art_path, publish_date, audio_type, audio_path, hidden)
+      VALUES (?, 1, 'Episode With Art', '/images/abc-detail.webp', '2024-01-01', 'url', 'https://example.com/4.mp3', 0)
+    `).run(season.lastInsertRowid)
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/?episode=${withArt.lastInsertRowid}`,
+      headers: { 'user-agent': 'Twitterbot/1.0', host: 'podcast.example.com' },
+    })
+    expect(res.body).toContain('<meta property="og:image" content="http://podcast.example.com/images/abc-detail.webp">')
+  })
+
+  it('leaves an already-absolute cover art URL untouched', async () => {
+    const season = app.db.prepare(`INSERT INTO seasons (number, title) VALUES (4, 'Season Four')`).run()
+    const withAbsoluteArt = app.db.prepare(`
+      INSERT INTO episodes (season_id, number, title, cover_art_path, publish_date, audio_type, audio_path, hidden)
+      VALUES (?, 1, 'Episode With Absolute Art', 'https://cdn.example.com/art.jpg', '2024-01-01', 'url', 'https://example.com/5.mp3', 0)
+    `).run(season.lastInsertRowid)
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/?episode=${withAbsoluteArt.lastInsertRowid}`,
+      headers: { 'user-agent': 'Twitterbot/1.0' },
+    })
+    expect(res.body).toContain('<meta property="og:image" content="https://cdn.example.com/art.jpg">')
+  })
+
+  it('is scoped to exactly "/" and does not intercept a crawler-UA request to another route', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/episodes/${episodeId}`,
+      headers: { 'user-agent': 'Twitterbot/1.0' },
+    })
+    expect(res.body).not.toContain('og:title')
+    const body = res.json()
+    expect(body.id).toBe(episodeId)
+  })
 })

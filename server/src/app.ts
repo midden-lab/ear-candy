@@ -148,7 +148,12 @@ export function buildApp(opts: AppOptions = {}) {
     // unaffected — this only short-circuits for a known crawler user agent
     // with a resolvable, visible episode id in the query string.
     app.addHook('onRequest', async (req, reply) => {
-      if (req.method !== 'GET' || !isKnownCrawler(req.headers['user-agent'])) return
+      // Scoped to exactly `/` — without this, a request to any other route
+      // (e.g. an API endpoint) from a UA that happens to match the crawler
+      // regex would be silently short-circuited into an OG-HTML response
+      // instead of its real handler.
+      if (req.method !== 'GET' || req.url.split('?')[0] !== '/') return
+      if (!isKnownCrawler(req.headers['user-agent'])) return
       const episodeIdRaw = (req.query as Record<string, string> | undefined)?.episode
       const episodeId = episodeIdRaw !== undefined ? parseInt(episodeIdRaw, 10) : NaN
       if (isNaN(episodeId)) return
@@ -159,8 +164,9 @@ export function buildApp(opts: AppOptions = {}) {
       `).get(episodeId) as Episode | undefined
       const settings = app.db.prepare('SELECT * FROM settings').get() as Settings | undefined
       if (!episode || !settings) return
-      const shareUrl = `${req.protocol}://${req.hostname}${req.url}`
-      await reply.code(200).type('text/html').send(renderEpisodeOgHtml(episode, settings, shareUrl))
+      const origin = `${req.protocol}://${req.hostname}`
+      const shareUrl = `${origin}${req.url}`
+      await reply.code(200).type('text/html').send(renderEpisodeOgHtml(episode, settings, shareUrl, origin))
     })
 
     app.register(staticPlugin, {

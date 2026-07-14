@@ -102,6 +102,21 @@ it('shows brief "Copied" confirmation after copying', async () => {
   expect(screen.getByText('Copied')).toBeInTheDocument()
 })
 
+it('announces the copy confirmation via a status live region separate from the button', async () => {
+  const { user } = setupUser()
+  render(<ShareDialog episodeId={1} episodeTitle="Test Episode" />)
+  await user.click(screen.getByRole('button'))
+  const copyButton = screen.getByRole('button', { name: 'Copy link' })
+  expect(copyButton).toHaveAttribute('aria-label', 'Copy link')
+  await user.click(copyButton)
+  // The button's own accessible name stays stable ("Copy link") — the
+  // announcement lives in a separate role="status" region, not on the
+  // button whose name would otherwise change on the exact element just
+  // clicked (a known spotty case for screen-reader announcements).
+  expect(copyButton).toHaveAttribute('aria-label', 'Copy link')
+  expect(screen.getByRole('status')).toHaveTextContent('Copied to clipboard')
+})
+
 it('builds a correct Bluesky share intent link', async () => {
   const user = userEvent.setup()
   render(<ShareDialog episodeId={42} episodeTitle="Cool Episode" />)

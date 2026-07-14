@@ -20,14 +20,20 @@ function escapeHtml(value: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
-export function renderEpisodeOgHtml(episode: Episode, settings: Settings, shareUrl: string): string {
+export function renderEpisodeOgHtml(episode: Episode, settings: Settings, shareUrl: string, origin: string): string {
   const title = escapeHtml(episode.title)
   const siteName = escapeHtml(settings.podcast_name)
   const description = escapeHtml(episode.description || settings.tagline || '')
   const image = episode.cover_art_path ?? settings.cover_art_path
-  const imageTag = image ? `<meta property="og:image" content="${escapeHtml(image)}">\n    ` : ''
+  // Cover art is stored/returned as a site-relative path (e.g. /images/<uuid>.webp)
+  // — the Open Graph spec requires og:image to be an absolute URL, or
+  // Twitter/Facebook/Slack/Discord's unfurlers silently fail to resolve it
+  // and the preview card renders with no image at all.
+  const absoluteImage = image ? (image.startsWith('http://') || image.startsWith('https://') ? image : `${origin}${image}`) : null
+  const imageTag = absoluteImage ? `<meta property="og:image" content="${escapeHtml(absoluteImage)}">\n    ` : ''
 
   return `<!DOCTYPE html>
 <html>
