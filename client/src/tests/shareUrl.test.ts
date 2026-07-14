@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildShareUrl, buildTweetIntentUrl, buildFacebookIntentUrl } from '../utils/shareUrl'
+import { buildShareUrl, buildTweetIntentUrl, buildFacebookIntentUrl, buildBlueskyIntentUrl } from '../utils/shareUrl'
 
 describe('buildShareUrl', () => {
   it('builds a URL with just the episode id when no timestamp is given', () => {
@@ -36,5 +36,14 @@ describe('buildFacebookIntentUrl', () => {
   it('encodes the share URL into a Facebook sharer URL', () => {
     const intent = buildFacebookIntentUrl('https://example.com/?episode=1')
     expect(intent).toBe('https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fexample.com%2F%3Fepisode%3D1')
+  })
+})
+
+describe('buildBlueskyIntentUrl', () => {
+  it('encodes the episode title and share URL together into the post text', () => {
+    const intent = buildBlueskyIntentUrl('https://example.com/?episode=1', 'My Episode')
+    expect(intent).toBe(
+      'https://bsky.app/intent/compose?text=Listening%20to%20%22My%20Episode%22%0Ahttps%3A%2F%2Fexample.com%2F%3Fepisode%3D1'
+    )
   })
 })

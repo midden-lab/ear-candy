@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { buildShareUrl, buildTweetIntentUrl, buildFacebookIntentUrl } from '../utils/shareUrl'
+import { buildShareUrl, buildTweetIntentUrl, buildFacebookIntentUrl, buildBlueskyIntentUrl } from '../utils/shareUrl'
 import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 
 export interface ShareDialogProps {
@@ -227,6 +227,18 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.4h-1.2c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" />
+                </svg>
+              </a>
+              <a
+                href={buildBlueskyIntentUrl(shareUrl, episodeTitle)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleSocialClick}
+                aria-label="Share to Bluesky"
+                className={socialBtnClass}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 8.5C10.6 5.7 8.2 3.6 6 3c-2 0-3 1.1-3 2.9 0 3.9 2 8.1 4.5 9.6-2 .3-3.5 1.7-2.4 3.5 1 1.7 4 1.5 6.3-1.5.4-.5.7-1 .9-1.5.2.5.5 1 .9 1.5 2.3 3 5.3 3.2 6.3 1.5 1.1-1.8-.4-3.2-2.4-3.5C19 14 21 9.8 21 5.9 21 4.1 20 3 18 3c-2.2.6-4.6 2.7-6 5.5Z" />
                 </svg>
               </a>
             </div>

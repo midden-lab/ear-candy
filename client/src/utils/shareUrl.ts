@@ -21,3 +21,10 @@ export function buildFacebookIntentUrl(shareUrl: string): string {
   // ignores any pre-filled text/title params, so there's nothing else to pass.
   return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`
 }
+
+export function buildBlueskyIntentUrl(shareUrl: string, episodeTitle: string): string {
+  // Bluesky's compose intent has no separate url param — the link goes
+  // directly in the post text, same as a user pasting it themselves.
+  const text = `Listening to "${episodeTitle}"\n${shareUrl}`
+  return `https://bsky.app/intent/compose?text=${encodeURIComponent(text)}`
+}
