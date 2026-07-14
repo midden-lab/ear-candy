@@ -1,5 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react'
-import { vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, act } from '@testing-library/react'
+import { vi, beforeEach, describe } from 'vitest'
 import { usePlayerStore } from '../store/playerStore'
 import AudioPlayer from '../components/AudioPlayer'
 import type { Episode } from '../types'
@@ -32,9 +32,12 @@ const mockEpisode: Episode = {
   updated_at: '2024-01-01T00:00:00Z',
 }
 
+const otherEpisode: Episode = { ...mockEpisode, id: 2, title: 'Other Episode' }
+
 beforeEach(() => {
   usePlayerStore.setState({ episode: null, playing: false, currentTime: 0, duration: 120, speed: 1 })
   vi.clearAllMocks()
+  localStorage.clear()
 })
 
 it('renders nothing when there is no episode in the store', () => {
@@ -75,4 +78,62 @@ it('resets the --player-h CSS variable when there is no episode', () => {
   usePlayerStore.setState({ episode: null })
   render(<AudioPlayer />)
   expect(document.documentElement.style.getPropertyValue('--player-h')).toBe('0px')
+})
+
+describe('per-episode resume position', () => {
+  it('saves progress on switching away from an episode and restores it later', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true })
+    const { rerender, unmount } = render(<AudioPlayer />)
+
+    fireEvent.timeUpdate(document.querySelector('audio')!, {
+      target: { currentTime: 42 },
+    })
+    // AudioPlayerView reads audioRef.current.currentTime directly rather than
+    // the event target, so drive the real element's value too.
+    const audio = document.querySelector('audio')!
+    Object.defineProperty(audio, 'currentTime', { value: 42, configurable: true })
+    fireEvent.timeUpdate(audio)
+
+    expect(usePlayerStore.getState().currentTime).toBe(42)
+
+    // Switch to a different episode — the outgoing episode's position
+    // (episode 1 @ 42s) should be persisted via the cleanup path.
+    act(() => usePlayerStore.setState({ episode: otherEpisode }))
+    rerender(<AudioPlayer />)
+    unmount()
+
+    // A fresh mount for the original episode should immediately resume at 42s.
+    usePlayerStore.setState({ episode: mockEpisode })
+    render(<AudioPlayer />)
+    expect(usePlayerStore.getState().currentTime).toBe(42)
+  })
+
+  it('does not persist trivial near-start progress', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true })
+    const { unmount } = render(<AudioPlayer />)
+
+    const audio = document.querySelector('audio')!
+    Object.defineProperty(audio, 'currentTime', { value: 2, configurable: true })
+    fireEvent.timeUpdate(audio)
+    unmount()
+
+    usePlayerStore.setState({ episode: mockEpisode })
+    render(<AudioPlayer />)
+    expect(usePlayerStore.getState().currentTime).toBe(0)
+  })
+
+  it('clears saved progress once an episode finishes', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true })
+    const { unmount } = render(<AudioPlayer />)
+
+    const audio = document.querySelector('audio')!
+    Object.defineProperty(audio, 'currentTime', { value: 90, configurable: true })
+    fireEvent.timeUpdate(audio)
+    fireEvent.ended(audio)
+    unmount()
+
+    usePlayerStore.setState({ episode: mockEpisode })
+    render(<AudioPlayer />)
+    expect(usePlayerStore.getState().currentTime).toBe(0)
+  })
 })

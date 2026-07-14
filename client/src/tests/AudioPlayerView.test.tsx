@@ -323,6 +323,92 @@ describe('switching episodes mid-playback (regression)', () => {
   })
 })
 
+describe('resumeTime (per-episode resume position)', () => {
+  const secondEpisode: Episode = {
+    ...mockEpisode,
+    id: 2,
+    title: 'Second Episode',
+    audio_path: 'https://example.com/second.mp3',
+  }
+
+  it('seeks the audio element to resumeTime when an episode loads', () => {
+    render(
+      <AudioPlayerView
+        episode={mockEpisode}
+        playing={false}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        resumeTime={42}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    expect(document.querySelector('audio')!.currentTime).toBe(42)
+  })
+
+  it('does not seek when resumeTime is 0/undefined', () => {
+    render(
+      <AudioPlayerView
+        episode={mockEpisode}
+        playing={false}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    expect(document.querySelector('audio')!.currentTime).toBe(0)
+  })
+
+  it('applies the new resumeTime again when switching to another episode', () => {
+    const { rerender } = render(
+      <AudioPlayerView
+        episode={mockEpisode}
+        playing={false}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        resumeTime={42}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    expect(document.querySelector('audio')!.currentTime).toBe(42)
+
+    rerender(
+      <AudioPlayerView
+        episode={secondEpisode}
+        playing={false}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        resumeTime={17}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    expect(document.querySelector('audio')!.currentTime).toBe(17)
+  })
+})
+
 describe('mobile (< md)', () => {
   afterEach(() => {
     window.matchMedia = originalMatchMedia
