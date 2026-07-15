@@ -128,6 +128,13 @@ it('builds a correct Bluesky share intent link', async () => {
   )
 })
 
+it('focuses the close button on open, not the dialog container (issue #54)', async () => {
+  const user = userEvent.setup()
+  render(<ShareDialog episodeId={1} episodeTitle="Test Episode" />)
+  await user.click(screen.getByRole('button'))
+  expect(screen.getByRole('button', { name: 'Close share dialog' })).toHaveFocus()
+})
+
 it('closes on Escape and returns focus to the trigger button', async () => {
   const user = userEvent.setup()
   render(<ShareDialog episodeId={1} episodeTitle="Test Episode" />)
@@ -158,7 +165,7 @@ it('closes and returns focus after the explicit close button is clicked', async 
   render(<ShareDialog episodeId={1} episodeTitle="Test Episode" />)
   const trigger = screen.getByRole('button')
   await user.click(trigger)
-  await user.click(screen.getByRole('button', { name: 'Close' }))
+  await user.click(screen.getByRole('button', { name: 'Close share dialog' }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(trigger).toHaveFocus()
 })

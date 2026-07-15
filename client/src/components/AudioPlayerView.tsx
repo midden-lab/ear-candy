@@ -298,7 +298,9 @@ export default function AudioPlayerView({
               <path d="m6 9 6 6 6-6"/>
             </svg>
           </button>
-          <ShareDialog episodeId={episode.id} episodeTitle={episode.title} currentTime={currentTime} className="[&>button]:h-11 [&>button]:w-11 [&>button]:justify-center" />
+          {/* ShareDialog's own trigger is already a 44px (h-11 w-11) touch
+              target by default — no per-usage size override needed here. */}
+          <ShareDialog episodeId={episode.id} episodeTitle={episode.title} currentTime={currentTime} />
         </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-8 px-6 pb-6">
           <EpisodeCoverArt

@@ -39,6 +39,11 @@ export default function EpisodeList({
     // reloading or copying the address bar URL lands back on this episode.
     // A plain click always starts fresh, so any shared-link `t` param is
     // dropped rather than carried over to an unrelated selection.
+    // Deliberately replaceState, never pushState — this app has no
+    // popstate listener, and since nothing ever pushes a new history
+    // entry, there's no stale per-episode entry for back/forward to land
+    // on (verified empirically: window.history.length doesn't grow across
+    // episode switches). See CLAUDE.md's Client gotchas (issue #55).
     const url = new URL(window.location.href)
     url.searchParams.set('episode', String(ep.id))
     url.searchParams.delete('t')
