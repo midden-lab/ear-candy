@@ -1,7 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify'
-import type { Season } from '../../types.js'
+import type { Season, Episode } from '../../types.js'
 import { requireAdmin } from '../../auth.js'
 import { isValidMediaPath } from '../../utils/validation.js'
+import { deleteLocalMediaFile } from '../../utils/mediaFiles.js'
 
 const ALLOWED_SEASON_PATCH_FIELDS = new Set(['number', 'title', 'description', 'cover_art_path', 'hidden'])
 
@@ -96,9 +97,21 @@ export const adminSeasonsRoute: FastifyPluginAsync = async (app) => {
 
   app.delete<{ Params: { id: string } }>('/admin/seasons/:id', { preHandler: requireAdmin }, async (req, reply) => {
     const id = parseInt(req.params.id, 10)
-    const existing = app.db.prepare('SELECT id FROM seasons WHERE id = ?').get(id)
+    const existing = app.db.prepare('SELECT * FROM seasons WHERE id = ?').get(id) as Season | undefined
     if (!existing) return reply.status(404).send({ error: 'Not found' })
+    // Read every episode's media paths before deleting — ON DELETE CASCADE
+    // wipes their rows the instant the season row goes, so this is the
+    // last chance to know what files need cleaning up (issue #4).
+    const episodes = app.db.prepare('SELECT * FROM episodes WHERE season_id = ?').all(id) as Episode[]
     app.db.prepare('DELETE FROM seasons WHERE id = ?').run(id)
+    await Promise.all([
+      deleteLocalMediaFile(existing.cover_art_path),
+      ...episodes.flatMap(ep => [
+        deleteLocalMediaFile(ep.audio_path),
+        deleteLocalMediaFile(ep.cover_art_path),
+        deleteLocalMediaFile(ep.cover_art_thumb_path),
+      ]),
+    ])
     return reply.status(204).send()
   })
 }
