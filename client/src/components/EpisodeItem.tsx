@@ -49,7 +49,9 @@ export default function EpisodeItem({ episode, isActive, isPlaying = false, rema
           <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">{episode.publish_date}</span>
           <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">·</span>
           {remainingSeconds !== undefined ? (
-            <span className="text-xs text-[var(--accent)] shrink-0">{formatDuration(remainingSeconds)} left</span>
+            <span className="text-xs text-[var(--accent)] shrink-0">
+              <span className="tabular-nums">{formatDuration(remainingSeconds)}</span> left
+            </span>
           ) : (
             <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">{formatDuration(episode.duration_seconds)}</span>
           )}
