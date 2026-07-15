@@ -44,6 +44,7 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
   const [includeTimestamp, setIncludeTimestamp] = useState(true)
   const [copied, setCopied] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const lastFocusedRef = useRef<HTMLElement | null>(null)
   const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
@@ -64,14 +65,16 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
     lastFocusedRef.current?.focus()
   }
 
-  // Focus the panel on open, trap Tab/Shift+Tab within it, and close on
-  // Escape — the same hand-rolled listener shape this app already uses
-  // elsewhere for outside-click/Escape dismissal, just scoped to a real
-  // focus trap since this is a true modal, not a corner popover.
+  // Focus the close button on open (the WAI-ARIA APG dialog convention —
+  // a specific interactive control, not the panel container itself), trap
+  // Tab/Shift+Tab within the panel, and close on Escape — the same
+  // hand-rolled listener shape this app already uses elsewhere for
+  // outside-click/Escape dismissal, just scoped to a real focus trap since
+  // this is a true modal, not a corner popover.
   useEffect(() => {
     if (!open) return
     const panel = panelRef.current
-    panel?.focus()
+    closeButtonRef.current?.focus()
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
@@ -116,7 +119,11 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
     closeDialog()
   }
 
-  const iconBtnClass = 'rounded p-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors'
+  // Explicit h-11/w-11 (44px) rather than relying on padding around the
+  // icon to happen to reach that footprint — guarantees the tap target
+  // meets common touch-target guidance even on a touch-capable desktop/
+  // tablet hybrid, without visually enlarging the icon glyph itself.
+  const iconBtnClass = 'flex h-11 w-11 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors'
   const socialBtnClass = 'flex h-11 w-11 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
 
   return (
@@ -165,8 +172,9 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
                 Share episode
               </h2>
               <button
+                ref={closeButtonRef}
                 onClick={closeDialog}
-                aria-label="Close"
+                aria-label="Close share dialog"
                 className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
