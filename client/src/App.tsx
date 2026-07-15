@@ -32,7 +32,15 @@ export default function App() {
   // to phone width behaves identically to an actual phone — AppShell only
   // gives this visual effect below the `md` breakpoint.
   const [focusedPane, setFocusedPane] = useState<'list' | 'detail'>('list')
-  const episode = usePlayerStore(s => s.episode)
+  // The episode shown in the detail pane — deliberately independent of the
+  // player's own episode/playing state. Browsing the list must never
+  // interrupt whatever's already playing in the background; only an
+  // explicit Play action (DetailPane's play button, or the player bar
+  // itself once something is loaded) is allowed to change what's loaded
+  // into the player.
+  const [viewingEpisode, setViewingEpisode] = useState<Episode | null>(null)
+  const playerEpisode = usePlayerStore(s => s.episode)
+  const playing = usePlayerStore(s => s.playing)
   const [sharedStart, setSharedStart] = useState<SharedStart | undefined>(undefined)
 
   const { isDark, toggleDark } = useTheme(settings?.accent_color ?? '#5a3ef5')
@@ -55,8 +63,12 @@ export default function App() {
       if (!isNaN(sharedEpisodeId)) {
         try {
           const ep = await getEpisode(sharedEpisodeId)
+          // Deep links load the episode ready-to-play but paused (same
+          // no-autoplay rule as browsing the list) — the listener still has
+          // to press Play themselves.
           usePlayerStore.getState().setEpisode(ep)
           usePlayerStore.getState().setPlaying(false)
+          setViewingEpisode(ep)
           setFocusedPane('detail')
           if (!isNaN(sharedTime) && sharedTime >= 0) {
             setSharedStart({ episodeId: ep.id, time: sharedTime })
@@ -100,6 +112,21 @@ export default function App() {
       existingLinks.forEach(el => el.remove())
     }
   }, [settings])
+
+  // The only place playback is ever started/switched from browsing UI —
+  // toggles play/pause if the viewed episode is already the one loaded in
+  // the player, otherwise loads it fresh and starts it (interrupting
+  // whatever was playing before, same as any podcast app: only one thing
+  // can audibly play at a time, but *browsing* never does this on its own).
+  const handlePlayEpisode = (ep: Episode) => {
+    const store = usePlayerStore.getState()
+    if (store.episode?.id === ep.id) {
+      store.setPlaying(!store.playing)
+    } else {
+      store.setEpisode(ep)
+      store.setPlaying(true)
+    }
+  }
 
   const handleSeasonSelect = (seasonId: number) => {
     setActiveSeason(seasonId)
@@ -186,14 +213,19 @@ export default function App() {
           episodes={episodes}
           activeSeason={activeSeason}
           loading={episodesLoading}
+          viewingEpisodeId={viewingEpisode?.id ?? null}
           onSeasonSelect={handleSeasonSelect}
+          onEpisodeView={ep => setViewingEpisode(ep)}
           onEpisodeSelect={() => setFocusedPane('detail')}
         />
       }
       detail={
         <DetailPane
-          episode={episode}
+          episode={viewingEpisode}
           seasons={seasons}
+          isCurrentPlayerEpisode={playerEpisode?.id === viewingEpisode?.id}
+          playing={playing}
+          onPlayPause={() => viewingEpisode && handlePlayEpisode(viewingEpisode)}
           onBack={() => setFocusedPane('list')}
         />
       }

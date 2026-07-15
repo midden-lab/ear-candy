@@ -22,12 +22,18 @@ Ear Candy is a self-hostable podcast webapp. Each deployment hosts a single podc
 - Full light/dark theme (dark is the default; toggle persists to `localStorage`)
 - Admin-configurable accent color, with an auto-computed WCAG-contrast text color so a pale admin-chosen accent never produces unreadable button text
 - Episode duration auto-detected client-side from the audio file/URL on save — no manual entry
+- Per-episode playback resume: position is cached client-side in `localStorage` (`client/src/utils/episodeProgress.ts`) and offered back the next time that episode is loaded, regardless of which device-local session — see Client gotchas
+- Episode sharing: a share dialog (`client/src/components/ShareDialog.tsx`) in the player produces a deep link (`?episode=X&t=Y`) that reopens the app at that exact episode/timestamp, with real Open Graph preview tags served to link-preview crawlers server-side — see Client and Server gotchas
+- Browsing the episode list/detail pane is fully decoupled from what's actually loaded in the player — clicking an episode never auto-plays it or interrupts whatever's already playing in the background; only an explicit Play action (in the detail pane) changes what's loaded — see Client gotchas
+- Episode list rows show live "remaining time" (decrementing while that episode is actually playing) once a listener has partially heard an episode
 
 ---
 
 ## Essential Commands
 
 All commands should be run from the repo root unless noted.
+
+**Claude Code: always invoke these via their `make` target, not the underlying `npm`/`docker` command directly** — `make test`, `make lint`, `make e2e`, `make e2e-ui`, `make up`, `make down`, `make setup`. This isn't just a style preference: `make e2e` runs `make e2e-reset-db` first, which wipes and re-seeds the local dev database for a deterministic run (see gotcha #28) — running `cd e2e && npm test` directly skips that reset and silently reintroduces the exact cascading-failure class documented in gotcha #30 (a stale/manually-created season colliding by name with what the `seededPage` fixture seeds). If you need to run a *subset* of e2e specs (e.g. `npx playwright test tests/player.spec.ts`), still run `make e2e-reset-db` yourself immediately beforehand.
 
 | Command | Description |
 |---------|-------------|
@@ -37,16 +43,16 @@ All commands should be run from the repo root unless noted.
 | `make logs` | Tail dev stack logs. |
 | `make test` | Run server unit tests (`cd server && npm test`) then client unit tests (`cd client && npm test`). |
 | `make lint` | Lint server (`cd server && npm run lint`) then client (`cd client && npm run lint`). |
-| `make e2e` | Run Playwright E2E tests (`cd e2e && npm test`). **Requires `make up` first.** |
-| `make e2e-ui` | Open Playwright UI mode. |
+| `make e2e` | Run Playwright E2E tests (`cd e2e && npm test`). **Requires `make up` first.** Wipes and re-seeds the local dev database first (`make e2e-reset-db`) for a clean, deterministic run — see gotcha #28. |
+| `make e2e-ui` | Open Playwright UI mode. Same DB reset as `make e2e`. |
 | `make build-prod` | Build production Docker image (`docker build -t ear-candy .`, the root monolithic `Dockerfile`). |
 | `make up-prod` | Start production stack (`docker compose -f docker-compose.prod.yml up -d`) — also just builds/runs the root `Dockerfile`, see Docker & Deployment gotchas. |
 
 **Per-package commands:**
 
-- **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 102 tests), `npm run lint` (eslint)
-- **Client:** `cd client && npm run dev` (vite), `npm test` (vitest + jsdom, 200 tests + 2 skipped), `npm run lint` (eslint), `npm run typecheck` (tsc --noEmit)
-- **E2E:** `cd e2e && npm test` (playwright, 43 tests), `npm run test:ui` (playwright --ui)
+- **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 115 tests), `npm run lint` (eslint)
+- **Client:** `cd client && npm run dev` (vite), `npm test` (vitest + jsdom, 273 tests + 3 skipped), `npm run lint` (eslint), `npm run typecheck` (tsc --noEmit)
+- **E2E:** `cd e2e && npm test` (playwright, 44 tests), `npm run test:ui` (playwright --ui) — prefer `make e2e`/`make e2e-ui` (see note above)
 
 ---
 
@@ -74,8 +80,8 @@ In **dev**, client and server run as separate Docker services. In **production**
 ### Client Architecture
 
 - **Entry point:** `client/src/main.tsx` → renders `App.tsx`.
-- **App.tsx:** Root component with simple view routing (`'player' | 'admin-login' | 'admin'`). No router library — just state-driven conditional rendering.
-- **State management:** Zustand in `client/src/store/playerStore.ts` for audio player state (episode, playing, currentTime, duration, speed).
+- **App.tsx:** Root component with simple view routing (`'player' | 'admin-login' | 'admin'`). No router library — just state-driven conditional rendering. It does read `window.location.search` once at boot to resolve a shared deep link (`?episode=X&t=Y`) and writes `?episode=` back via `history.replaceState` on episode selection (in `EpisodeList.tsx`) — this is one-directional URL syncing, not client-side routing; there's no `popstate` listener, see Client gotchas.
+- **State management:** Zustand in `client/src/store/playerStore.ts` for audio player state (episode, playing, currentTime, duration, speed) — this is *only* the player's own state. `App.tsx` separately holds `viewingEpisode` (which episode the detail pane shows) as plain `useState`, deliberately decoupled from the store — see Client gotchas on why.
 - **API layer:** `client/src/api.ts` — typed fetch wrappers. Public endpoints use plain fetch; admin endpoints use `credentials: 'include'` for cookie auth.
 - **Theming:** `useTheme` hook reads/writes `localStorage` key `'theme'` and toggles `.dark` class on `<html>`. Dark is the default (no saved preference → dark) so existing users never see an unannounced theme change. Accent color is set as CSS variable `--accent` on `:root`, with `--accent-contrast` (black/white, computed via WCAG relative luminance in `client/src/utils/color.ts`) set alongside it for readable text on admin-chosen accent colors.
 - **Styling:** Tailwind CSS with `darkMode: 'class'`. Every component has both light and dark variants — this wasn't always true (see `CHANGELOG`-style note in Client gotchas below if you're wondering why every class has a `dark:` pair).
@@ -110,33 +116,36 @@ ear-candy/
 │   │   │       └── settings.ts         # PUT/PATCH /api/admin/settings
 │   │   └── utils/
 │   │       ├── duration.ts     # parseDuration, formatDuration
-│   │       └── validation.ts   # isValidMediaPath and friends (accepts /audio/, /images/, http(s) URLs)
+│   │       ├── validation.ts   # isValidMediaPath and friends (accepts /audio/, /images/, http(s) URLs)
+│   │       └── crawler.ts      # isKnownCrawler, renderEpisodeOgHtml — OG tags for shared-link preview bots
 │   ├── scripts/                # One-off maintenance scripts (see Docker & Deployment gotchas)
-│   ├── tests/                  # Vitest tests (node env, globals), 102 tests
+│   ├── tests/                  # Vitest tests (node env, globals), 115 tests
 │   │   └── helpers.ts          # buildTestApp(), buildTestDb()
 │   └── data/                   # SQLite DB + uploads (gitignored)
 │
 ├── client/
 │   ├── src/
-│   │   ├── App.tsx             # Root + view routing
+│   │   ├── App.tsx             # Root + view routing + boot-time deep-link resolution + viewingEpisode state
 │   │   ├── api.ts              # Fetch wrappers
 │   │   ├── types.ts            # Shared TS interfaces (mirrors server)
 │   │   ├── index.css           # Tailwind directives + CSS variables (--accent, --accent-contrast)
 │   │   ├── store/
-│   │   │   └── playerStore.ts  # Zustand player state
+│   │   │   └── playerStore.ts  # Zustand player state — episode/playing/currentTime/duration/speed only
 │   │   ├── hooks/
 │   │   │   ├── useTheme.ts       # Dark/light mode + accent color/contrast
 │   │   │   └── useBreakpoint.ts  # Responsive breakpoint hook (mobile/desktop layout switching)
 │   │   ├── utils/
-│   │   │   └── color.ts        # getContrastTextColor (WCAG luminance-based black/white pick)
+│   │   │   ├── color.ts             # getContrastTextColor (WCAG luminance-based black/white pick)
+│   │   │   ├── episodeProgress.ts   # get/save/clearEpisodeProgress — localStorage resume-position cache
+│   │   │   └── shareUrl.ts          # buildShareUrl, buildTweetIntentUrl/buildBlueskyIntentUrl/buildFacebookIntentUrl
 │   │   ├── components/         # Listener UI: AppShell, AudioPlayer(View), DetailPane, EpisodeItem/List(View),
 │   │   │                       # EpisodeCoverArt (responsive srcset thumb/detail), IconRail, MobileHeader,
-│   │   │                       # ThemeBadge, SeasonTabs, PillBadge, ProgressBar
+│   │   │                       # ThemeBadge, SeasonTabs, PillBadge, ProgressBar, ShareDialog (portal modal)
 │   │   ├── pages/
 │   │   │   ├── AdminLogin.tsx
 │   │   │   └── admin/          # AdminLayout (session check on mount), EpisodeManager, EpisodeFormPanel,
 │   │   │                       # SeasonBlock, AdminSettings
-│   │   └── tests/              # Vitest tests (jsdom env, globals), 200 tests + 2 skipped
+│   │   └── tests/              # Vitest tests (jsdom env, globals), 273 tests + 3 skipped
 │   │       └── setup.ts        # localStorage/matchMedia/ResizeObserver/Audio mocks + jest-dom
 │   ├── vite.config.ts          # Vite + proxy /api, /audio, and /images to server
 │   └── tailwind.config.ts      # darkMode: 'class'
@@ -145,7 +154,7 @@ ear-candy/
 │   ├── fixtures.ts             # Custom Playwright fixtures (seededPage, adminPage)
 │   ├── fixtures/               # Test media files (audio, cover art, favicon)
 │   ├── playwright.config.ts    # workers: 1, chromium only
-│   └── tests/                  # E2E specs, 43 tests across admin/listener/mobile/player/screenshot/theme
+│   └── tests/                  # E2E specs, 44 tests across admin/listener/mobile/player/screenshot/theme
 │
 ├── planning/                  # Design specs and plans (historical context)
 ├── scripts/hash-password.sh  # bcrypt hash helper
@@ -186,7 +195,7 @@ ear-candy/
 
 ## Testing Approach
 
-### Server Tests (`server/tests/`) — 102 tests
+### Server Tests (`server/tests/`) — 115 tests
 
 - **Runner:** Vitest with `environment: 'node'`, `globals: true`.
 - **Test DB:** `:memory:` SQLite via `buildTestApp()` helper (`tests/helpers.ts`).
@@ -194,7 +203,7 @@ ear-candy/
 - **Auth in tests:** Tests that need admin auth set `process.env.ADMIN_PASSWORD_HASH` to a bcrypt hash, then call login to get a cookie, and pass it in headers.
 - **Cleanup:** `afterEach` often deletes `process.env.ADMIN_PASSWORD_HASH` to avoid cross-test pollution.
 
-### Client Tests (`client/src/tests/`) — 200 tests + 2 skipped
+### Client Tests (`client/src/tests/`) — 273 tests + 3 skipped
 
 - **Runner:** Vitest with `environment: 'jsdom'`, `globals: true`.
 - **Setup file:** `client/src/tests/setup.ts` mocks `localStorage` (Node v22+ native localStorage breaks without a valid file path), `matchMedia`, `ResizeObserver`, `URL.createObjectURL`/`revokeObjectURL`, and patches `HTMLMediaElement.prototype.src` to fire an async `error` event by default (jsdom never fires real media load events on its own — this stops anything awaiting audio duration probing from hanging forever). Also imports `@testing-library/jest-dom`.
@@ -202,10 +211,10 @@ ear-candy/
 - **Important:** `vi.clearAllMocks()` wipes `HTMLMediaElement` mocks, so re-apply them after clearing.
 - **Testing real audio duration detection:** `EpisodeFormPanel.test.tsx` stubs `window.Audio` wholesale via `vi.stubGlobal('Audio', ...)` with a controllable fake (settable `.duration`, manual `.emit('loadedmetadata' | 'durationchange' | 'error')`) — this bypasses the global jsdom patch above and gives full control over the probe's resolved value per test.
 
-### E2E Tests (`e2e/tests/`) — 43 tests
+### E2E Tests (`e2e/tests/`) — 44 tests
 
 - **Runner:** Playwright with `workers: 1` (tests share a real database, must run serially — see the cascading-failure gotcha below for why this matters more than it looks).
-- **Base URL:** `http://localhost:5173` (dev client). **Requires `make up` running.**
+- **Base URL:** `http://localhost:5173` (dev client). **Requires `make up` running.** Always run the suite via `make e2e`/`make e2e-ui`, not `cd e2e && npm test` directly — see gotcha #28.
 - **Fixtures:**
   - `seededPage`: Logs in via API, seeds a season + 2 episodes, navigates to `/`, then tears down (deletes season, resets settings) in a `finally`. Use for listener UI tests.
   - `adminPage`: Logs in via browser request, clicks admin gear, navigates to admin panel. Use for admin panel tests. `admin.spec.ts`'s shared `afterEach` also closes any stuck open form panel first (see gotcha below) before deleting the last season.
@@ -260,9 +269,9 @@ ear-candy/
 
 26. **Server tests use `app.inject()`, not HTTP.** No server port binding. Fastify's `inject()` simulates HTTP requests.
 27. **Client tests need a `localStorage` mock.** Node v22+ has a native `localStorage` that throws without a file path. `setup.ts` replaces it with an in-memory mock.
-28. **E2E tests require the dev stack running.** `make e2e` does NOT start services. Run `make up` first. Tests hit the real database, so `workers: 1` is mandatory.
+28. **E2E tests require the dev stack running.** `make e2e` does NOT start services. Run `make up` first. Tests hit the real database, so `workers: 1` is mandatory. `make e2e` (and `make e2e-ui`) also run `make e2e-reset-db` first, which stops the `server` container, deletes `server/data/db.sqlite*` on the host (the dev compose file bind-mounts `./server/data`), and restarts it — migrations recreate an empty schema on boot. **This destroys any manually-added local dev content** (episodes/seasons/settings you created by hand while poking at the app) every time you run the E2E suite locally — always run E2E tests via `make e2e`/`make e2e-ui`, never `cd e2e && npm test` directly, or you lose this guarantee. Added after real local runs cascaded into near-total failure because a manually-created season happened to collide by name with what `seededPage` seeds (see gotcha #30) — CI never hits this since its `e2e` job always runs against a fresh, empty container.
 29. **E2E fixtures use API request context for setup, browser context for admin.** `seededPage` uses `request.post()` (isolated API context) to seed data. `adminPage` uses `page.request.post()` (shares browser cookie jar) to log in.
-30. **E2E tests clean up after themselves — and that cleanup being robust matters a lot.** `seededPage` deletes its season and resets settings in a `finally`. `admin.spec.ts`'s shared `afterEach` deletes the last season, but first closes any leftover open form panel (`Cancel` button, if visible) — without that, a single test failing mid-form leaves the panel open, the cleanup click gets intercepted by it, times out, and every subsequent test in the run inherits the polluted DB state and fails too. A real ~20-minute cascading failure across 22 of 44 tests looked like a silent CI hang before this was root-caused (see `music-metadata`/audio-decoding gotcha below for the actual trigger).
+30. **E2E tests clean up after themselves — and that cleanup being robust matters a lot.** `seededPage` deletes its season and resets settings in a `finally`. `admin.spec.ts`'s shared `afterEach` deletes the last season, but first closes any leftover open form panel (`Cancel` button, if visible) — without that, a single test failing mid-form leaves the panel open, the cleanup click gets intercepted by it, times out, and every subsequent test in the run inherits the polluted DB state and fails too. A real ~20-minute cascading failure across 22 of 44 tests looked like a silent CI hang before this was root-caused (see `music-metadata`/audio-decoding gotcha below for the actual trigger). A second, distinct flavor of this same failure class was hit locally: `seededPage` always seeds a season titled exactly `"Season 1"`, which silently collided with a manually-created local season of the same name, producing `strict mode violation: ... resolved to 2 elements` and cascading from there — this is what `make e2e-reset-db` (gotcha #28) now prevents.
 31. **Real browser audio decoding is unreliable in GitHub Actions' headless Chromium specifically** — confirmed via a test that passed 100% locally and failed 100% in CI regardless of the WAV file's bit depth (8-bit and 16-bit both failed identically), most likely a missing audio backend on the minimal runner image. Don't write e2e assertions that depend on the browser successfully decoding real audio duration — that logic is already covered by unit tests with a controllable fake `Audio` (see Client Tests above). `npm test`'s output buffering also hid this cascading failure behind what looked like a total silent hang — CI now invokes `npx playwright test` directly for real-time log streaming (see CI/CD).
 
 ### Docker & Deployment
@@ -297,6 +306,14 @@ ear-candy/
 38. **Both server and client use `typescript-eslint` recommended.** Server config is minimal. Client adds `eslint-plugin-react` and `eslint-plugin-react-hooks`.
 39. **`argsIgnorePattern: '^_'`** is configured for `@typescript-eslint/no-unused-vars` in both packages.
 
+### Browsing vs. playing, resume position, and sharing
+
+40. **Browsing the episode list/detail pane never touches the player.** `App.tsx` holds `viewingEpisode` (plain `useState`) separately from `playerStore.episode` — clicking a row (`EpisodeList.tsx`'s `handleEpisodeClick`) only calls `onEpisodeView`, updating `viewingEpisode` and the URL; it never calls `setEpisode`/`setPlaying`. The *only* thing that changes what's loaded in the player is `App.tsx`'s `handlePlayEpisode`, wired to a Play/Pause button in `DetailPane.tsx` — toggles play/pause if `viewingEpisode` is already the player's episode, otherwise loads it fresh and starts it (interrupting whatever was playing, same as any podcast app). This means a listener can freely browse other episodes' details while something else keeps playing in the background. `EpisodeItem`'s row highlight (`isActive`) follows `viewingEpisode`; its EQ indicator (`isPlaying`) follows the player's actual episode — they can differ, on purpose.
+41. **`DetailPane`'s Play/Pause button has a distinct `aria-label`** (`"Play episode"`/`"Pause episode"`) from its visible text (`"Play"`/`"Pause"`) — deliberately, because the player bar's own transport button also has accessible name `"Play"`/`"Pause"`, and once both are mounted simultaneously (the viewed episode is also the one loaded/playing), an identical accessible name on two different buttons is a real ambiguity, not just a test-locator nuisance (`getByRole('button', { name: 'Pause' })` resolving to 2 elements is exactly the bug this fixed — hit for real when adding e2e coverage for this feature).
+42. **Deep links are one-directional URL syncing, not routing.** `App.tsx` parses `?episode=X&t=Y` once at boot (see `utils/shareUrl.ts` for the encode side); `EpisodeList.tsx` writes `?episode=` back via `history.replaceState` (never `pushState`) on every episode view. There is deliberately no `popstate` listener — since nothing ever calls `pushState`, there's no per-episode browser-history entry to go back/forward to, so this isn't a missing feature so much as a non-goal; verified empirically (`window.history.length` doesn't grow across episode switches). If `pushState`-based back/forward navigation is ever added, a `popstate` listener re-running the same boot-time deep-link resolution logic would be needed.
+43. **Shared-timestamp precedence: the listener's own progress always wins once it exists.** `AudioPlayer.tsx`'s `resumeTimeFor` prefers `getEpisodeProgress(id)` (local saved position) over a shared link's `t` — a shared timestamp only applies the *first* time that episode is loaded with no prior local progress. This needs no explicit "already consumed" flag; once any real listening happens (or the episode finishes, which clears saved progress via `handleEnded`), the ordinary resume-position logic takes over naturally.
+44. **Server-rendered Open Graph tags for shared links only exist in production's single-container mode.** `server/src/app.ts`'s crawler-detection `onRequest` hook (backing `server/src/utils/crawler.ts`) is registered only inside the `if (clientDist && fs.existsSync(clientDist))` block — inert in dev's split client/server topology, active only when `SERVE_CLIENT=true`. It's scoped to exactly `/` (checked via `req.url.split('?')[0] !== '/'`) so a crawler-UA-flavored request to any other route (e.g. an API endpoint) can't be accidentally short-circuited into an OG-HTML response. `og:image` is resolved to an absolute URL (`${req.protocol}://${req.hostname}${path}`) before being emitted — cover art paths are stored/returned as site-relative paths, and the Open Graph spec requires an absolute `og:image` or link-preview unfurlers silently show no image at all (a real bug caught in a pre-production review, not a hypothetical).
+
 ---
 
 ## Branching & Workflow
@@ -314,10 +331,10 @@ This is convention, not a technical enforcement: GitHub branch protection rules 
 Jobs run in this order:
 
 1. `lint` — ESLint on server + client (parallel with `test`/`typecheck`)
-2. `test` — Vitest server (102 tests) + client (200 tests + 2 skipped)
+2. `test` — Vitest server (115 tests) + client (273 tests + 3 skipped)
 3. `typecheck` — `tsc --noEmit` on client
 4. `build` — builds the root `Dockerfile` image, pushes to GHCR (needs lint+test+typecheck)
-5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright (43 tests) against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit). Capped at `timeout-minutes: 15` (healthy runs take ~4-6 min) so a genuine hang (browser/network stall) fails fast instead of silently running for hours. Invoked directly as `npx playwright test`, not `npm test` — the npm wrapper was found to buffer all output until the child process exits normally, which hid a real ~20-minute cascading test failure behind what looked like total silence.
+5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright (44 tests) against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit). Capped at `timeout-minutes: 15` (healthy runs take ~4-6 min) so a genuine hang (browser/network stall) fails fast instead of silently running for hours. Invoked directly as `npx playwright test`, not `npm test` — the npm wrapper was found to buffer all output until the child process exits normally, which hid a real ~20-minute cascading test failure behind what looked like total silence.
 6. `deploy` — only on `main`; SSHes to the production Droplet, pulls the new image **by digest** (not tag — see below), restarts the container, health-checks it (needs build+e2e)
 
 Note: CI's `e2e` job exercises the **production image**, not `docker compose up` — different from local `make e2e`, which requires the dev stack (`make up`).

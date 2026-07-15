@@ -103,14 +103,14 @@ it('marks the episode matching activeEpisodeId as active (aria-current)', () => 
   expect(firstEpBtn).not.toHaveAttribute('aria-current')
 })
 
-it('shows the EQ indicator only for the active episode when playing is true', () => {
+it('shows the EQ indicator only for the playing episode when playing is true', () => {
   render(
     <EpisodeListView
       podcastName="Test Show"
       seasons={seasons}
       episodes={episodes}
       activeSeason={1}
-      activeEpisodeId={10}
+      playingEpisodeId={10}
       playing={true}
       onSeasonSelect={() => {}}
       onEpisodeClick={() => {}}
@@ -119,6 +119,28 @@ it('shows the EQ indicator only for the active episode when playing is true', ()
   const buttons = screen.getAllByRole('button')
   const firstEpBtn = buttons.find(b => b.textContent?.includes('First Episode'))
   expect(firstEpBtn?.querySelector('.eq-bars')).not.toBeNull()
+})
+
+it('EQ indicator follows playingEpisodeId independently of activeEpisodeId (viewed vs. playing can differ)', () => {
+  render(
+    <EpisodeListView
+      podcastName="Test Show"
+      seasons={seasons}
+      episodes={episodes}
+      activeSeason={1}
+      activeEpisodeId={11}
+      playingEpisodeId={10}
+      playing={true}
+      onSeasonSelect={() => {}}
+      onEpisodeClick={() => {}}
+    />
+  )
+  const buttons = screen.getAllByRole('button')
+  const firstEpBtn = buttons.find(b => b.textContent?.includes('First Episode'))
+  const secondEpBtn = buttons.find(b => b.textContent?.includes('Second Episode'))
+  expect(firstEpBtn?.querySelector('.eq-bars')).not.toBeNull()
+  expect(secondEpBtn?.querySelector('.eq-bars')).toBeNull()
+  expect(secondEpBtn).toHaveAttribute('aria-current', 'true')
 })
 
 it('does not show the EQ indicator when playing is false', () => {
@@ -135,6 +157,21 @@ it('does not show the EQ indicator when playing is false', () => {
     />
   )
   expect(document.querySelector('.eq-bars')).toBeNull()
+})
+
+it('passes each episode through getRemainingSeconds and renders the result per row', () => {
+  render(
+    <EpisodeListView
+      podcastName="Test Show"
+      seasons={seasons}
+      episodes={episodes}
+      activeSeason={1}
+      getRemainingSeconds={ep => (ep.id === 10 ? 65 : undefined)}
+      onSeasonSelect={() => {}}
+      onEpisodeClick={() => {}}
+    />
+  )
+  expect(screen.getByText('1:05 left')).toBeInTheDocument()
 })
 
 it('renders the podcast name at the top', () => {

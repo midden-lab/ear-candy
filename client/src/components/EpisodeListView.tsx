@@ -8,10 +8,19 @@ export interface EpisodeListViewProps {
   episodes: Episode[]
   activeSeason: number | null
   loading?: boolean
-  /** id of the episode currently loaded in the player, if any. */
+  /** id of the episode currently shown in the detail pane (drives row
+   *  highlight/aria-current) — independent of which episode is actually
+   *  playing. */
   activeEpisodeId?: number | null
-  /** Whether the active episode is currently playing (drives the EQ indicator). */
+  /** id of the episode currently loaded in the player, if any (drives the
+   *  EQ indicator) — independent of which row is highlighted. */
+  playingEpisodeId?: number | null
+  /** Whether the playing episode is currently playing (vs. loaded/paused). */
   playing?: boolean
+  /** Seconds left in an episode the listener has partially heard, live for
+   *  whichever one is actually playing. Omit/undefined renders the plain
+   *  total duration instead. */
+  getRemainingSeconds?: (episode: Episode) => number | undefined
   onSeasonSelect: (seasonId: number) => void
   onEpisodeClick: (episode: Episode) => void
 }
@@ -23,7 +32,7 @@ export interface EpisodeListViewProps {
  * how or where playback state lives.
  */
 export default function EpisodeListView({
-  podcastName, seasons, episodes, activeSeason, loading, activeEpisodeId, playing, onSeasonSelect, onEpisodeClick,
+  podcastName, seasons, episodes, activeSeason, loading, activeEpisodeId, playingEpisodeId, playing, getRemainingSeconds, onSeasonSelect, onEpisodeClick,
 }: EpisodeListViewProps) {
   return (
     <div className="flex flex-col h-full">
@@ -43,7 +52,8 @@ export default function EpisodeListView({
               key={ep.id}
               episode={ep}
               isActive={activeEpisodeId === ep.id}
-              isPlaying={Boolean(playing) && activeEpisodeId === ep.id}
+              isPlaying={Boolean(playing) && playingEpisodeId === ep.id}
+              remainingSeconds={getRemainingSeconds?.(ep)}
               onClick={onEpisodeClick}
             />
           ))

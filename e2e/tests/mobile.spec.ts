@@ -39,8 +39,9 @@ test.describe('Mobile listener UI (< md)', () => {
     await expect(panelDiscussionItem(page)).toBeVisible()
   })
 
-  test('player mini-bar is visible after selecting an episode and does not overlap the overflow menu', async ({ seededPage: page }) => {
+  test('player mini-bar is visible after pressing Play and does not overlap the overflow menu', async ({ seededPage: page }) => {
     await deepDiveItem(page).click()
+    await page.getByRole('button', { name: 'Play' }).click()
     const miniBar = page.getByTestId('player-bar')
     await expect(miniBar).toBeVisible()
     await expect(miniBar).toContainText('Deep Dive')
@@ -61,8 +62,9 @@ test.describe('Mobile listener UI (< md)', () => {
 
   test('tapping the mini-bar opens the full-screen now-playing overlay with all controls tappable', async ({ seededPage: page }) => {
     await deepDiveItem(page).click()
-    // Selecting an episode starts playback immediately, so the transport
-    // button already reads "Pause" by the time the overlay opens.
+    // Pressing the detail pane's Play button starts playback immediately, so
+    // the transport button already reads "Pause" by the time the overlay opens.
+    await page.getByRole('button', { name: 'Play' }).click()
     await page.getByRole('button', { name: /now playing/i }).click()
 
     await expect(page.getByRole('button', { name: 'Collapse now playing' })).toBeVisible()
@@ -104,6 +106,7 @@ test.describe('Mobile listener UI (< md)', () => {
 test.describe('Desktop listener UI unaffected by the mobile refactor', () => {
   test('full transport controls still resolve by role/label at desktop viewport', async ({ seededPage: page }) => {
     await deepDiveItem(page).click()
+    await page.getByRole('button', { name: 'Play' }).click()
     await expect(page.getByRole('button', { name: 'Playback speed' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Skip to start' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Skip to end' })).toBeVisible()

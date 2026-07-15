@@ -1,4 +1,4 @@
-.PHONY: help setup up down logs test lint e2e e2e-ui build-prod up-prod
+.PHONY: help setup up down logs test lint e2e e2e-ui e2e-check-running e2e-reset-db build-prod up-prod
 
 PASSWORD ?= changeme
 
@@ -11,8 +11,10 @@ help:
 	@echo "  logs             Tail dev stack logs"
 	@echo "  test             Run server + client test suites"
 	@echo "  lint             Lint server + client"
-	@echo "  e2e              Run Playwright E2E tests (requires: make up)"
-	@echo "  e2e-ui           Open Playwright UI mode"
+	@echo "  e2e              Run Playwright E2E tests (requires: make up). Wipes and re-seeds"
+	@echo "                   the local dev database first for a clean, deterministic run —"
+	@echo "                   any manually-added episodes/seasons/settings will be lost."
+	@echo "  e2e-ui           Open Playwright UI mode (same DB reset as e2e)"
 	@echo "  build-prod       Build production Docker images"
 	@echo "  up-prod          Start production stack (detached)"
 	@echo ""
@@ -51,18 +53,35 @@ lint:
 	cd server && npm run lint
 	cd client && npm run lint
 
-e2e:
+e2e-check-running:
 	@if ! curl -s http://localhost:5173 > /dev/null 2>&1; then \
 		echo "Dev stack not running. Start it first with: make up"; \
 		exit 1; \
 	fi
+
+# E2E specs share one real database and assert on exact content (episode
+# titles, season names, counts) — any leftover local dev data (or a prior
+# run's cleanup having been interrupted, e.g. by force-killing a hung test)
+# collides with what the seeded fixtures create and produces confusing
+# cascading failures that have nothing to do with the code under test. CI's
+# e2e job never sees this because it runs against a fresh container with an
+# empty database; resetting here makes local runs match that guarantee.
+e2e-reset-db: e2e-check-running
+	@echo "Resetting local dev database for a clean e2e run (this wipes server/data/db.sqlite*)..."
+	docker compose stop server
+	rm -f server/data/db.sqlite server/data/db.sqlite-shm server/data/db.sqlite-wal
+	docker compose up -d server
+	@echo "Waiting for the server to come back up..."
+	@for i in $$(seq 1 30); do \
+		curl -sf http://localhost:3001/api/health > /dev/null 2>&1 && exit 0; \
+		sleep 1; \
+	done; \
+	echo "Server did not become healthy after reset" && exit 1
+
+e2e: e2e-reset-db
 	cd e2e && npm test
 
-e2e-ui:
-	@if ! curl -s http://localhost:5173 > /dev/null 2>&1; then \
-		echo "Dev stack not running. Start it first with: make up"; \
-		exit 1; \
-	fi
+e2e-ui: e2e-reset-db
 	cd e2e && npm run test:ui
 
 build-prod:

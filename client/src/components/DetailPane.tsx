@@ -5,10 +5,20 @@ import EpisodeCoverArt from './EpisodeCoverArt'
 interface DetailPaneProps {
   episode: Episode | null
   seasons: Season[]
+  /** Whether `episode` is the one actually loaded in the player right now —
+   *  distinct from merely being viewed. Determines whether the Play button
+   *  toggles play/pause vs. loads this episode fresh (interrupting
+   *  whatever's currently playing). */
+  isCurrentPlayerEpisode?: boolean
+  /** Whether the player is currently playing (only meaningful when
+   *  `isCurrentPlayerEpisode` is true — otherwise the button always shows
+   *  "Play", since pressing it would start this episode from scratch). */
+  playing?: boolean
+  onPlayPause?: () => void
   onBack?: () => void
 }
 
-export default function DetailPane({ episode, seasons, onBack }: DetailPaneProps) {
+export default function DetailPane({ episode, seasons, isCurrentPlayerEpisode, playing, onPlayPause, onBack }: DetailPaneProps) {
   if (!episode) {
     return (
       <div className="flex h-full items-center justify-center text-zinc-400 dark:text-zinc-500">
@@ -51,6 +61,35 @@ export default function DetailPane({ episode, seasons, onBack }: DetailPaneProps
       <p className="mb-1 text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{seasonLabel}</p>
       <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{episode.title}</h1>
       <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{episode.publish_date}</p>
+
+      {onPlayPause && (
+        <button
+          onClick={onPlayPause}
+          // Distinct from the player bar's own "Play"/"Pause" buttons —
+          // once both are on screen at once (this episode is loaded and
+          // playing), an identical accessible name on two different
+          // buttons is a real ambiguity for screen readers and any
+          // role-based query, not just a testing nuisance.
+          aria-label={isCurrentPlayerEpisode && playing ? 'Pause episode' : 'Play episode'}
+          className="mt-4 flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2 font-medium text-[var(--accent-contrast)] transition-opacity hover:opacity-90"
+        >
+          {isCurrentPlayerEpisode && playing ? (
+            <>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+              </svg>
+              Pause
+            </>
+          ) : (
+            <>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              Play
+            </>
+          )}
+        </button>
+      )}
 
       {guestList.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
