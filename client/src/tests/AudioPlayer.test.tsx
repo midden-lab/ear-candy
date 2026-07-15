@@ -167,4 +167,23 @@ describe('shared-link start time', () => {
     render(<AudioPlayer sharedStart={{ episodeId: 1, time: 75 }} />)
     expect(usePlayerStore.getState().currentTime).toBe(200)
   })
+
+  it('re-applies the shared timestamp if re-visiting the same shared link after the episode finished (issue #56)', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true })
+    const { unmount } = render(<AudioPlayer sharedStart={{ episodeId: 1, time: 75 }} />)
+
+    const audio = document.querySelector('audio')!
+    Object.defineProperty(audio, 'currentTime', { value: 118, configurable: true })
+    fireEvent.timeUpdate(audio)
+    fireEvent.ended(audio)
+    unmount()
+
+    // `ended` cleared the saved progress — re-opening the same shared link
+    // (same sharedStart prop, e.g. the listener followed it again from a
+    // chat/social post) should honor the shared timestamp again, rather
+    // than silently resuming at 0 with no explanation.
+    usePlayerStore.setState({ episode: mockEpisode })
+    render(<AudioPlayer sharedStart={{ episodeId: 1, time: 75 }} />)
+    expect(usePlayerStore.getState().currentTime).toBe(75)
+  })
 })

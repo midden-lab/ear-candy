@@ -30,6 +30,16 @@ describe('buildTweetIntentUrl', () => {
       'https://twitter.com/intent/tweet?url=https%3A%2F%2Fexample.com%2F%3Fepisode%3D1&text=Listening%20to%20%22My%20Episode%22'
     )
   })
+
+  it('safely encodes a title containing quotes and HTML (issue #56)', () => {
+    const intent = buildTweetIntentUrl('https://example.com/?episode=1', 'Episode "Two": <b>Cool</b>')
+    // encodeURIComponent handles quotes/angle-brackets/etc. safely — assert
+    // the raw characters never appear unencoded in the resulting URL.
+    expect(intent).not.toContain('"')
+    expect(intent).not.toContain('<')
+    expect(intent).not.toContain('>')
+    expect(intent).toContain(encodeURIComponent('Listening to "Episode "Two": <b>Cool</b>"'))
+  })
 })
 
 describe('buildFacebookIntentUrl', () => {
@@ -45,5 +55,14 @@ describe('buildBlueskyIntentUrl', () => {
     expect(intent).toBe(
       'https://bsky.app/intent/compose?text=Listening%20to%20%22My%20Episode%22%0Ahttps%3A%2F%2Fexample.com%2F%3Fepisode%3D1'
     )
+  })
+
+  it('safely encodes a title containing quotes and HTML (issue #56)', () => {
+    const intent = buildBlueskyIntentUrl('https://example.com/?episode=1', 'Episode "Two": <b>Cool</b>')
+    expect(intent).not.toContain('"')
+    expect(intent).not.toContain('<')
+    expect(intent).not.toContain('>')
+    const decoded = decodeURIComponent(intent.split('text=')[1])
+    expect(decoded).toBe('Listening to "Episode "Two": <b>Cool</b>"\nhttps://example.com/?episode=1')
   })
 })
