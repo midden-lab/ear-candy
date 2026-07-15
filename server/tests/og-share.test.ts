@@ -154,4 +154,57 @@ describe('shared-episode OG tags for known crawlers', () => {
     const body = res.json()
     expect(body.id).toBe(episodeId)
   })
+
+  it('does not emit a meta-refresh redirect (issue #53 — was a Host-header-controlled open-redirect vector)', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/?episode=${episodeId}`,
+      headers: { 'user-agent': 'Twitterbot/1.0' },
+    })
+    expect(res.body).not.toContain('http-equiv="refresh"')
+  })
+
+  it('reflects an attacker-controlled Host header into og:url by default, but only as inert (escaped) metadata', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/?episode=${episodeId}`,
+      headers: { 'user-agent': 'Twitterbot/1.0', host: 'evil.example.com' },
+    })
+    expect(res.body).toContain('<meta property="og:url" content="http://evil.example.com/')
+    // No redirect-capable tag anywhere in the response — see the meta-refresh test above.
+    expect(res.body).not.toContain('http-equiv="refresh"')
+  })
+
+  it('PUBLIC_ORIGIN, when set, overrides the request-derived origin entirely', async () => {
+    const original = process.env.PUBLIC_ORIGIN
+    process.env.PUBLIC_ORIGIN = 'https://podcast.example.org'
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: `/?episode=${episodeId}`,
+        headers: { 'user-agent': 'Twitterbot/1.0', host: 'evil.example.com' },
+      })
+      expect(res.body).toContain('<meta property="og:url" content="https://podcast.example.org/')
+      expect(res.body).not.toContain('evil.example.com')
+    } finally {
+      if (original === undefined) delete process.env.PUBLIC_ORIGIN
+      else process.env.PUBLIC_ORIGIN = original
+    }
+  })
+
+  it('a malformed PUBLIC_ORIGIN is ignored, falling back to the request-derived origin', async () => {
+    const original = process.env.PUBLIC_ORIGIN
+    process.env.PUBLIC_ORIGIN = 'not-a-valid-origin'
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: `/?episode=${episodeId}`,
+        headers: { 'user-agent': 'Twitterbot/1.0', host: 'podcast.example.com' },
+      })
+      expect(res.body).toContain('<meta property="og:url" content="http://podcast.example.com/')
+    } finally {
+      if (original === undefined) delete process.env.PUBLIC_ORIGIN
+      else process.env.PUBLIC_ORIGIN = original
+    }
+  })
 })
