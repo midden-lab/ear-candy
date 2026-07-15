@@ -4,7 +4,7 @@ import EpisodeCoverArt from './EpisodeCoverArt'
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
+  const s = Math.floor(seconds % 60)
   if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   return `${m}:${String(s).padStart(2, '0')}`
 }
@@ -14,10 +14,13 @@ interface EpisodeItemProps {
   isActive: boolean
   /** Whether this episode is the one currently playing (not just selected). */
   isPlaying?: boolean
+  /** Seconds left, for an episode partially listened to. Renders "X left"
+   *  in place of the plain total duration when present. */
+  remainingSeconds?: number
   onClick: (episode: Episode) => void
 }
 
-export default function EpisodeItem({ episode, isActive, isPlaying = false, onClick }: EpisodeItemProps) {
+export default function EpisodeItem({ episode, isActive, isPlaying = false, remainingSeconds, onClick }: EpisodeItemProps) {
   return (
     <button
       onClick={() => onClick(episode)}
@@ -45,7 +48,11 @@ export default function EpisodeItem({ episode, isActive, isPlaying = false, onCl
         <div className="flex items-center gap-2 mt-0.5 min-w-0">
           <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">{episode.publish_date}</span>
           <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">·</span>
-          <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">{formatDuration(episode.duration_seconds)}</span>
+          {remainingSeconds !== undefined ? (
+            <span className="text-xs text-[var(--accent)] shrink-0">{formatDuration(remainingSeconds)} left</span>
+          ) : (
+            <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">{formatDuration(episode.duration_seconds)}</span>
+          )}
           {episode.guests ? (
             <>
               <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">·</span>

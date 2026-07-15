@@ -92,3 +92,33 @@ it('renders a back button and calls onBack when clicked, given onBack', async ()
   await user.click(backButton)
   expect(onBack).toHaveBeenCalledTimes(1)
 })
+
+describe('play/pause button', () => {
+  it('does not render a play button when onPlayPause is not provided', () => {
+    render(<DetailPane episode={mockEpisode} seasons={seasons} />)
+    expect(screen.queryByText('Play')).not.toBeInTheDocument()
+  })
+
+  it('shows "Play" when this episode is not the one loaded in the player', () => {
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={false} playing={false} onPlayPause={() => {}} />)
+    expect(screen.getByText('Play')).toBeInTheDocument()
+  })
+
+  it('shows "Play" (not "Pause") when this episode IS loaded but currently paused', () => {
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} playing={false} onPlayPause={() => {}} />)
+    expect(screen.getByText('Play')).toBeInTheDocument()
+  })
+
+  it('shows "Pause" only when this episode is both loaded and playing', () => {
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} playing={true} onPlayPause={() => {}} />)
+    expect(screen.getByText('Pause')).toBeInTheDocument()
+  })
+
+  it('calls onPlayPause when clicked', async () => {
+    const user = userEvent.setup()
+    const onPlayPause = vi.fn()
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={false} onPlayPause={onPlayPause} />)
+    await user.click(screen.getByText('Play'))
+    expect(onPlayPause).toHaveBeenCalledTimes(1)
+  })
+})
