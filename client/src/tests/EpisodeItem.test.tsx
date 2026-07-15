@@ -100,7 +100,11 @@ it('renders no img, just the placeholder slot, when there is no cover art', () =
 
 it('shows "X left" instead of total duration when remainingSeconds is given', () => {
   render(<EpisodeItem episode={episode} isActive={false} remainingSeconds={185} onClick={() => {}} />)
-  expect(screen.getByText('3:05 left')).toBeInTheDocument()
+  // The timestamp digits are wrapped in their own tabular-nums span (so the
+  // countdown doesn't make "left" jitter as digit widths vary), so the full
+  // "3:05 left" string is split across nodes — match by container instead.
+  expect(screen.getByText('3:05')).toBeInTheDocument()
+  expect(screen.getByText('3:05').closest('span')?.parentElement).toHaveTextContent('3:05 left')
   expect(screen.queryByText('1:01:01')).not.toBeInTheDocument()
 })
 
