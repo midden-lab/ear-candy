@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
@@ -52,114 +53,105 @@ beforeEach(() => {
   usePlayerStore.setState({ episode: null, playing: false, currentTime: 0, duration: 0 })
 })
 
-it('renders season tabs and episode items', () => {
-  render(
+interface HarnessOverrides {
+  loading?: boolean
+  episodes?: Episode[]
+  onEpisodeSelect?: () => void
+}
+
+/** Stateful harness so onEpisodeView actually updates what's highlighted —
+ *  proves the real click -> highlight wiring, not just that the callback
+ *  fired. */
+function Harness({ loading, episodes: episodesOverride, onEpisodeSelect }: HarnessOverrides) {
+  const [viewingEpisodeId, setViewingEpisodeId] = useState<number | null>(null)
+  return (
     <EpisodeList
       podcastName="Test Show"
       seasons={seasons}
-      episodes={episodes}
+      episodes={episodesOverride ?? episodes}
       activeSeason={1}
+      loading={loading}
+      viewingEpisodeId={viewingEpisodeId}
       onSeasonSelect={() => {}}
+      onEpisodeView={ep => setViewingEpisodeId(ep.id)}
+      onEpisodeSelect={onEpisodeSelect}
     />
   )
+}
+
+it('renders season tabs and episode items', () => {
+  render(<Harness />)
   expect(screen.getByRole('button', { name: 'Season One' })).toBeInTheDocument()
   expect(screen.getByText('First Episode')).toBeInTheDocument()
   expect(screen.getByText('Second Episode')).toBeInTheDocument()
 })
 
-it('clicking an episode sets it as active in the player store', async () => {
+it('clicking an episode does not touch the player store (browsing must not auto-play)', async () => {
   const user = userEvent.setup()
-  render(
-    <EpisodeList
-      podcastName="Test Show"
-      seasons={seasons}
-      episodes={episodes}
-      activeSeason={1}
-      onSeasonSelect={() => {}}
-    />
-  )
+  render(<Harness />)
   await user.click(screen.getByText('First Episode'))
-  expect(usePlayerStore.getState().episode?.id).toBe(10)
+  expect(usePlayerStore.getState().episode).toBeNull()
+  expect(usePlayerStore.getState().playing).toBe(false)
+})
+
+it('clicking an episode does not interrupt an already-playing different episode', async () => {
+  const user = userEvent.setup()
+  usePlayerStore.setState({ episode: episodes[1], playing: true })
+  render(<Harness />)
+  await user.click(screen.getByText('First Episode'))
+  // Still episode 11 (Second Episode) playing in the background.
+  expect(usePlayerStore.getState().episode?.id).toBe(11)
   expect(usePlayerStore.getState().playing).toBe(true)
 })
 
-it('active episode item has isActive=true (aria-current="true")', async () => {
+it('active (viewed) episode item has aria-current="true", independent of what is playing', async () => {
   const user = userEvent.setup()
-  render(
-    <EpisodeList
-      podcastName="Test Show"
-      seasons={seasons}
-      episodes={episodes}
-      activeSeason={1}
-      onSeasonSelect={() => {}}
-    />
-  )
+  render(<Harness />)
   await user.click(screen.getByText('Second Episode'))
-  // After clicking Second Episode, it should be active
   const buttons = screen.getAllByRole('button')
-  // Find the button containing "Second Episode"
   const secondEpBtn = buttons.find(b => b.textContent?.includes('Second Episode'))
   expect(secondEpBtn).toHaveAttribute('aria-current', 'true')
-  // First episode should not be active
   const firstEpBtn = buttons.find(b => b.textContent?.includes('First Episode'))
   expect(firstEpBtn).not.toHaveAttribute('aria-current')
 })
 
+it('EQ indicator follows the actually-playing episode, not the viewed one', async () => {
+  const user = userEvent.setup()
+  usePlayerStore.setState({ episode: episodes[1], playing: true })
+  render(<Harness />)
+  // View (click into) a different episode than the one playing.
+  await user.click(screen.getByText('First Episode'))
+  const buttons = screen.getAllByRole('button')
+  const firstEpBtn = buttons.find(b => b.textContent?.includes('First Episode'))!
+  const secondEpBtn = buttons.find(b => b.textContent?.includes('Second Episode'))!
+  // Viewed row (First Episode) is highlighted...
+  expect(firstEpBtn).toHaveAttribute('aria-current', 'true')
+  // ...but the EQ bars stay on the row that's actually playing (Second Episode).
+  expect(secondEpBtn.querySelector('.eq-bars')).toBeInTheDocument()
+  expect(firstEpBtn.querySelector('.eq-bars')).not.toBeInTheDocument()
+})
+
 it('renders the podcast name at the top', () => {
-  render(
-    <EpisodeList
-      podcastName="My Great Show"
-      seasons={seasons}
-      episodes={episodes}
-      activeSeason={1}
-      onSeasonSelect={() => {}}
-    />
-  )
-  expect(screen.getByText('My Great Show')).toBeInTheDocument()
+  render(<Harness />)
+  expect(screen.getByText('Test Show')).toBeInTheDocument()
 })
 
 it('calls onEpisodeSelect when an episode is clicked', async () => {
   const user = userEvent.setup()
   const onEpisodeSelect = vi.fn()
-  render(
-    <EpisodeList
-      podcastName="Test Show"
-      seasons={seasons}
-      episodes={episodes}
-      activeSeason={1}
-      onSeasonSelect={() => {}}
-      onEpisodeSelect={onEpisodeSelect}
-    />
-  )
+  render(<Harness onEpisodeSelect={onEpisodeSelect} />)
   await user.click(screen.getByText('First Episode'))
   expect(onEpisodeSelect).toHaveBeenCalledTimes(1)
 })
 
 it('shows a loading indicator instead of episodes when loading', () => {
-  render(
-    <EpisodeList
-      podcastName="Test Show"
-      seasons={seasons}
-      episodes={episodes}
-      activeSeason={1}
-      loading
-      onSeasonSelect={() => {}}
-    />
-  )
+  render(<Harness loading />)
   expect(screen.getByText('Loading…')).toBeInTheDocument()
   expect(screen.queryByText('First Episode')).not.toBeInTheDocument()
 })
 
 it('shows an empty state when the season has no episodes', () => {
-  render(
-    <EpisodeList
-      podcastName="Test Show"
-      seasons={seasons}
-      episodes={[]}
-      activeSeason={1}
-      onSeasonSelect={() => {}}
-    />
-  )
+  render(<Harness episodes={[]} />)
   expect(screen.getByText('No episodes in this season yet.')).toBeInTheDocument()
 })
 
@@ -170,15 +162,7 @@ describe('URL sync on episode selection', () => {
 
   it('updates the URL with the selected episode id', async () => {
     const user = userEvent.setup()
-    render(
-      <EpisodeList
-        podcastName="Test Show"
-        seasons={seasons}
-        episodes={episodes}
-        activeSeason={1}
-        onSeasonSelect={() => {}}
-      />
-    )
+    render(<Harness />)
     await user.click(screen.getByText('First Episode'))
     expect(new URLSearchParams(window.location.search).get('episode')).toBe('10')
   })
@@ -186,18 +170,30 @@ describe('URL sync on episode selection', () => {
   it('drops any existing t param on a plain click', async () => {
     window.history.replaceState(null, '', '/?episode=99&t=42')
     const user = userEvent.setup()
-    render(
-      <EpisodeList
-        podcastName="Test Show"
-        seasons={seasons}
-        episodes={episodes}
-        activeSeason={1}
-        onSeasonSelect={() => {}}
-      />
-    )
+    render(<Harness />)
     await user.click(screen.getByText('Second Episode'))
     const params = new URLSearchParams(window.location.search)
     expect(params.get('episode')).toBe('11')
     expect(params.has('t')).toBe(false)
+  })
+})
+
+describe('remaining time', () => {
+  it('shows plain duration when no progress is saved', () => {
+    render(<Harness />)
+    expect(screen.getByText('30:00')).toBeInTheDocument()
+  })
+
+  it('shows "X left" for the actively-playing episode, reflecting live currentTime', () => {
+    usePlayerStore.setState({ episode: episodes[0], playing: true, currentTime: 300 })
+    render(<Harness />)
+    expect(screen.getByText('25:00 left')).toBeInTheDocument()
+  })
+
+  it('shows "X left" for a non-playing episode using its saved localStorage progress', () => {
+    localStorage.setItem('episode-progress', JSON.stringify({ 11: { time: 600, savedAt: Date.now() } }))
+    render(<Harness />)
+    expect(screen.getByText('30:00 left')).toBeInTheDocument()
+    localStorage.clear()
   })
 })

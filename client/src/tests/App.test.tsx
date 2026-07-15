@@ -283,3 +283,84 @@ describe('deep-linked shared episode (?episode=X&t=Y)', () => {
     expect(usePlayerStore.getState().episode).toBeNull()
   })
 })
+
+describe('browsing vs. playing decoupling', () => {
+  const season: Season = {
+    id: 1, number: 1, title: 'Season One', description: '', cover_art_path: null, hidden: false, created_at: '2024-01-01T00:00:00Z',
+  }
+  const episodeA: Episode = {
+    id: 1, season_id: 1, number: 1, title: 'Episode A', description: '', guests: '', tags: '',
+    cover_art_path: null, cover_art_thumb_path: null, duration_seconds: 100, publish_date: '2024-01-01',
+    audio_type: 'url', audio_path: 'https://example.com/a.mp3', hidden: false,
+    created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z',
+  }
+  const episodeB: Episode = { ...episodeA, id: 2, number: 2, title: 'Episode B', audio_path: 'https://example.com/b.mp3' }
+
+  beforeEach(() => {
+    vi.mocked(getSeasons).mockResolvedValue([season])
+    vi.mocked(getEpisodes).mockResolvedValue([episodeA, episodeB])
+  })
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('clicking an episode shows its details but does not touch the player', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByText('Episode A'))
+    expect(await screen.findByText('Play')).toBeInTheDocument()
+    expect(usePlayerStore.getState().episode).toBeNull()
+    expect(usePlayerStore.getState().playing).toBe(false)
+  })
+
+  it('pressing Play in the detail pane loads and starts the viewed episode', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByText('Episode A'))
+    await user.click(await screen.findByText('Play'))
+    expect(usePlayerStore.getState().episode?.id).toBe(1)
+    expect(usePlayerStore.getState().playing).toBe(true)
+  })
+
+  it('browsing to a different episode does not interrupt one already playing in the background', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByText('Episode A'))
+    await user.click(await screen.findByText('Play'))
+    expect(usePlayerStore.getState().episode?.id).toBe(1)
+
+    // Browse to Episode B's detail view — must not disturb playback of A.
+    await user.click(await screen.findByText('Episode B'))
+    expect(usePlayerStore.getState().episode?.id).toBe(1)
+    expect(usePlayerStore.getState().playing).toBe(true)
+    // The detail pane now shows B's own (not-yet-loaded) Play button.
+    expect(await screen.findByText('Play')).toBeInTheDocument()
+  })
+
+  it('pressing Play on a different episode than the one playing switches the player to it', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByText('Episode A'))
+    await user.click(await screen.findByText('Play'))
+    await user.click(await screen.findByText('Episode B'))
+    await user.click(await screen.findByText('Play'))
+    expect(usePlayerStore.getState().episode?.id).toBe(2)
+    expect(usePlayerStore.getState().playing).toBe(true)
+  })
+
+  it('pressing the detail-pane button again on the already-loaded episode toggles pause, then play', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByText('Episode A'))
+    await user.click(await screen.findByText('Play'))
+    expect(usePlayerStore.getState().playing).toBe(true)
+
+    await user.click(await screen.findByText('Pause'))
+    expect(usePlayerStore.getState().playing).toBe(false)
+    expect(usePlayerStore.getState().episode?.id).toBe(1)
+
+    await user.click(await screen.findByText('Play'))
+    expect(usePlayerStore.getState().playing).toBe(true)
+  })
+})

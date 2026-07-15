@@ -97,3 +97,15 @@ it('renders no img, just the placeholder slot, when there is no cover art', () =
   render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
   expect(document.querySelector('img')).not.toBeInTheDocument()
 })
+
+it('shows "X left" instead of total duration when remainingSeconds is given', () => {
+  render(<EpisodeItem episode={episode} isActive={false} remainingSeconds={185} onClick={() => {}} />)
+  expect(screen.getByText('3:05 left')).toBeInTheDocument()
+  expect(screen.queryByText('1:01:01')).not.toBeInTheDocument()
+})
+
+it('shows plain total duration when remainingSeconds is omitted', () => {
+  render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
+  expect(screen.getByText('1:01:01')).toBeInTheDocument()
+  expect(screen.queryByText(/left/)).not.toBeInTheDocument()
+})
