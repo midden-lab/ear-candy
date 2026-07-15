@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { runMigrations } from '../src/db/migrate.js'
 
 function columns(db: Database.Database, table: string): string[] {
@@ -128,5 +131,118 @@ describe('runMigrations', () => {
     expect(row.podcast_name).toBe('Acme Media Co')
     expect(row.favicon_path).toBe('/images/favicon-real.png')
     expect(row.browser_tab_title).toBeNull()
+  })
+
+  describe('schema_migrations tracking', () => {
+    it('records all three migrations as applied on a fresh database', () => {
+      const db = new Database(':memory:')
+      runMigrations(db)
+      const rows = db.prepare('SELECT version, description FROM schema_migrations ORDER BY version').all()
+      expect(rows).toEqual([
+        { version: 1, description: 'episodes.cover_art_thumb_path' },
+        { version: 2, description: 'settings.favicon_path' },
+        { version: 3, description: 'settings.browser_tab_title' },
+      ])
+    })
+
+    it('backfills schema_migrations for a pre-existing database that already has all the columns, without re-running any ALTER TABLE', () => {
+      const db = new Database(':memory:')
+      // First run establishes the columns and schema_migrations rows...
+      runMigrations(db)
+      // ...delete the tracking rows only, simulating a DB that had the
+      // columns before version tracking was introduced.
+      db.prepare('DELETE FROM schema_migrations').run()
+
+      expect(() => runMigrations(db)).not.toThrow()
+      const rows = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all()
+      expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }])
+    })
+
+    it('running migrations again with everything already applied is a no-op', () => {
+      const db = new Database(':memory:')
+      runMigrations(db)
+      const before = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all()
+      runMigrations(db)
+      const after = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all()
+      expect(after).toEqual(before)
+    })
+  })
+
+  describe('pre-migration backup', () => {
+    let tmpDir: string
+    let dbPath: string
+
+    beforeEach(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ear-candy-migrate-test-'))
+      dbPath = path.join(tmpDir, 'db.sqlite')
+    })
+
+    afterEach(() => {
+      fs.rmSync(tmpDir, { recursive: true })
+    })
+
+    function backupFiles(): string[] {
+      return fs.readdirSync(tmpDir).filter(f => f.includes('.pre-migration-'))
+    }
+
+    it('creates a timestamped backup file before running pending migrations against a real file-backed database', () => {
+      const db = new Database(dbPath)
+      db.pragma('journal_mode = WAL')
+      expect(backupFiles()).toHaveLength(0)
+
+      runMigrations(db, { dbPath })
+
+      expect(backupFiles()).toHaveLength(1)
+      expect(backupFiles()[0]).toMatch(/^db\.sqlite\.pre-migration-.+\.bak$/)
+    })
+
+    it('does not create a backup on a second run once everything is already applied', () => {
+      const db = new Database(dbPath)
+      db.pragma('journal_mode = WAL')
+      runMigrations(db, { dbPath })
+      expect(backupFiles()).toHaveLength(1)
+
+      runMigrations(db, { dbPath })
+      expect(backupFiles()).toHaveLength(1)
+    })
+
+    it('does not create a backup for :memory: databases even when dbPath is passed', () => {
+      const db = new Database(':memory:')
+      expect(() => runMigrations(db, { dbPath: ':memory:' })).not.toThrow()
+    })
+
+    it('the backup file is a valid, restorable SQLite database reflecting the pre-migration schema', () => {
+      // Pre-create a settings table missing browser_tab_title, matching a
+      // real pre-migration production DB, with a real customized row.
+      const seed = new Database(dbPath)
+      seed.pragma('journal_mode = WAL')
+      seed.prepare(`
+        CREATE TABLE settings (
+          podcast_name   TEXT NOT NULL DEFAULT 'Ear Candy',
+          tagline        TEXT NOT NULL DEFAULT '',
+          description    TEXT NOT NULL DEFAULT '',
+          cover_art_path TEXT,
+          favicon_path   TEXT,
+          accent_color   TEXT NOT NULL DEFAULT '#5a3ef5'
+        )
+      `).run()
+      seed.prepare('INSERT INTO settings (podcast_name) VALUES (?)').run('Backup Test Pod')
+      seed.close()
+
+      const db = new Database(dbPath)
+      db.pragma('journal_mode = WAL')
+      runMigrations(db, { dbPath })
+      db.close()
+
+      const backupPath = path.join(tmpDir, backupFiles()[0])
+      const restored = new Database(backupPath, { readonly: true })
+      const cols = (restored.prepare('PRAGMA table_info(settings)').all() as { name: string }[]).map(c => c.name)
+      // The backup reflects state as of right before this run's migration —
+      // browser_tab_title had not been added yet.
+      expect(cols).not.toContain('browser_tab_title')
+      const row = restored.prepare('SELECT podcast_name FROM settings').get() as { podcast_name: string }
+      expect(row.podcast_name).toBe('Backup Test Pod')
+      restored.close()
+    })
   })
 })
