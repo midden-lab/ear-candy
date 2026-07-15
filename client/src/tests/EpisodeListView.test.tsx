@@ -171,7 +171,7 @@ it('passes each episode through getRemainingSeconds and renders the result per r
       onEpisodeClick={() => {}}
     />
   )
-  expect(screen.getByText('1:05 left')).toBeInTheDocument()
+  expect(screen.getByText('1:05').closest('span')?.parentElement).toHaveTextContent('1:05 left')
 })
 
 it('renders the podcast name at the top', () => {

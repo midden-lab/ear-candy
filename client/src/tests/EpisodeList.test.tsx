@@ -187,13 +187,19 @@ describe('remaining time', () => {
   it('shows "X left" for the actively-playing episode, reflecting live currentTime', () => {
     usePlayerStore.setState({ episode: episodes[0], playing: true, currentTime: 300 })
     render(<Harness />)
-    expect(screen.getByText('25:00 left')).toBeInTheDocument()
+    // The digits are wrapped in their own tabular-nums span (so the
+    // countdown doesn't make "left" jitter as digit widths vary), so match
+    // via the digits' parent rather than the combined string.
+    expect(screen.getByText('25:00').closest('span')?.parentElement).toHaveTextContent('25:00 left')
   })
 
   it('shows "X left" for a non-playing episode using its saved localStorage progress', () => {
     localStorage.setItem('episode-progress', JSON.stringify({ 11: { time: 600, savedAt: Date.now() } }))
     render(<Harness />)
-    expect(screen.getByText('30:00 left')).toBeInTheDocument()
+    // "30:00" also coincidentally matches the OTHER episode's plain total
+    // duration, so disambiguate by finding the one whose parent says "left".
+    const remaining = screen.getAllByText('30:00').find(el => el.parentElement?.textContent === '30:00 left')
+    expect(remaining).toBeTruthy()
     localStorage.clear()
   })
 })
