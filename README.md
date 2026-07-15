@@ -91,6 +91,12 @@ The live production deployment (via GitHub Actions, see `.github/workflows/ci-cd
 
 Both are required; the server will refuse to start in production if either is missing.
 
+### Optional environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `PUBLIC_ORIGIN` | Pins the origin (`scheme://host[:port]`, no trailing slash) used in Open Graph preview tags served to link-preview crawlers, instead of trusting the request's `Host` header. Fine to leave unset for most deployments. |
+
 ### Data persistence
 
 Mount `./data` to persist the SQLite database and uploaded audio files across restarts. The production compose file does this automatically:

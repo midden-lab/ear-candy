@@ -46,9 +46,24 @@ export function renderEpisodeOgHtml(episode: Episode, settings: Settings, shareU
     <meta property="og:site_name" content="${siteName}">
     <meta property="og:type" content="website">
     ${imageTag}<meta name="twitter:card" content="summary_large_image">
-    <meta http-equiv="refresh" content="0; url=${escapeHtml(shareUrl)}">
   </head>
   <body></body>
 </html>
 `
+}
+
+/**
+ * `og:url`/`og:image` are built from the request's own protocol+hostname by
+ * default, which derives from the `Host`/`X-Forwarded-Host` header —
+ * attacker-controllable input reflected (HTML-escaped) into the response
+ * (issue #53). Low severity since it's metadata, not executable, but an
+ * optional `PUBLIC_ORIGIN` env var lets a deployment pin the trusted origin
+ * explicitly instead of trusting whatever Host header a request arrived
+ * with. Returns null (caller falls back to the request-derived origin) if
+ * unset or malformed, rather than crashing on a typo'd env var.
+ */
+export function resolveConfiguredOrigin(value: string | undefined): string | null {
+  if (!value) return null
+  const trimmed = value.trim().replace(/\/+$/, '')
+  return /^https?:\/\/[^/]+$/.test(trimmed) ? trimmed : null
 }

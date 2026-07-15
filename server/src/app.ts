@@ -19,7 +19,7 @@ import { adminUploadRoute } from './routes/admin/upload.js'
 import { adminUploadImageRoute } from './routes/admin/upload-image.js'
 import { adminUploadFaviconRoute } from './routes/admin/upload-favicon.js'
 import { adminSettingsRoute } from './routes/admin/settings.js'
-import { isKnownCrawler, renderEpisodeOgHtml } from './utils/crawler.js'
+import { isKnownCrawler, renderEpisodeOgHtml, resolveConfiguredOrigin } from './utils/crawler.js'
 import type { Episode, Settings } from './types.js'
 
 declare module 'fastify' {
@@ -164,7 +164,9 @@ export function buildApp(opts: AppOptions = {}) {
       `).get(episodeId) as Episode | undefined
       const settings = app.db.prepare('SELECT * FROM settings').get() as Settings | undefined
       if (!episode || !settings) return
-      const origin = `${req.protocol}://${req.hostname}`
+      // Prefer an explicitly configured origin over the request's own
+      // Host-derived one — see resolveConfiguredOrigin's doc comment (issue #53).
+      const origin = resolveConfiguredOrigin(process.env.PUBLIC_ORIGIN) ?? `${req.protocol}://${req.hostname}`
       const shareUrl = `${origin}${req.url}`
       await reply.code(200).type('text/html').send(renderEpisodeOgHtml(episode, settings, shareUrl, origin))
     })

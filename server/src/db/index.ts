@@ -11,6 +11,6 @@ export function initDb(dbPath: string): Database.Database {
   const db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
-  runMigrations(db)
+  runMigrations(db, { dbPath })
   return db
 }
