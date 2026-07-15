@@ -12,3 +12,6 @@ server/data/uploads/*
 
 # Generated planning reports (red-team/security/DR audits) — kept locally, not tracked
 planning/*.html
+
+# Playwright screenshot artifacts from local/manual runs
+e2e/screenshots/

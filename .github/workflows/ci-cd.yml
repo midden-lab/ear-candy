@@ -14,14 +14,20 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# Least-privilege default for every job's GITHUB_TOKEN — only `build` needs
+# more (packages: write, to push to GHCR) and already declares its own
+# job-level permissions block, which overrides this default for that job.
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '22'
 
@@ -40,10 +46,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '22'
 
@@ -66,10 +72,10 @@ jobs:
   typecheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '22'
 
@@ -89,13 +95,13 @@ jobs:
       sha_tag: ${{ steps.export_sha.outputs.sha_tag }}
       image_digest: ${{ steps.resolve_digest.outputs.digest }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
       - name: Log in to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -103,7 +109,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -113,7 +119,7 @@ jobs:
             latest=false
 
       - name: Build and push image
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           push: true
@@ -162,13 +168,13 @@ jobs:
     # lint/test/build only, kept fast since it runs on every push there.
     if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
       - name: Log in to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -182,21 +188,27 @@ jobs:
           docker pull "$IMAGE"
           docker tag "$IMAGE" ear-candy:test
 
+      # The test admin password is generated fresh per run, same as
+      # COOKIE_SECRET — no fallback to a hardcoded value baked into the
+      # workflow. The ear-candy-test container is ephemeral and only
+      # reachable from this runner, but there's no reason for its admin
+      # credential to be predictable across every CI run either (issue #45).
       - name: Generate CI-only credentials
         id: creds
         run: |
           COOKIE_SECRET=$(openssl rand -hex 32)
+          ADMIN_PASSWORD=$(openssl rand -hex 16)
           HASH=$(docker run --rm \
             -w /tmp \
-            -e PW="$PASSWORD" \
+            -e PW="$ADMIN_PASSWORD" \
             node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 \
             sh -c 'npm install --no-save --quiet bcryptjs >/dev/null 2>&1 && node -e "const b=require(\"bcryptjs\"); process.stdout.write(b.hashSync(process.env.PW, 10))"')
           echo "::add-mask::$COOKIE_SECRET"
+          echo "::add-mask::$ADMIN_PASSWORD"
           echo "::add-mask::$HASH"
           echo "cookie_secret=$COOKIE_SECRET" >> "$GITHUB_OUTPUT"
+          echo "admin_password=$ADMIN_PASSWORD" >> "$GITHUB_OUTPUT"
           echo "admin_password_hash=$HASH" >> "$GITHUB_OUTPUT"
-        env:
-          PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'changeme' }}
 
       - name: Start test container
         env:
@@ -228,7 +240,7 @@ jobs:
           exit 1
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '22'
 
@@ -252,12 +264,12 @@ jobs:
         working-directory: ./e2e
         run: npx playwright test
         env:
-          TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD || 'changeme' }}
+          TEST_ADMIN_PASSWORD: ${{ steps.creds.outputs.admin_password }}
           BASE_URL: http://localhost:3000
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: playwright-report
           path: e2e/playwright-report/
@@ -265,7 +277,7 @@ jobs:
 
       - name: Upload E2E screenshots
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: e2e-screenshots
           path: e2e/screenshots/
@@ -281,7 +293,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Deploy to Droplet via SSH
-        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
         env:
           DEPLOY_REGISTRY: ${{ env.REGISTRY }}
           DEPLOY_IMAGE_NAME: ${{ env.IMAGE_NAME }}
@@ -351,3 +363,24 @@ jobs:
             done
             echo "Health check failed"
             exit 1
+
+  # A separate job (not just deploy's own internal health-check loop above)
+  # so "the app is verified healthy" is its own distinct, independently
+  # visible CI result — catches the case where deploy's internal check
+  # itself gets accidentally broken or removed in some future edit (#16).
+  verify-production:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Verify /api/health on the production Droplet
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
+        with:
+          host: ${{ secrets.DROPLET_IP }}
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            RESPONSE=$(curl -sf http://localhost:3000/api/health)
+            echo "Response: $RESPONSE"
+            echo "$RESPONSE" | grep -q '"ok":true'
