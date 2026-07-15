@@ -121,4 +121,13 @@ describe('play/pause button', () => {
     await user.click(screen.getByText('Play'))
     expect(onPlayPause).toHaveBeenCalledTimes(1)
   })
+
+  it('has an accessible name distinct from the player bar\'s own Play/Pause buttons', () => {
+    // Both can be on screen simultaneously once this episode is loaded and
+    // playing — an identical accessible name on two different buttons
+    // would be ambiguous for screen readers and any role-based query.
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} playing={true} onPlayPause={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Pause episode' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument()
+  })
 })

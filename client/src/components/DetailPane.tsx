@@ -65,6 +65,12 @@ export default function DetailPane({ episode, seasons, isCurrentPlayerEpisode, p
       {onPlayPause && (
         <button
           onClick={onPlayPause}
+          // Distinct from the player bar's own "Play"/"Pause" buttons —
+          // once both are on screen at once (this episode is loaded and
+          // playing), an identical accessible name on two different
+          // buttons is a real ambiguity for screen readers and any
+          // role-based query, not just a testing nuisance.
+          aria-label={isCurrentPlayerEpisode && playing ? 'Pause episode' : 'Play episode'}
           className="mt-4 flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2 font-medium text-[var(--accent-contrast)] transition-opacity hover:opacity-90"
         >
           {isCurrentPlayerEpisode && playing ? (

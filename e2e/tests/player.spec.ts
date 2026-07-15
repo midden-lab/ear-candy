@@ -22,7 +22,11 @@ test.describe('Audio Player', () => {
   test('detail-pane Play button starts playback immediately (button reads Pause right after)', async ({ seededPage: page }) => {
     await page.locator('button', { hasText: 'Deep Dive' }).click()
     await page.getByRole('button', { name: 'Play' }).click()
-    await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible()
+    // Scoped to the player bar: the detail pane's own play/pause button has
+    // a distinct accessible name ("Pause episode") specifically so it never
+    // collides with the player bar's icon-only "Pause" button once both are
+    // on screen at once.
+    await expect(page.getByTestId('player-bar').getByRole('button', { name: 'Pause' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Play', exact: true })).not.toBeVisible()
   })
 
