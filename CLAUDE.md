@@ -52,7 +52,7 @@ All commands should be run from the repo root unless noted.
 
 - **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 115 tests), `npm run lint` (eslint)
 - **Client:** `cd client && npm run dev` (vite), `npm test` (vitest + jsdom, 273 tests + 3 skipped), `npm run lint` (eslint), `npm run typecheck` (tsc --noEmit)
-- **E2E:** `cd e2e && npm test` (playwright, 44 tests), `npm run test:ui` (playwright --ui) — prefer `make e2e`/`make e2e-ui` (see note above)
+- **E2E:** `cd e2e && npm test` (playwright, 48 tests, 2 skipped outside CI's production-image run), `npm run test:ui` (playwright --ui) — prefer `make e2e`/`make e2e-ui` (see note above)
 
 ---
 
@@ -154,7 +154,7 @@ ear-candy/
 │   ├── fixtures.ts             # Custom Playwright fixtures (seededPage, adminPage)
 │   ├── fixtures/               # Test media files (audio, cover art, favicon)
 │   ├── playwright.config.ts    # workers: 1, chromium only
-│   └── tests/                  # E2E specs, 44 tests across admin/listener/mobile/player/screenshot/theme
+│   └── tests/                  # E2E specs, 48 tests across admin/listener/mobile/player/screenshot/sharing/theme (2 skip unless running against the production image)
 │
 ├── planning/                  # Design specs and plans (historical context)
 ├── scripts/hash-password.sh  # bcrypt hash helper
@@ -211,7 +211,7 @@ ear-candy/
 - **Important:** `vi.clearAllMocks()` wipes `HTMLMediaElement` mocks, so re-apply them after clearing.
 - **Testing real audio duration detection:** `EpisodeFormPanel.test.tsx` stubs `window.Audio` wholesale via `vi.stubGlobal('Audio', ...)` with a controllable fake (settable `.duration`, manual `.emit('loadedmetadata' | 'durationchange' | 'error')`) — this bypasses the global jsdom patch above and gives full control over the probe's resolved value per test.
 
-### E2E Tests (`e2e/tests/`) — 44 tests
+### E2E Tests (`e2e/tests/`) — 48 tests (2 skipped outside the production-image CI run)
 
 - **Runner:** Playwright with `workers: 1` (tests share a real database, must run serially — see the cascading-failure gotcha below for why this matters more than it looks).
 - **Base URL:** `http://localhost:5173` (dev client). **Requires `make up` running.** Always run the suite via `make e2e`/`make e2e-ui`, not `cd e2e && npm test` directly — see gotcha #28.
@@ -316,6 +316,7 @@ ear-candy/
 43. **Shared-timestamp precedence: the listener's own progress always wins once it exists.** `AudioPlayer.tsx`'s `resumeTimeFor` prefers `getEpisodeProgress(id)` (local saved position) over a shared link's `t` — a shared timestamp only applies the *first* time that episode is loaded with no prior local progress. This needs no explicit "already consumed" flag; once any real listening happens (or the episode finishes, which clears saved progress via `handleEnded`), the ordinary resume-position logic takes over naturally.
 44. **Server-rendered Open Graph tags for shared links only exist in production's single-container mode.** `server/src/app.ts`'s crawler-detection `onRequest` hook (backing `server/src/utils/crawler.ts`) is registered only inside the `if (clientDist && fs.existsSync(clientDist))` block — inert in dev's split client/server topology, active only when `SERVE_CLIENT=true`. It's scoped to exactly `/` (checked via `req.url.split('?')[0] !== '/'`) so a crawler-UA-flavored request to any other route (e.g. an API endpoint) can't be accidentally short-circuited into an OG-HTML response. `og:image` is resolved to an absolute URL (`${req.protocol}://${req.hostname}${path}`) before being emitted — cover art paths are stored/returned as site-relative paths, and the Open Graph spec requires an absolute `og:image` or link-preview unfurlers silently show no image at all (a real bug caught in a pre-production review, not a hypothetical).
 45. **`og:url`'s origin trusts the request's `Host` header by default — an optional `PUBLIC_ORIGIN` env var pins it instead (issue #53).** `req.hostname` is attacker-controllable input (the `Host`/`X-Forwarded-Host` header), reflected — HTML-escaped, so not script-injectable — into the crawler-served OG response. This was a real (low-severity, escaped, metadata-only) open-redirect-flavored issue when the response also included a `<meta http-equiv="refresh">` pointing at that same attacker-controlled origin; the refresh tag has since been removed entirely (it was genuinely non-essential — bots read `<meta>` tags, they don't follow refreshes — so removing it was strictly safer, not a feature cut). `server/src/utils/crawler.ts`'s `resolveConfiguredOrigin` validates `process.env.PUBLIC_ORIGIN` (must be a bare `scheme://host[:port]`, no path, no trailing slash) and, if set and well-formed, `app.ts`'s crawler hook uses it instead of `${req.protocol}://${req.hostname}` — malformed or unset values fall straight back to the request-derived origin rather than crashing on a typo'd env var.
+46. **`e2e/tests/sharing.spec.ts`'s OG-tag crawler tests are gated on `!process.env.BASE_URL`, not `!process.env.CI`.** Per gotcha #44, crawler OG rendering only exists in the production single-container build — CI's `e2e` job always explicitly sets `BASE_URL=http://localhost:3000` (the running production image) while local `make e2e` never sets it (defaults to the dev client's `:5173`), so that's a direct, reliable signal for "is the crawler hook even reachable here" rather than a proxy for it (issue #51). The two share-flow tests (deep-link round-trip through the real UI) run everywhere and don't need this gate.
 
 ---
 
@@ -337,7 +338,7 @@ Jobs run in this order:
 2. `test` — Vitest server (115 tests) + client (273 tests + 3 skipped)
 3. `typecheck` — `tsc --noEmit` on client
 4. `build` — builds the root `Dockerfile` image, pushes to GHCR (needs lint+test+typecheck)
-5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright (44 tests) against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit). Capped at `timeout-minutes: 15` (healthy runs take ~4-6 min) so a genuine hang (browser/network stall) fails fast instead of silently running for hours. Invoked directly as `npx playwright test`, not `npm test` — the npm wrapper was found to buffer all output until the child process exits normally, which hid a real ~20-minute cascading test failure behind what looked like total silence.
+5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright (48 tests, including 2 production-image-only OG-tag crawler tests that BASE_URL-gate-skip everywhere else) against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit). Capped at `timeout-minutes: 15` (healthy runs take ~4-6 min) so a genuine hang (browser/network stall) fails fast instead of silently running for hours. Invoked directly as `npx playwright test`, not `npm test` — the npm wrapper was found to buffer all output until the child process exits normally, which hid a real ~20-minute cascading test failure behind what looked like total silence.
 6. `deploy` — only on `main`; SSHes to the production Droplet, pulls the new image **by digest** (not tag — see below), restarts the container, health-checks it (needs build+e2e)
 
 Note: CI's `e2e` job exercises the **production image**, not `docker compose up` — different from local `make e2e`, which requires the dev stack (`make up`).
