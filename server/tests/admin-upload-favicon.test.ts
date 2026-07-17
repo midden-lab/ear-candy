@@ -31,6 +31,26 @@ function multipartBody(boundary: string, filename: string, contentType: string, 
   ].join('\r\n')
 }
 
+function multipartBuffer(boundary: string, filename: string, contentType: string, content: Buffer) {
+  return Buffer.concat([
+    Buffer.from(`--${boundary}\r\n`),
+    Buffer.from(`Content-Disposition: form-data; name="file"; filename="${filename}"\r\n`),
+    Buffer.from(`Content-Type: ${contentType}\r\n\r\n`),
+    content,
+    Buffer.from(`\r\n--${boundary}--\r\n`)
+  ])
+}
+
+// Real PNG/ICO magic bytes so uploads pass the magic-byte content check (issue #38).
+const REAL_PNG_BYTES = Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  Buffer.from('fake favicon bytes')
+])
+const REAL_ICO_BYTES = Buffer.concat([
+  Buffer.from([0x00, 0x00, 0x01, 0x00]),
+  Buffer.from('fake favicon bytes')
+])
+
 describe('POST /api/admin/upload/favicon', () => {
   afterEach(() => {
     delete process.env.ADMIN_PASSWORD_HASH
@@ -105,9 +125,9 @@ describe('POST /api/admin/upload/favicon', () => {
   })
 
   it.each([
-    ['favicon.png', 'image/png'],
-    ['favicon.ico', 'image/x-icon'],
-  ])('accepts a valid %s upload and returns a path under /images/', async (filename, mimetype) => {
+    ['favicon.png', 'image/png', REAL_PNG_BYTES],
+    ['favicon.ico', 'image/x-icon', REAL_ICO_BYTES],
+  ])('accepts a valid %s upload and returns a path under /images/', async (filename, mimetype, bytes) => {
     const app = await makeApp()
     const cookie = await getAuthCookie(app)
     const boundary = '----testboundary'
@@ -116,7 +136,7 @@ describe('POST /api/admin/upload/favicon', () => {
       method: 'POST',
       url: '/api/admin/upload/favicon',
       headers: { cookie, 'content-type': `multipart/form-data; boundary=${boundary}` },
-      payload: multipartBody(boundary, filename, mimetype, 'fake favicon bytes')
+      payload: multipartBuffer(boundary, filename, mimetype, bytes as Buffer)
     })
 
     expect(res.statusCode).toBe(200)
@@ -126,5 +146,20 @@ describe('POST /api/admin/upload/favicon', () => {
     const savedPath = path.resolve('data/uploads/images', path.basename(json.path))
     expect(fs.existsSync(savedPath)).toBe(true)
     fs.unlinkSync(savedPath)
+  })
+
+  it('rejects a file whose extension/mimetype claim PNG but whose content is not a real PNG signature (issue #38)', async () => {
+    const app = await makeApp()
+    const cookie = await getAuthCookie(app)
+    const boundary = '----testboundary'
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/upload/favicon',
+      headers: { cookie, 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: multipartBody(boundary, 'disguised.png', 'image/png', 'not actually a png file')
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json()).toEqual({ error: 'File content does not match a recognized PNG or ICO image' })
   })
 })
