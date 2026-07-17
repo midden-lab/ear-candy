@@ -4,6 +4,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { requireAdmin } from '../../auth.js'
+import { peekHeader, matchesAudioSignature } from '../../utils/magicBytes.js'
 
 const ALLOWED_AUDIO_EXTENSIONS = new Set([
   '.mp3', '.m4a', '.wav', '.ogg', '.oga', '.flac', '.aac', '.webm'
@@ -29,10 +30,19 @@ export const adminUploadRoute: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ error: 'Only audio file uploads are allowed' })
     }
 
+    // Extension/mimetype are both client-supplied and trivially spoofable —
+    // check the file's actual leading bytes match a real audio container/
+    // frame signature before ever writing it to disk (issue #38).
+    const { head, stream } = await peekHeader(data.file)
+    if (!matchesAudioSignature(head, ext)) {
+      stream.resume()
+      return reply.status(400).send({ error: 'File content does not match a recognized audio format' })
+    }
+
     const filename = `${randomUUID()}${ext}`
     const dest = path.resolve('data/uploads', filename)
 
-    await pipeline(data.file, fs.createWriteStream(dest))
+    await pipeline(stream, fs.createWriteStream(dest))
 
     return { path: `/audio/${filename}` }
   })

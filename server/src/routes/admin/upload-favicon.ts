@@ -4,6 +4,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { requireAdmin } from '../../auth.js'
+import { peekHeader, matchesFaviconSignature } from '../../utils/magicBytes.js'
 
 // SVG deliberately excluded: unlike PNG/ICO, an SVG can embed <script> and a
 // browser will execute it if the uploaded file is ever navigated to directly
@@ -31,13 +32,19 @@ export const adminUploadFaviconRoute: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ error: 'Only PNG or ICO favicon uploads are allowed' })
     }
 
+    const { head, stream } = await peekHeader(data.file)
+    if (!matchesFaviconSignature(head, ext)) {
+      stream.resume()
+      return reply.status(400).send({ error: 'File content does not match a recognized PNG or ICO image' })
+    }
+
     const uploadsDir = path.resolve('data/uploads/images')
     fs.mkdirSync(uploadsDir, { recursive: true })
 
     const filename = `favicon-${randomUUID()}${ext}`
     const dest = path.join(uploadsDir, filename)
 
-    await pipeline(data.file, fs.createWriteStream(dest))
+    await pipeline(stream, fs.createWriteStream(dest))
 
     if (data.file.truncated) {
       fs.unlinkSync(dest)

@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify'
 import type { Episode } from '../../types.js'
 import { requireAdmin } from '../../auth.js'
 import { isValidMediaPath } from '../../utils/validation.js'
+import { deleteLocalMediaFile } from '../../utils/mediaFiles.js'
 
 const ALLOWED_EPISODE_PATCH_FIELDS = new Set([
   'season_id', 'number', 'title', 'description', 'guests', 'tags',
@@ -170,9 +171,15 @@ export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
 
   app.delete<{ Params: { id: string } }>('/admin/episodes/:id', { preHandler: requireAdmin }, async (req, reply) => {
     const id = parseInt(req.params.id, 10)
-    const existing = app.db.prepare('SELECT id FROM episodes WHERE id = ?').get(id)
+    const existing = app.db.prepare('SELECT * FROM episodes WHERE id = ?').get(id) as Episode | undefined
     if (!existing) return reply.status(404).send({ error: 'Not found' })
     app.db.prepare('DELETE FROM episodes WHERE id = ?').run(id)
+    // Best-effort — the DB row is already gone either way (issue #4).
+    await Promise.all([
+      deleteLocalMediaFile(existing.audio_path),
+      deleteLocalMediaFile(existing.cover_art_path),
+      deleteLocalMediaFile(existing.cover_art_thumb_path),
+    ])
     return reply.status(204).send()
   })
 }
