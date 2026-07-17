@@ -96,6 +96,7 @@ Both are required; the server will refuse to start in production if either is mi
 | Variable | Description |
 |----------|-------------|
 | `PUBLIC_ORIGIN` | Pins the origin (`scheme://host[:port]`, no trailing slash) used in Open Graph preview tags served to link-preview crawlers, instead of trusting the request's `Host` header. Fine to leave unset for most deployments. |
+| `TRUSTED_PROXY_IPS` | Comma-separated IPs Fastify trusts to set `X-Forwarded-For` (your reverse proxy's address, as seen from inside the app's own network namespace). Defaults to loopback only (`127.0.0.1,::1`). If your reverse proxy runs on the host while the app runs in a container, this is likely your Docker bridge gateway address, not loopback — check with `docker network inspect bridge`. |
 
 ### Data persistence
 

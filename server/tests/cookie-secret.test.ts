@@ -14,8 +14,23 @@ describe('COOKIE_SECRET requirement', () => {
     expect(() => buildApp({ dbPath: ':memory:', logger: false })).toThrow('COOKIE_SECRET env var is required')
   })
 
-  it('builds successfully when COOKIE_SECRET is set', () => {
-    process.env.COOKIE_SECRET = 'a-real-secret'
+  it('builds successfully when COOKIE_SECRET is set and long enough', () => {
+    process.env.COOKIE_SECRET = 'a'.repeat(32)
     expect(() => buildApp({ dbPath: ':memory:', logger: false })).not.toThrow()
+  })
+
+  it('throws when COOKIE_SECRET is set but below the minimum length (issue #40)', () => {
+    process.env.COOKIE_SECRET = 'too-short'
+    expect(() => buildApp({ dbPath: ':memory:', logger: false })).toThrow('COOKIE_SECRET must be at least 32 characters (got 9)')
+  })
+
+  it('accepts a secret exactly at the minimum length', () => {
+    process.env.COOKIE_SECRET = 'a'.repeat(32)
+    expect(() => buildApp({ dbPath: ':memory:', logger: false })).not.toThrow()
+  })
+
+  it('rejects a secret one character below the minimum length', () => {
+    process.env.COOKIE_SECRET = 'a'.repeat(31)
+    expect(() => buildApp({ dbPath: ':memory:', logger: false })).toThrow('COOKIE_SECRET must be at least 32 characters (got 31)')
   })
 })

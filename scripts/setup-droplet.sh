@@ -34,12 +34,13 @@ apt update
 apt install -y caddy
 
 # --- Step 5: Configure Caddy ---
+# Rendered from the checked-in template (infra/Caddyfile.template), not an
+# inline heredoc — that template is the single source of truth for what
+# Caddy should look like, so a manual live edit on the Droplet has
+# something to diff against instead of silently drifting (issue #58, #44).
 echo "Configuring Caddy for $DOMAIN..."
-cat > /etc/caddy/Caddyfile << EOF
-$DOMAIN {
-  reverse_proxy localhost:3001
-}
-EOF
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+sed "s/__DOMAIN__/$DOMAIN/" "$SCRIPT_DIR/../infra/Caddyfile.template" > /etc/caddy/Caddyfile
 systemctl reload caddy
 
 # --- Step 6: Setup backup script ---

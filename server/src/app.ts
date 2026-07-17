@@ -34,17 +34,36 @@ interface AppOptions {
   clientDistPath?: string
 }
 
+// Production sits behind Caddy, reverse-proxying to the app container's
+// published port — without trustProxy, Fastify's req.ip is the direct TCP
+// peer, collapsing every real visitor into one shared IP for things like
+// the login lockout counter (issue #33: one attacker's failed attempts
+// could lock out the real admin too). Loopback (127.0.0.1/::1) was the
+// first fix attempted here, but it doesn't actually work in production:
+// Caddy runs on the Droplet host while the app runs in a container
+// published via `docker run -p 3000:3000`, and Docker NATs that
+// host-to-container connection through the bridge network — from inside
+// the container, Caddy's connection appears to originate from the bridge
+// gateway address (e.g. 172.17.0.1), not loopback. That address is a
+// property of this specific deployment's Docker networking, not something
+// to hardcode into application source (a custom network, a different
+// bridge subnet, or moving off this exact setup would silently break it
+// again) — so it's configurable via TRUSTED_PROXY_IPS (comma-separated),
+// with the deploy job (.github/workflows/ci-cd.yml) responsible for
+// setting the real value for this deployment. Defaults to loopback-only
+// when unset, which is what local dev/CI/e2e actually sit behind (no
+// proxy at all there, so loopback-only remains a safe, correct default).
+const MIN_COOKIE_SECRET_LENGTH = 32
+
+export function resolveTrustedProxies(value: string | undefined): string[] {
+  const defaults = ['127.0.0.1', '::1']
+  if (!value) return defaults
+  const parsed = value.split(',').map(s => s.trim()).filter(Boolean)
+  return parsed.length > 0 ? parsed : defaults
+}
+
 export function buildApp(opts: AppOptions = {}) {
-  // Production sits behind Caddy on the same host, reverse-proxying over
-  // loopback (see scripts/setup-droplet.sh) — without trustProxy, Fastify's
-  // req.ip is the direct TCP peer, which in production is always Caddy's
-  // loopback address, collapsing every real visitor into one shared IP for
-  // things like the login lockout counter (issue #33: one attacker's failed
-  // attempts could lock out the real admin too). Trusting only loopback
-  // means req.ip reflects the real client from X-Forwarded-For when the
-  // immediate connection is from Caddy, while still refusing to trust
-  // forwarded headers from any address that isn't the local reverse proxy.
-  const app = Fastify({ logger: opts.logger ?? true, trustProxy: ['127.0.0.1', '::1'] })
+  const app = Fastify({ logger: opts.logger ?? true, trustProxy: resolveTrustedProxies(process.env.TRUSTED_PROXY_IPS) })
   const dbPath = opts.dbPath ?? path.resolve('data/db.sqlite')
   const db = initDb(dbPath)
 
@@ -53,6 +72,14 @@ export function buildApp(opts: AppOptions = {}) {
   const cookieSecret = process.env.COOKIE_SECRET
   if (!cookieSecret) {
     throw new Error('COOKIE_SECRET env var is required')
+  }
+  // Only presence was checked before, not strength — an operator
+  // hand-editing .env could set a trivially short/guessable secret, letting
+  // an attacker forge valid session cookies offline via HMAC brute-force
+  // (issue #40). `make setup`'s generated secrets (openssl rand -hex 32,
+  // 64 hex chars) clear this floor comfortably.
+  if (cookieSecret.length < MIN_COOKIE_SECRET_LENGTH) {
+    throw new Error(`COOKIE_SECRET must be at least ${MIN_COOKIE_SECRET_LENGTH} characters (got ${cookieSecret.length})`)
   }
   app.register(cookie, { secret: cookieSecret })
 
