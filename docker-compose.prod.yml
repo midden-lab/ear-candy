@@ -14,3 +14,8 @@ services:
       - PORT=3000
       - COOKIE_SECRET=${COOKIE_SECRET:?COOKIE_SECRET must be set}
       - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:?ADMIN_PASSWORD_HASH must be set}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
