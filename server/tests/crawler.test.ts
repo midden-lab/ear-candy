@@ -9,6 +9,13 @@ describe('isKnownCrawler', () => {
     expect(isKnownCrawler('Discordbot/2.0')).toBe(true)
   })
 
+  it('recognizes LinkedIn, WhatsApp, Telegram, and Applebot user agents (issue #52)', () => {
+    expect(isKnownCrawler('LinkedInBot/1.0 (compatible; Mozilla/5.0; Apache-HttpClient +http://www.linkedin.com)')).toBe(true)
+    expect(isKnownCrawler('WhatsApp/2.23.20.0 A')).toBe(true)
+    expect(isKnownCrawler('TelegramBot (like TwitterBot)')).toBe(true)
+    expect(isKnownCrawler('Mozilla/5.0 (compatible; Applebot/0.1; +http://www.apple.com/go/applebot)')).toBe(true)
+  })
+
   it('does not recognize a real browser', () => {
     expect(isKnownCrawler('Mozilla/5.0 (real browser)')).toBe(false)
   })

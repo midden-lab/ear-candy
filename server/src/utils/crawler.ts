@@ -8,7 +8,13 @@ import type { Episode, Settings } from '../types.js'
 // pattern every SPA uses for this exact problem: detect known bot user
 // agents and serve them a tiny static HTML snippet with the right meta
 // tags instead of the real app shell.
-const CRAWLER_USER_AGENT_PATTERN = /Twitterbot|facebookexternalhit|Slackbot|Discordbot/i
+// Apple doesn't publish a distinct link-preview bot UA for iMessage — its
+// rich-link fetches are widely reported (no official confirmation) to share
+// the "Applebot" identifier used for Siri/Spotlight/Safari suggestions, so
+// it's included here as a best-effort match rather than a confirmed one
+// (issue #52).
+const CRAWLER_USER_AGENT_PATTERN =
+  /Twitterbot|facebookexternalhit|Slackbot|Discordbot|LinkedInBot|WhatsApp|TelegramBot|Applebot/i
 
 export function isKnownCrawler(userAgent: string | undefined): boolean {
   return !!userAgent && CRAWLER_USER_AGENT_PATTERN.test(userAgent)

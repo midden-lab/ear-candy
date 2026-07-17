@@ -49,10 +49,15 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
     const match = await bcrypt.compare(password, hash)
     if (!match) {
       recordFailedAttempt(req.ip)
+      // Deliberately never logs the submitted password itself — only the
+      // outcome and requesting IP, enough to answer "did someone get in,
+      // and when" after the fact (issue #13) without logging credentials.
+      req.log.info({ event: 'admin_login', outcome: 'failure', ip: req.ip })
       return reply.status(401).send({ error: 'Invalid password' })
     }
 
     failedAttempts.delete(req.ip)
+    req.log.info({ event: 'admin_login', outcome: 'success', ip: req.ip })
     reply.setCookie('admin_session', buildSessionCookieValue(), {
       signed: true,
       httpOnly: true,
@@ -64,7 +69,8 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
     return { ok: true }
   })
 
-  app.post('/admin/logout', async (_req, reply) => {
+  app.post('/admin/logout', async (req, reply) => {
+    req.log.info({ event: 'admin_logout', ip: req.ip })
     reply.clearCookie('admin_session', { path: '/' })
     return { ok: true }
   })
