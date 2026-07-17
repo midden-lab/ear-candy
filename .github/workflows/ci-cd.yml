@@ -327,6 +327,18 @@ jobs:
               exit 1
             fi
 
+            # Preflight, before touching the running container: the app now
+            # refuses to boot with a COOKIE_SECRET under 32 characters
+            # (issue #40). Checking here means a too-short secret fails the
+            # deploy cleanly with the OLD container still up and serving
+            # traffic, instead of stopping/removing it and only then
+            # discovering the new one won't start — see docs/runbooks/
+            # rotate-secrets.md if this fires.
+            if [ "${#DEPLOY_COOKIE_SECRET}" -lt 32 ]; then
+              echo "COOKIE_SECRET is under 32 characters — refusing to deploy (see docs/runbooks/rotate-secrets.md)" >&2
+              exit 1
+            fi
+
             # Pulling by digest (not tag) IS the integrity check — Docker
             # verifies the content hash as part of the pull itself, so a
             # tampered/wrong image simply fails to pull rather than needing
@@ -345,6 +357,16 @@ jobs:
             docker rm ear-candy || true
 
             echo "Starting new container..."
+            # TRUSTED_PROXY_IPS: 172.17.0.1 is this Droplet's default Docker
+            # bridge gateway — Caddy runs on the host and reverse-proxies to
+            # this container's published port, and that host-to-container
+            # hop gets NATed through the bridge, so from inside the
+            # container Caddy's connection appears to originate from the
+            # gateway address, not loopback (confirmed via `docker network
+            # inspect bridge` and live request logs — issue #33). This is a
+            # property of this specific deployment's Docker networking, so
+            # it's declared here next to the rest of the deploy config it
+            # depends on, not hardcoded into application source.
             docker run -d \
               --name ear-candy \
               --restart unless-stopped \
@@ -358,6 +380,7 @@ jobs:
               -e PORT=3000 \
               -e COOKIE_SECRET="$DEPLOY_COOKIE_SECRET" \
               -e ADMIN_PASSWORD_HASH="$DEPLOY_ADMIN_PASSWORD_HASH" \
+              -e TRUSTED_PROXY_IPS="127.0.0.1,::1,172.17.0.1" \
               "$IMAGE"
 
             echo "Pruning dangling images..."
