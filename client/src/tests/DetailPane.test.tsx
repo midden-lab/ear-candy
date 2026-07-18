@@ -144,6 +144,17 @@ describe('loading/error/retry state (issues #82, #83, #84)', () => {
     expect(screen.queryByText('Buffering…')).not.toBeInTheDocument()
   })
 
+  it('reserves status-line space even with no status, so content below never shifts as buffering starts/ends', () => {
+    // Regression test for a real reported bug: the status line used to be
+    // conditionally rendered, so the description/pill badges below it
+    // visibly jumped down when buffering started and back up when it
+    // ended. It must always be present in the DOM (just invisible) instead.
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} playing={true} onPlayPause={() => {}} />)
+    const status = screen.getByRole('status')
+    expect(status).toBeInTheDocument()
+    expect(status).toHaveClass('opacity-0')
+  })
+
   it('shows Retry instead of Pause/Play when this episode is the one erroring', () => {
     render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} playing={true} error={true} onPlayPause={() => {}} />)
     expect(screen.getByRole('button', { name: 'Retry episode' })).toBeInTheDocument()
@@ -175,6 +186,6 @@ describe('loading/error/retry state (issues #82, #83, #84)', () => {
 
   it('shows a generic message for an upload-type episode error', () => {
     render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} error={true} onPlayPause={() => {}} />)
-    expect(screen.getByText('Playback interrupted — tap Retry.')).toBeInTheDocument()
+    expect(screen.getByText('Playback interrupted — tap retry.')).toBeInTheDocument()
   })
 })

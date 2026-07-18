@@ -1,6 +1,8 @@
 import type { Episode, Season } from '../types'
 import PillBadge from './PillBadge'
 import EpisodeCoverArt from './EpisodeCoverArt'
+import PlaybackStatusLine from './PlaybackStatusLine'
+import { getPlaybackStatus } from '../utils/playbackStatus'
 
 interface DetailPaneProps {
   episode: Episode | null
@@ -113,16 +115,10 @@ export default function DetailPane({
           </button>
         )
       })()}
-      {isCurrentPlayerEpisode && error && (
-        <p role="status" className="mt-2 text-sm text-red-500 dark:text-red-400">
-          {episode.audio_type === 'url'
-            ? 'Playback interrupted — the source may be unreachable or blocking playback here. Tap Retry.'
-            : 'Playback interrupted — tap Retry.'}
-        </p>
-      )}
-      {isCurrentPlayerEpisode && loading && !error && (
-        <p role="status" className="mt-2 text-sm text-zinc-400 dark:text-zinc-500">Buffering…</p>
-      )}
+      <PlaybackStatusLine
+        status={getPlaybackStatus(episode, { loading: isCurrentPlayerEpisode && loading, error: isCurrentPlayerEpisode && error })}
+        className="mt-2"
+      />
 
       {guestList.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
