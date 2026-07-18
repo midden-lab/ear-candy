@@ -69,6 +69,31 @@ export default function AudioPlayer({ sharedStart }: AudioPlayerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [episode?.id])
 
+  // The periodic save below only fires every 5s of playback progress, so a
+  // real disconnect or a closed/backgrounded tab could lose up to that much
+  // resume position. Persisting eagerly on these events closes that gap
+  // without changing the periodic tick itself or anything about how a saved
+  // position is later used (issue #85).
+  useEffect(() => {
+    const id = episode?.id
+    if (id === undefined) return
+
+    function persistIfNotEnded() {
+      if (!endedRef.current) saveEpisodeProgress(id!, currentTimeRef.current)
+    }
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'hidden') persistIfNotEnded()
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pagehide', persistIfNotEnded)
+    window.addEventListener('offline', persistIfNotEnded)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pagehide', persistIfNotEnded)
+      window.removeEventListener('offline', persistIfNotEnded)
+    }
+  }, [episode?.id])
+
   const lastPersistedRef = useRef(0)
   const handleTimeUpdate = (t: number) => {
     setCurrentTime(t)
