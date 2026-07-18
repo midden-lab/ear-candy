@@ -14,11 +14,20 @@ interface DetailPaneProps {
    *  `isCurrentPlayerEpisode` is true — otherwise the button always shows
    *  "Play", since pressing it would start this episode from scratch). */
   playing?: boolean
+  /** Buffering/error state — only meaningful when `isCurrentPlayerEpisode`
+   *  is true, same as `playing` (issues #82, #83). */
+  loading?: boolean
+  error?: boolean
   onPlayPause?: () => void
+  /** Triggers the same retry action as the player bar's own retry button —
+   *  only relevant when `isCurrentPlayerEpisode && error`. */
+  onRetry?: () => void
   onBack?: () => void
 }
 
-export default function DetailPane({ episode, seasons, isCurrentPlayerEpisode, playing, onPlayPause, onBack }: DetailPaneProps) {
+export default function DetailPane({
+  episode, seasons, isCurrentPlayerEpisode, playing, loading, error, onPlayPause, onRetry, onBack,
+}: DetailPaneProps) {
   if (!episode) {
     return (
       <div className="flex h-full items-center justify-center text-zinc-400 dark:text-zinc-500">
@@ -62,33 +71,57 @@ export default function DetailPane({ episode, seasons, isCurrentPlayerEpisode, p
       <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{episode.title}</h1>
       <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{episode.publish_date}</p>
 
-      {onPlayPause && (
-        <button
-          onClick={onPlayPause}
-          // Distinct from the player bar's own "Play"/"Pause" buttons —
-          // once both are on screen at once (this episode is loaded and
-          // playing), an identical accessible name on two different
-          // buttons is a real ambiguity for screen readers and any
-          // role-based query, not just a testing nuisance.
-          aria-label={isCurrentPlayerEpisode && playing ? 'Pause episode' : 'Play episode'}
-          className="mt-4 flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2 font-medium text-[var(--accent-contrast)] transition-opacity hover:opacity-90"
-        >
-          {isCurrentPlayerEpisode && playing ? (
-            <>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-              </svg>
-              Pause
-            </>
-          ) : (
-            <>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              Play
-            </>
-          )}
-        </button>
+      {onPlayPause && (() => {
+        const showError = !!(isCurrentPlayerEpisode && error)
+        const showLoading = !!(isCurrentPlayerEpisode && loading && !error)
+        const showPause = !!(isCurrentPlayerEpisode && playing && !showError)
+        return (
+          <button
+            onClick={showError ? onRetry : onPlayPause}
+            // Distinct from the player bar's own "Play"/"Pause"/"Retry
+            // playback" buttons — once both are on screen at once (this
+            // episode is loaded and playing), an identical accessible name
+            // on two different buttons is a real ambiguity for screen
+            // readers and any role-based query, not just a testing
+            // nuisance.
+            aria-label={showError ? 'Retry episode' : (showPause ? 'Pause episode' : 'Play episode')}
+            aria-busy={showLoading || undefined}
+            className={`mt-4 flex items-center gap-2 rounded-full bg-[var(--accent)] px-5 py-2 font-medium text-[var(--accent-contrast)] transition-opacity hover:opacity-90 ${showLoading ? 'opacity-60' : ''}`}
+          >
+            {showError ? (
+              <>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.996 5.996 0 0 1-5.65 4c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                </svg>
+                Retry
+              </>
+            ) : showPause ? (
+              <>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                </svg>
+                Pause
+              </>
+            ) : (
+              <>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Play
+              </>
+            )}
+          </button>
+        )
+      })()}
+      {isCurrentPlayerEpisode && error && (
+        <p role="status" className="mt-2 text-sm text-red-500 dark:text-red-400">
+          {episode.audio_type === 'url'
+            ? 'Playback interrupted — the source may be unreachable or blocking playback here. Tap Retry.'
+            : 'Playback interrupted — tap Retry.'}
+        </p>
+      )}
+      {isCurrentPlayerEpisode && loading && !error && (
+        <p role="status" className="mt-2 text-sm text-zinc-400 dark:text-zinc-500">Buffering…</p>
       )}
 
       {guestList.length > 0 && (

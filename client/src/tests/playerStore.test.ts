@@ -28,7 +28,10 @@ const mockEpisode2: Episode = {
 }
 
 beforeEach(() => {
-  usePlayerStore.setState({ episode: null, playing: false, currentTime: 0, duration: 0, speed: 1 })
+  usePlayerStore.setState({
+    episode: null, playing: false, currentTime: 0, duration: 0, speed: 1,
+    loading: false, error: false, retryNonce: 0,
+  })
 })
 
 describe('playerStore', () => {
@@ -96,5 +99,57 @@ describe('playerStore', () => {
   it('setSpeed updates speed', () => {
     usePlayerStore.getState().setSpeed(1.5)
     expect(usePlayerStore.getState().speed).toBe(1.5)
+  })
+
+  describe('loading/error/retry state (issues #82, #83)', () => {
+    it('has loading/error false and retryNonce 0 by default', () => {
+      const state = usePlayerStore.getState()
+      expect(state.loading).toBe(false)
+      expect(state.error).toBe(false)
+      expect(state.retryNonce).toBe(0)
+    })
+
+    it('setLoading toggles loading independently of other state', () => {
+      act(() => usePlayerStore.getState().setLoading(true))
+      expect(usePlayerStore.getState().loading).toBe(true)
+      act(() => usePlayerStore.getState().setLoading(false))
+      expect(usePlayerStore.getState().loading).toBe(false)
+    })
+
+    it('setError toggles error independently of other state', () => {
+      act(() => usePlayerStore.getState().setError(true))
+      expect(usePlayerStore.getState().error).toBe(true)
+    })
+
+    it('setPlaying(false) clears a stale loading flag — pausing cancels the pending play attempt', () => {
+      act(() => {
+        usePlayerStore.getState().setPlaying(true)
+        usePlayerStore.getState().setLoading(true)
+      })
+      act(() => usePlayerStore.getState().setPlaying(false))
+      expect(usePlayerStore.getState().loading).toBe(false)
+      expect(usePlayerStore.getState().playing).toBe(false)
+    })
+
+    it('setPlaying(true) does not touch loading', () => {
+      act(() => usePlayerStore.getState().setLoading(true))
+      act(() => usePlayerStore.getState().setPlaying(true))
+      expect(usePlayerStore.getState().loading).toBe(true)
+    })
+
+    it('retryPlayback increments retryNonce, clears error, and sets loading', () => {
+      act(() => usePlayerStore.getState().setError(true))
+      act(() => usePlayerStore.getState().retryPlayback())
+      const state = usePlayerStore.getState()
+      expect(state.retryNonce).toBe(1)
+      expect(state.error).toBe(false)
+      expect(state.loading).toBe(true)
+    })
+
+    it('retryPlayback increments retryNonce on every call', () => {
+      act(() => usePlayerStore.getState().retryPlayback())
+      act(() => usePlayerStore.getState().retryPlayback())
+      expect(usePlayerStore.getState().retryNonce).toBe(2)
+    })
   })
 })

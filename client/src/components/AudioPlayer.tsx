@@ -27,8 +27,10 @@ interface AudioPlayerProps {
  * a one-time shared-link start time when present.
  */
 export default function AudioPlayer({ sharedStart }: AudioPlayerProps) {
-  const { episode, playing, currentTime, duration, speed, setPlaying, setCurrentTime, setDuration, setSpeed } =
-    usePlayerStore()
+  const {
+    episode, playing, currentTime, duration, speed, loading, error, retryNonce,
+    setPlaying, setCurrentTime, setDuration, setSpeed, setLoading, setError, retryPlayback,
+  } = usePlayerStore()
 
   // Kept fresh on every timeUpdate so the effect below can read "the last
   // known position" from its cleanup without depending on currentTime
@@ -119,12 +121,20 @@ export default function AudioPlayer({ sharedStart }: AudioPlayerProps) {
       duration={duration}
       speed={speed}
       resumeTime={episode ? resumeTimeFor(episode.id) : undefined}
+      loading={loading}
+      error={error}
+      retrySignal={retryNonce}
       onSeek={setCurrentTime}
       onTogglePlay={() => setPlaying(!playing)}
       onSpeedChange={setSpeed}
       onTimeUpdate={handleTimeUpdate}
       onDurationChange={setDuration}
       onEnded={handleEnded}
+      onWaiting={() => setLoading(true)}
+      onPlaybackResumed={() => { setLoading(false); setError(false) }}
+      onPlaybackError={() => { setError(true); setLoading(false) }}
+      onReset={() => { setLoading(false); setError(false) }}
+      onRetry={retryPlayback}
       onHeightChange={px => document.documentElement.style.setProperty('--player-h', `${px}px`)}
     />
   )

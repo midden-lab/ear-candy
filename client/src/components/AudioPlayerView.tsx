@@ -15,6 +15,14 @@ function formatTime(seconds: number, showSign = false): string {
 
 const SPEEDS = [1, 1.5, 2] as const
 
+function RetryIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.996 5.996 0 0 1-5.65 4c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+    </svg>
+  )
+}
+
 interface TransportControlsProps {
   playing: boolean
   onTogglePlay: () => void
@@ -26,14 +34,24 @@ interface TransportControlsProps {
   onCycleSpeed: () => void
   /** Bumps skip/speed touch targets to >=44px for the mobile full-screen overlay. */
   large?: boolean
+  /** True while buffering (native waiting/stalled events) — dims the
+   *  central button but leaves it clickable, so pausing can still cancel a
+   *  slow buffering attempt (issue #82). */
+  loading?: boolean
+  /** True after a real playback failure — swaps the central button to a
+   *  retry action instead of play/pause (issue #83). */
+  error?: boolean
+  onRetry?: () => void
 }
 
 function TransportControls({
   playing, onTogglePlay, onSkipStart, onSkipEnd, onBack15, onForward15, speed, onCycleSpeed, large,
+  loading, error, onRetry,
 }: TransportControlsProps) {
   const btnClass = large
     ? 'flex h-11 w-11 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors'
     : 'rounded p-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors'
+  const isLoading = !!loading && !error
 
   return (
     <div className="flex items-center justify-center gap-3">
@@ -48,11 +66,14 @@ function TransportControls({
         </svg>
       </button>
       <button
-        onClick={onTogglePlay}
-        className="rounded-full bg-[var(--accent)] p-3 text-[var(--accent-contrast)] transition-opacity hover:opacity-90"
-        aria-label={playing ? 'Pause' : 'Play'}
+        onClick={error ? onRetry : onTogglePlay}
+        className={`rounded-full bg-[var(--accent)] p-3 text-[var(--accent-contrast)] transition-opacity hover:opacity-90 ${isLoading ? 'opacity-60' : ''}`}
+        aria-label={error ? 'Retry playback' : (playing ? 'Pause' : 'Play')}
+        aria-busy={isLoading || undefined}
       >
-        {playing ? (
+        {error ? (
+          <RetryIcon size={20} />
+        ) : playing ? (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
           </svg>
@@ -94,6 +115,17 @@ export interface AudioPlayerViewProps {
    *  `episode` changes — never re-applied on later re-renders of the same
    *  episode. Omit/0 for "start from the beginning". */
   resumeTime?: number
+  /** True while the browser is buffering and can't yet fulfil a play()
+   *  attempt (issue #82). */
+  loading?: boolean
+  /** True after a real playback failure (issue #83). */
+  error?: boolean
+  /** Bumped (any change in value) to signal "reload and retry playback now"
+   *  — the actual retry side effect (audio.load()/play()) happens inside
+   *  this component, since only it holds the <audio> ref; the host just
+   *  needs to be able to trigger it from wherever its own retry button
+   *  lives (which may not be this component at all — e.g. DetailPane). */
+  retrySignal?: number
   /** Fired after the view has moved the underlying <audio> element's playhead. */
   onSeek: (time: number) => void
   onTogglePlay: () => void
@@ -101,6 +133,21 @@ export interface AudioPlayerViewProps {
   onTimeUpdate: (time: number) => void
   onDurationChange: (duration: number) => void
   onEnded: () => void
+  /** Native `waiting`/`stalled` — playback attempted but not enough data yet. */
+  onWaiting?: () => void
+  /** Native `playing` — playback actually resumed; clears both loading and error. */
+  onPlaybackResumed?: () => void
+  /** Native `error` — playback genuinely failed. */
+  onPlaybackError?: () => void
+  /** Called once per actual episode swap, before loading the new source —
+   *  lets the host clear any stale loading/error state left over from the
+   *  previous episode. */
+  onReset?: () => void
+  /** Called when a retry action is triggered from within this component
+   *  (the transport button or mini-bar, when in the error state) — maps to
+   *  the host's own retry state action (e.g. bumping the value it later
+   *  passes back in as `retrySignal`). */
+  onRetry?: () => void
   /** The player's own rendered height in px, whenever it changes. Lets a host
    *  layout (e.g. this app's AppShell) reserve exactly enough space below the
    *  fixed player bar — this component makes no assumption about how, or
@@ -118,8 +165,9 @@ export interface AudioPlayerViewProps {
  * management — the host wires it to whatever store it likes.
  */
 export default function AudioPlayerView({
-  episode, playing, currentTime, duration, speed, resumeTime,
-  onSeek, onTogglePlay, onSpeedChange, onTimeUpdate, onDurationChange, onEnded, onHeightChange,
+  episode, playing, currentTime, duration, speed, resumeTime, loading, error, retrySignal,
+  onSeek, onTogglePlay, onSpeedChange, onTimeUpdate, onDurationChange, onEnded,
+  onWaiting, onPlaybackResumed, onPlaybackError, onReset, onRetry, onHeightChange,
 }: AudioPlayerViewProps) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
@@ -139,6 +187,11 @@ export default function AudioPlayerView({
   useEffect(() => {
     const audio = audioRef.current
     if (!audio || !episode) return
+    // Clear any stale loading/error state left over from whatever was
+    // previously loaded — otherwise a listener who hits an error on one
+    // episode, then switches to another, would see the old error message
+    // hanging around on an episode it never actually applied to.
+    onReset?.()
     audio.src = episode.audio_path
     audio.load()
     // Browsers queue a currentTime assignment made before metadata has
@@ -169,6 +222,23 @@ export default function AudioPlayerView({
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = speed
   }, [speed])
+
+  // Reloading and re-attempting play() is the actual retry mechanism — only
+  // this component holds the <audio> ref, so it reacts to `retrySignal`
+  // changing (bumped by whichever button the host's retry action lives
+  // behind) rather than exposing an imperative retry function for callers
+  // to invoke directly (issue #83).
+  const prevRetrySignalRef = useRef(retrySignal)
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !episode) return
+    if (retrySignal !== undefined && retrySignal !== prevRetrySignalRef.current) {
+      prevRetrySignalRef.current = retrySignal
+      audio.load()
+      void audio.play()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retrySignal])
 
   const isFullScreenOverlay = !isDesktop && expanded
 
@@ -211,17 +281,40 @@ export default function AudioPlayerView({
 
   const remaining = currentTime - duration
 
+  // External-URL episodes are the one case where a failure could plausibly
+  // be the source blocking cross-origin playback (CORS) rather than a
+  // generic network hiccup — the browser gives us no way to actually tell
+  // the difference, so this is a best-effort hint, not a diagnosis
+  // (issue #84).
+  const errorMessage = episode.audio_type === 'url'
+    ? 'Playback interrupted — the source may be unreachable or blocking playback here. Tap play to retry.'
+    : 'Playback interrupted — tap play to retry.'
+  const statusMessage = error ? errorMessage : (loading ? 'Buffering…' : null)
+
   const audioEl = (
     <audio
       ref={audioRef}
       onTimeUpdate={() => onTimeUpdate(audioRef.current?.currentTime ?? 0)}
       onDurationChange={() => onDurationChange(audioRef.current?.duration ?? 0)}
       onEnded={onEnded}
+      // `stalled` (fetch unexpectedly stopped making progress) is treated
+      // the same as `waiting` (not enough data buffered to continue) —
+      // both are "still trying, not yet a real failure" (issue #82).
+      // `playing` (native event, not the `playing` prop) fires when
+      // playback actually resumes, clearing both loading and error state.
+      // `error` is a genuine failure (issue #83).
+      onWaiting={() => onWaiting?.()}
+      onStalled={() => onWaiting?.()}
+      onPlaying={() => onPlaybackResumed?.()}
+      onError={() => onPlaybackError?.()}
     />
   )
 
   const transportProps = {
     playing,
+    loading,
+    error,
+    onRetry,
     onTogglePlay,
     onSkipStart: () => skipTo(0),
     onSkipEnd: () => skipTo(duration),
@@ -258,14 +351,20 @@ export default function AudioPlayerView({
           <span
             role="button"
             tabIndex={0}
-            onClick={e => { e.stopPropagation(); onTogglePlay() }}
+            onClick={e => { e.stopPropagation(); if (error) onRetry?.(); else onTogglePlay() }}
             onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); onTogglePlay() }
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation(); e.preventDefault()
+                if (error) onRetry?.(); else onTogglePlay()
+              }
             }}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-contrast)]"
-            aria-label={playing ? 'Pause' : 'Play'}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-contrast)] ${loading && !error ? 'opacity-60' : ''}`}
+            aria-label={error ? 'Retry playback' : (playing ? 'Pause' : 'Play')}
+            aria-busy={(loading && !error) || undefined}
           >
-            {playing ? (
+            {error ? (
+              <RetryIcon size={18} />
+            ) : playing ? (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
               </svg>
@@ -312,6 +411,11 @@ export default function AudioPlayerView({
           />
           <div className="w-full max-w-xs text-center">
             <div className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-100">{episode.title}</div>
+            {statusMessage && (
+              <p role="status" className={`mt-1 text-sm ${error ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                {statusMessage}
+              </p>
+            )}
           </div>
           <div className="w-full max-w-xs space-y-2">
             <ProgressBar currentTime={currentTime} duration={duration} onSeek={handleSeek} />
@@ -341,6 +445,11 @@ export default function AudioPlayerView({
         />
         <div className="min-w-0 flex-1 space-y-2">
           <div className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{episode.title}</div>
+          {statusMessage && (
+            <p role="status" className={`text-xs ${error ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
+              {statusMessage}
+            </p>
+          )}
           <ProgressBar currentTime={currentTime} duration={duration} onSeek={handleSeek} />
           <div className="flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
             <span>{formatTime(currentTime)}</span>
