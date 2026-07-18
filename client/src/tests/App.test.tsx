@@ -30,16 +30,37 @@ vi.mock('../api', () => ({
   updateSettings: vi.fn(),
 }))
 
+// Neutralizes setup.ts's global patch that fires an async `error` event
+// whenever `.src` is set (there to stop EpisodeFormPanel's duration probing
+// from hanging in tests) — without this, any test here that awaits
+// anything after an episode loads (userEvent, findBy*) gives that pending
+// event a chance to fire, flipping the player into its new error/retry
+// state (issue #83) and breaking assertions that have nothing to do with
+// playback errors. Tests that specifically want to exercise the error path
+// fire `error`/`waiting`/`playing` on the <audio> element manually instead.
+function neutralizeAutoMediaError() {
+  Object.defineProperty(HTMLMediaElement.prototype, 'src', {
+    configurable: true,
+    set() {},
+    get() { return '' },
+  })
+}
+
 beforeEach(() => {
   HTMLMediaElement.prototype.load = vi.fn()
   HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
   HTMLMediaElement.prototype.pause = vi.fn()
-  usePlayerStore.setState({ episode: null, playing: false, currentTime: 0, duration: 0 })
+  neutralizeAutoMediaError()
+  usePlayerStore.setState({
+    episode: null, playing: false, currentTime: 0, duration: 0,
+    loading: false, error: false, retryNonce: 0,
+  })
   vi.clearAllMocks()
   // Re-apply HTMLMediaElement mocks after clearAllMocks
   HTMLMediaElement.prototype.load = vi.fn()
   HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
   HTMLMediaElement.prototype.pause = vi.fn()
+  neutralizeAutoMediaError()
 })
 
 it('shows loading initially when settings are pending', () => {

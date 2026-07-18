@@ -77,6 +77,14 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
   const [artUploadError, setArtUploadError] = useState('')
   const [durationSeconds, setDurationSeconds] = useState(episode?.duration_seconds ?? 0)
   const [detectingDuration, setDetectingDuration] = useState(false)
+  // Set when a URL-type episode's duration probe fails at save time — the
+  // most common real-world cause is the external host not allowing
+  // cross-origin (CORS) audio requests, which the browser reports as an
+  // opaque, generic error with no distinguishing detail available to us
+  // (issue #84). A failed probe never blocks saving (see probeAudioDuration's
+  // doc comment), but this is worth surfacing so an admin doesn't publish an
+  // episode that then silently fails to play for every listener.
+  const [probeFailedHint, setProbeFailedHint] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -140,6 +148,7 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
         setDetectingDuration(true)
         const probed = await probeAudioDuration(audioPath)
         setDetectingDuration(false)
+        setProbeFailedHint(probed === 0)
         // A failed probe (0) shouldn't clobber a previously-known-good
         // duration on a simple metadata edit — only adopt it when it
         // actually resolved to something real.
@@ -204,11 +213,18 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
         {audioType === 'url' ? (
           <div>
             <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1" htmlFor="ep-audio-path">Audio URL</label>
-            <input id="ep-audio-path" type="text" value={audioPath} onChange={e => setAudioPath(e.target.value)} required
+            <input id="ep-audio-path" type="text" value={audioPath}
+              onChange={e => { setAudioPath(e.target.value); setProbeFailedHint(false) }} required
               className="w-full rounded bg-zinc-100 dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
             {detectingDuration && <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Detecting duration...</p>}
             {!detectingDuration && durationSeconds > 0 && (
               <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Duration: {formatDuration(durationSeconds)}</p>
+            )}
+            {!detectingDuration && probeFailedHint && (
+              <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                Couldn&apos;t read this URL&apos;s audio — it may not allow cross-origin (CORS) playback, or the host may be
+                unreachable. The episode will still save, but verify playback manually before publishing.
+              </p>
             )}
           </div>
         ) : (

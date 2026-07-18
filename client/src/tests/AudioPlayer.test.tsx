@@ -14,6 +14,17 @@ HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
 HTMLMediaElement.prototype.pause = vi.fn()
 HTMLMediaElement.prototype.load = vi.fn()
 
+// Neutralizes setup.ts's global patch that fires an async `error` event
+// whenever `.src` is set — without this, any test here that awaits
+// anything after an episode loads gives that pending event a chance to
+// fire, flipping into the player store's error/retry state (issue #83)
+// unexpectedly, unrelated to what these resume-position tests assert on.
+Object.defineProperty(HTMLMediaElement.prototype, 'src', {
+  configurable: true,
+  set() {},
+  get() { return '' },
+})
+
 const mockEpisode: Episode = {
   id: 1,
   season_id: 1,
@@ -36,7 +47,10 @@ const mockEpisode: Episode = {
 const otherEpisode: Episode = { ...mockEpisode, id: 2, title: 'Other Episode' }
 
 beforeEach(() => {
-  usePlayerStore.setState({ episode: null, playing: false, currentTime: 0, duration: 120, speed: 1 })
+  usePlayerStore.setState({
+    episode: null, playing: false, currentTime: 0, duration: 120, speed: 1,
+    loading: false, error: false, retryNonce: 0,
+  })
   vi.clearAllMocks()
   localStorage.clear()
 })
@@ -267,5 +281,39 @@ describe('shared-link start time', () => {
     usePlayerStore.setState({ episode: mockEpisode })
     render(<AudioPlayer sharedStart={{ episodeId: 1, time: 75 }} />)
     expect(usePlayerStore.getState().currentTime).toBe(75)
+  })
+})
+
+describe('loading/error/retry wiring to the store (issues #82, #83)', () => {
+  it('native waiting event sets the store loading flag', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true })
+    render(<AudioPlayer />)
+    fireEvent.waiting(document.querySelector('audio')!)
+    expect(usePlayerStore.getState().loading).toBe(true)
+  })
+
+  it('native playing event clears both loading and error', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true, loading: true, error: true })
+    render(<AudioPlayer />)
+    fireEvent.playing(document.querySelector('audio')!)
+    const state = usePlayerStore.getState()
+    expect(state.loading).toBe(false)
+    expect(state.error).toBe(false)
+  })
+
+  it('native error event sets error and clears loading', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true, loading: true })
+    render(<AudioPlayer />)
+    fireEvent.error(document.querySelector('audio')!)
+    const state = usePlayerStore.getState()
+    expect(state.error).toBe(true)
+    expect(state.loading).toBe(false)
+  })
+
+  it('switching episodes clears a stale error from the previous one', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true, error: true })
+    render(<AudioPlayer />)
+    act(() => usePlayerStore.setState({ episode: otherEpisode }))
+    expect(usePlayerStore.getState().error).toBe(false)
   })
 })

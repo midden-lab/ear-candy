@@ -10,6 +10,20 @@ HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
 HTMLMediaElement.prototype.pause = vi.fn()
 HTMLMediaElement.prototype.load = vi.fn()
 
+// Neutralizes setup.ts's global patch that fires an async `error` event
+// whenever `.src` is set (there to stop EpisodeFormPanel's duration probing
+// from hanging in tests) — without this, any test here that awaits
+// anything after an episode loads gives that pending event a chance to
+// fire, flipping into this component's new error/retry state (issue #83)
+// unexpectedly. Tests that specifically want the error/loading/resumed
+// path fire `error`/`waiting`/`stalled`/`playing` on the <audio> element
+// manually instead (see the "loading and error state" describe block).
+Object.defineProperty(HTMLMediaElement.prototype, 'src', {
+  configurable: true,
+  set() {},
+  get() { return '' },
+})
+
 const originalMatchMedia = window.matchMedia
 
 function mockMobile() {
@@ -488,5 +502,143 @@ describe('mobile (< md)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Play' }))
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Collapse now playing' })).not.toBeInTheDocument()
+  })
+})
+
+describe('loading and error state (issues #82, #83)', () => {
+  function baseProps(overrides: Partial<AudioPlayerViewProps> = {}): AudioPlayerViewProps {
+    return {
+      episode: mockEpisode,
+      playing: true,
+      currentTime: 0,
+      duration: 120,
+      speed: 1,
+      onSeek: vi.fn(),
+      onTogglePlay: vi.fn(),
+      onSpeedChange: vi.fn(),
+      onTimeUpdate: vi.fn(),
+      onDurationChange: vi.fn(),
+      onEnded: vi.fn(),
+      ...overrides,
+    }
+  }
+
+  it('shows a Buffering… message and dims the central button while loading', () => {
+    render(<AudioPlayerView {...baseProps({ loading: true })} />)
+    expect(screen.getByText('Buffering…')).toBeInTheDocument()
+    const playBtn = screen.getByRole('button', { name: 'Pause' })
+    expect(playBtn).toHaveClass('opacity-60')
+    expect(playBtn).toHaveAttribute('aria-busy', 'true')
+  })
+
+  it('pausing while loading still works (clicking the dimmed button calls onTogglePlay)', () => {
+    const onTogglePlay = vi.fn()
+    render(<AudioPlayerView {...baseProps({ loading: true, onTogglePlay })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
+    expect(onTogglePlay).toHaveBeenCalled()
+  })
+
+  it('does not show Buffering… when not loading', () => {
+    render(<AudioPlayerView {...baseProps({ loading: false })} />)
+    expect(screen.queryByText('Buffering…')).not.toBeInTheDocument()
+  })
+
+  it('shows a retry affordance instead of Pause/Play when in the error state', () => {
+    const onRetry = vi.fn()
+    render(<AudioPlayerView {...baseProps({ error: true, onRetry })} />)
+    expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument()
+    const retryBtn = screen.getByRole('button', { name: 'Retry playback' })
+    fireEvent.click(retryBtn)
+    expect(onRetry).toHaveBeenCalled()
+  })
+
+  it('shows a generic interrupted message for an upload-type episode error', () => {
+    render(<AudioPlayerView {...baseProps({ error: true, episode: { ...mockEpisode, audio_type: 'upload' } })} />)
+    expect(screen.getByText('Playback interrupted — tap play to retry.')).toBeInTheDocument()
+  })
+
+  it('shows a CORS-aware message for a url-type episode error', () => {
+    render(<AudioPlayerView {...baseProps({ error: true, episode: { ...mockEpisode, audio_type: 'url' } })} />)
+    expect(screen.getByText(/may be unreachable or blocking playback/)).toBeInTheDocument()
+  })
+
+  it('error takes precedence over loading in the status message and button', () => {
+    render(<AudioPlayerView {...baseProps({ error: true, loading: true })} />)
+    expect(screen.queryByText('Buffering…')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry playback' })).toBeInTheDocument()
+  })
+
+  it('fires onWaiting on the native waiting event', () => {
+    const onWaiting = vi.fn()
+    const { container } = render(<AudioPlayerView {...baseProps({ onWaiting })} />)
+    fireEvent.waiting(container.querySelector('audio')!)
+    expect(onWaiting).toHaveBeenCalledTimes(1)
+  })
+
+  it('fires onWaiting on the native stalled event too', () => {
+    const onWaiting = vi.fn()
+    const { container } = render(<AudioPlayerView {...baseProps({ onWaiting })} />)
+    fireEvent.stalled(container.querySelector('audio')!)
+    expect(onWaiting).toHaveBeenCalledTimes(1)
+  })
+
+  it('fires onPlaybackResumed on the native playing event', () => {
+    const onPlaybackResumed = vi.fn()
+    const { container } = render(<AudioPlayerView {...baseProps({ onPlaybackResumed })} />)
+    fireEvent.playing(container.querySelector('audio')!)
+    expect(onPlaybackResumed).toHaveBeenCalledTimes(1)
+  })
+
+  it('fires onPlaybackError on the native error event', () => {
+    const onPlaybackError = vi.fn()
+    const { container } = render(<AudioPlayerView {...baseProps({ onPlaybackError })} />)
+    fireEvent.error(container.querySelector('audio')!)
+    expect(onPlaybackError).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls onReset once per actual episode swap', () => {
+    const onReset = vi.fn()
+    const { rerender } = render(<AudioPlayerView {...baseProps({ onReset })} />)
+    expect(onReset).toHaveBeenCalledTimes(1)
+    const other: Episode = { ...mockEpisode, id: 2, title: 'Other Episode' }
+    rerender(<AudioPlayerView {...baseProps({ onReset, episode: other })} />)
+    expect(onReset).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not call onReset again on a re-render of the same episode', () => {
+    const onReset = vi.fn()
+    const { rerender } = render(<AudioPlayerView {...baseProps({ onReset, currentTime: 0 })} />)
+    expect(onReset).toHaveBeenCalledTimes(1)
+    rerender(<AudioPlayerView {...baseProps({ onReset, currentTime: 5 })} />)
+    expect(onReset).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloads and re-plays the audio element when retrySignal changes', () => {
+    const loadCallsBefore = (HTMLMediaElement.prototype.load as ReturnType<typeof vi.fn>).mock.calls.length
+    const playCallsBefore = (HTMLMediaElement.prototype.play as ReturnType<typeof vi.fn>).mock.calls.length
+    const { rerender } = render(<AudioPlayerView {...baseProps({ retrySignal: 0 })} />)
+    rerender(<AudioPlayerView {...baseProps({ retrySignal: 1 })} />)
+    expect((HTMLMediaElement.prototype.load as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(loadCallsBefore)
+    expect((HTMLMediaElement.prototype.play as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(playCallsBefore)
+  })
+
+  it('does not reload on a re-render where retrySignal is unchanged', () => {
+    const { rerender } = render(<AudioPlayerView {...baseProps({ retrySignal: 3, currentTime: 0 })} />)
+    const loadCallsBefore = (HTMLMediaElement.prototype.load as ReturnType<typeof vi.fn>).mock.calls.length
+    rerender(<AudioPlayerView {...baseProps({ retrySignal: 3, currentTime: 10 })} />)
+    expect((HTMLMediaElement.prototype.load as ReturnType<typeof vi.fn>).mock.calls.length).toBe(loadCallsBefore)
+  })
+
+  it('mini-bar reflects loading and error state too', () => {
+    mockMobile()
+    const { rerender } = render(<AudioPlayerView {...baseProps({ loading: true })} />)
+    expect(screen.getByRole('button', { name: 'Pause' })).toHaveClass('opacity-60')
+
+    const onRetry = vi.fn()
+    rerender(<AudioPlayerView {...baseProps({ error: true, onRetry })} />)
+    const retryBtn = screen.getByRole('button', { name: 'Retry playback' })
+    fireEvent.click(retryBtn)
+    expect(onRetry).toHaveBeenCalled()
+    window.matchMedia = originalMatchMedia
   })
 })

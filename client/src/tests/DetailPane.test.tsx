@@ -131,3 +131,50 @@ describe('play/pause button', () => {
     expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument()
   })
 })
+
+describe('loading/error/retry state (issues #82, #83, #84)', () => {
+  it('dims the button and shows Buffering… only when this episode is the one loading', () => {
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} playing={true} loading={true} onPlayPause={() => {}} />)
+    expect(screen.getByText('Buffering…')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pause episode' })).toHaveClass('opacity-60')
+  })
+
+  it('does not show Buffering… when a different episode is loading (not this one)', () => {
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={false} loading={true} onPlayPause={() => {}} />)
+    expect(screen.queryByText('Buffering…')).not.toBeInTheDocument()
+  })
+
+  it('shows Retry instead of Pause/Play when this episode is the one erroring', () => {
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} playing={true} error={true} onPlayPause={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Retry episode' })).toBeInTheDocument()
+    expect(screen.getByText('Retry')).toBeInTheDocument()
+    expect(screen.queryByText('Pause')).not.toBeInTheDocument()
+  })
+
+  it('calls onRetry (not onPlayPause) when clicked in the error state', async () => {
+    const user = userEvent.setup()
+    const onPlayPause = vi.fn()
+    const onRetry = vi.fn()
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} error={true} onPlayPause={onPlayPause} onRetry={onRetry} />)
+    await user.click(screen.getByRole('button', { name: 'Retry episode' }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+    expect(onPlayPause).not.toHaveBeenCalled()
+  })
+
+  it('does not show the error state for a different episode than the one erroring', () => {
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={false} error={true} onPlayPause={() => {}} />)
+    expect(screen.getByText('Play')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Retry episode' })).not.toBeInTheDocument()
+  })
+
+  it('shows a CORS-aware hint for a url-type episode error', () => {
+    const urlEpisode = { ...mockEpisode, audio_type: 'url' as const }
+    render(<DetailPane episode={urlEpisode} seasons={seasons} isCurrentPlayerEpisode={true} error={true} onPlayPause={() => {}} />)
+    expect(screen.getByText(/may be unreachable or blocking playback/)).toBeInTheDocument()
+  })
+
+  it('shows a generic message for an upload-type episode error', () => {
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} error={true} onPlayPause={() => {}} />)
+    expect(screen.getByText('Playback interrupted — tap Retry.')).toBeInTheDocument()
+  })
+})
