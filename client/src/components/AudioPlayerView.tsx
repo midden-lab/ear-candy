@@ -3,6 +3,8 @@ import type { Episode } from '../types'
 import ProgressBar from './ProgressBar'
 import EpisodeCoverArt from './EpisodeCoverArt'
 import ShareDialog from './ShareDialog'
+import PlaybackStatusLine from './PlaybackStatusLine'
+import { getPlaybackStatus } from '../utils/playbackStatus'
 import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 
 function formatTime(seconds: number, showSign = false): string {
@@ -281,15 +283,7 @@ export default function AudioPlayerView({
 
   const remaining = currentTime - duration
 
-  // External-URL episodes are the one case where a failure could plausibly
-  // be the source blocking cross-origin playback (CORS) rather than a
-  // generic network hiccup — the browser gives us no way to actually tell
-  // the difference, so this is a best-effort hint, not a diagnosis
-  // (issue #84).
-  const errorMessage = episode.audio_type === 'url'
-    ? 'Playback interrupted — the source may be unreachable or blocking playback here. Tap play to retry.'
-    : 'Playback interrupted — tap play to retry.'
-  const statusMessage = error ? errorMessage : (loading ? 'Buffering…' : null)
+  const playbackStatus = getPlaybackStatus(episode, { loading, error })
 
   const audioEl = (
     <audio
@@ -411,11 +405,7 @@ export default function AudioPlayerView({
           />
           <div className="w-full max-w-xs text-center">
             <div className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-100">{episode.title}</div>
-            {statusMessage && (
-              <p role="status" className={`mt-1 text-sm ${error ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
-                {statusMessage}
-              </p>
-            )}
+            <PlaybackStatusLine status={playbackStatus} className="mt-1" />
           </div>
           <div className="w-full max-w-xs space-y-2">
             <ProgressBar currentTime={currentTime} duration={duration} onSeek={handleSeek} />
@@ -445,11 +435,7 @@ export default function AudioPlayerView({
         />
         <div className="min-w-0 flex-1 space-y-2">
           <div className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{episode.title}</div>
-          {statusMessage && (
-            <p role="status" className={`text-xs ${error ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
-              {statusMessage}
-            </p>
-          )}
+          <PlaybackStatusLine status={playbackStatus} size="xs" />
           <ProgressBar currentTime={currentTime} duration={duration} onSeek={handleSeek} />
           <div className="flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
             <span>{formatTime(currentTime)}</span>
