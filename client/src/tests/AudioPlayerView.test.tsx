@@ -543,6 +543,17 @@ describe('loading and error state (issues #82, #83)', () => {
     expect(screen.queryByText('Buffering…')).not.toBeInTheDocument()
   })
 
+  it('reserves status-line space even with no status, so the progress bar/controls below never shift as buffering starts/ends', () => {
+    // Regression test for a real reported bug: the status line used to be
+    // conditionally rendered, so the progress bar and transport controls
+    // below it visibly jumped down when buffering started and back up when
+    // it ended. It must always be present in the DOM (just invisible).
+    render(<AudioPlayerView {...baseProps({ loading: false, error: false })} />)
+    const status = screen.getByRole('status')
+    expect(status).toBeInTheDocument()
+    expect(status).toHaveClass('opacity-0')
+  })
+
   it('shows a retry affordance instead of Pause/Play when in the error state', () => {
     const onRetry = vi.fn()
     render(<AudioPlayerView {...baseProps({ error: true, onRetry })} />)
@@ -554,7 +565,7 @@ describe('loading and error state (issues #82, #83)', () => {
 
   it('shows a generic interrupted message for an upload-type episode error', () => {
     render(<AudioPlayerView {...baseProps({ error: true, episode: { ...mockEpisode, audio_type: 'upload' } })} />)
-    expect(screen.getByText('Playback interrupted — tap play to retry.')).toBeInTheDocument()
+    expect(screen.getByText('Playback interrupted — tap retry.')).toBeInTheDocument()
   })
 
   it('shows a CORS-aware message for a url-type episode error', () => {
