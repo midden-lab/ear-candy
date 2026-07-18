@@ -2,6 +2,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 import { vi, beforeEach, describe } from 'vitest'
 import { usePlayerStore } from '../store/playerStore'
 import AudioPlayer from '../components/AudioPlayer'
+import { getEpisodeProgress } from '../utils/episodeProgress'
 import type { Episode } from '../types'
 
 // Full behavioral coverage (mini-bar, expand/collapse, transport controls,
@@ -135,6 +136,87 @@ describe('per-episode resume position', () => {
     usePlayerStore.setState({ episode: mockEpisode })
     render(<AudioPlayer />)
     expect(usePlayerStore.getState().currentTime).toBe(0)
+  })
+
+  // The periodic save fires on any timeUpdate crossing 5s of movement from
+  // the last-persisted value — including the very first tick, since it
+  // starts at 0. To actually isolate the *eager* save (not just observe the
+  // periodic one that would happen anyway), each test below first "uses up"
+  // the periodic save with an initial tick, then moves the position again by
+  // less than 5s (so the periodic path stays silent) before triggering the
+  // event under test — only the eager path can be responsible for the final
+  // persisted value differing from the first tick's (issue #85).
+  describe('eager save on disconnect/tab-close', () => {
+    function setAudioTime(seconds: number) {
+      const audio = document.querySelector('audio')!
+      Object.defineProperty(audio, 'currentTime', { value: seconds, configurable: true })
+      fireEvent.timeUpdate(audio)
+    }
+
+    // Reading localStorage directly (rather than unmounting and remounting
+    // to observe the resumed value) avoids a confound: unmounting always
+    // re-persists the latest position via the pre-existing switch-away
+    // cleanup, which would mask whether the eager-save path under test here
+    // actually did anything.
+    it('persists immediately when the tab becomes hidden', () => {
+      usePlayerStore.setState({ episode: mockEpisode, playing: true })
+      render(<AudioPlayer />)
+      setAudioTime(20) // periodic tick persists 20
+      setAudioTime(22) // +2, below the periodic threshold — not yet persisted
+
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+      act(() => document.dispatchEvent(new Event('visibilitychange')))
+
+      expect(getEpisodeProgress(mockEpisode.id)).toBe(22)
+    })
+
+    it('does not eagerly persist when the tab becomes visible again', () => {
+      usePlayerStore.setState({ episode: mockEpisode, playing: true })
+      render(<AudioPlayer />)
+      setAudioTime(20) // periodic tick persists 20
+      setAudioTime(22) // +2, below the periodic threshold — not yet persisted
+
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+      act(() => document.dispatchEvent(new Event('visibilitychange')))
+
+      // Only the periodic tick's value (20) should have been persisted —
+      // a 'visible' transition must not trigger the eager-save path.
+      expect(getEpisodeProgress(mockEpisode.id)).toBe(20)
+    })
+
+    it('persists immediately on pagehide', () => {
+      usePlayerStore.setState({ episode: mockEpisode, playing: true })
+      render(<AudioPlayer />)
+      setAudioTime(20)
+      setAudioTime(22)
+
+      act(() => window.dispatchEvent(new Event('pagehide')))
+
+      expect(getEpisodeProgress(mockEpisode.id)).toBe(22)
+    })
+
+    it('persists immediately when the browser goes offline', () => {
+      usePlayerStore.setState({ episode: mockEpisode, playing: true })
+      render(<AudioPlayer />)
+      setAudioTime(20)
+      setAudioTime(22)
+
+      act(() => window.dispatchEvent(new Event('offline')))
+
+      expect(getEpisodeProgress(mockEpisode.id)).toBe(22)
+    })
+
+    it('does not persist on hide once the episode has already ended', () => {
+      usePlayerStore.setState({ episode: mockEpisode, playing: true })
+      render(<AudioPlayer />)
+      setAudioTime(90)
+      act(() => fireEvent.ended(document.querySelector('audio')!))
+
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+      act(() => document.dispatchEvent(new Event('visibilitychange')))
+
+      expect(getEpisodeProgress(mockEpisode.id)).toBeUndefined()
+    })
   })
 })
 

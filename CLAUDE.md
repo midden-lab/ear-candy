@@ -50,8 +50,8 @@ All commands should be run from the repo root unless noted.
 
 **Per-package commands:**
 
-- **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 115 tests), `npm run lint` (eslint)
-- **Client:** `cd client && npm run dev` (vite), `npm test` (vitest + jsdom, 273 tests + 3 skipped), `npm run lint` (eslint), `npm run typecheck` (tsc --noEmit)
+- **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 166 tests), `npm run lint` (eslint)
+- **Client:** `cd client && npm run dev` (vite), `npm test` (vitest + jsdom, 282 tests + 3 skipped), `npm run lint` (eslint), `npm run typecheck` (tsc --noEmit)
 - **E2E:** `cd e2e && npm test` (playwright, 48 tests, 2 skipped outside CI's production-image run), `npm run test:ui` (playwright --ui) — prefer `make e2e`/`make e2e-ui` (see note above)
 
 ---
@@ -119,7 +119,7 @@ ear-candy/
 │   │       ├── validation.ts   # isValidMediaPath and friends (accepts /audio/, /images/, http(s) URLs)
 │   │       └── crawler.ts      # isKnownCrawler, renderEpisodeOgHtml — OG tags for shared-link preview bots
 │   ├── scripts/                # One-off maintenance scripts (see Docker & Deployment gotchas)
-│   ├── tests/                  # Vitest tests (node env, globals), 115 tests
+│   ├── tests/                  # Vitest tests (node env, globals), 166 tests
 │   │   └── helpers.ts          # buildTestApp(), buildTestDb()
 │   └── data/                   # SQLite DB + uploads (gitignored)
 │
@@ -145,7 +145,7 @@ ear-candy/
 │   │   │   ├── AdminLogin.tsx
 │   │   │   └── admin/          # AdminLayout (session check on mount), EpisodeManager, EpisodeFormPanel,
 │   │   │                       # SeasonBlock, AdminSettings
-│   │   └── tests/              # Vitest tests (jsdom env, globals), 273 tests + 3 skipped
+│   │   └── tests/              # Vitest tests (jsdom env, globals), 282 tests + 3 skipped
 │   │       └── setup.ts        # localStorage/matchMedia/ResizeObserver/Audio mocks + jest-dom
 │   ├── vite.config.ts          # Vite + proxy /api, /audio, and /images to server
 │   └── tailwind.config.ts      # darkMode: 'class'
@@ -195,7 +195,7 @@ ear-candy/
 
 ## Testing Approach
 
-### Server Tests (`server/tests/`) — 115 tests
+### Server Tests (`server/tests/`) — 166 tests
 
 - **Runner:** Vitest with `environment: 'node'`, `globals: true`.
 - **Test DB:** `:memory:` SQLite via `buildTestApp()` helper (`tests/helpers.ts`).
@@ -203,7 +203,7 @@ ear-candy/
 - **Auth in tests:** Tests that need admin auth set `process.env.ADMIN_PASSWORD_HASH` to a bcrypt hash, then call login to get a cookie, and pass it in headers.
 - **Cleanup:** `afterEach` often deletes `process.env.ADMIN_PASSWORD_HASH` to avoid cross-test pollution.
 
-### Client Tests (`client/src/tests/`) — 273 tests + 3 skipped
+### Client Tests (`client/src/tests/`) — 282 tests + 3 skipped
 
 - **Runner:** Vitest with `environment: 'jsdom'`, `globals: true`.
 - **Setup file:** `client/src/tests/setup.ts` mocks `localStorage` (Node v22+ native localStorage breaks without a valid file path), `matchMedia`, `ResizeObserver`, `URL.createObjectURL`/`revokeObjectURL`, and patches `HTMLMediaElement.prototype.src` to fire an async `error` event by default (jsdom never fires real media load events on its own — this stops anything awaiting audio duration probing from hanging forever). Also imports `@testing-library/jest-dom`.
@@ -255,6 +255,7 @@ ear-candy/
 15. **PATCH vs PUT on episodes/settings:** `PUT` fully replaces all fields (except defaults). `PATCH` dynamically builds `SET` clauses from the request body, validated against an allowlist (`ALLOWED_*_PATCH_FIELDS`) as a SQL-injection guard against arbitrary field names. Both always update `updated_at = datetime('now')`.
 16. **Boolean serialization:** The DB stores `hidden` as `INTEGER` (0/1). In `PATCH`/`PUT` handlers, `hidden` is explicitly converted: `hidden ? 1 : 0` before writing to DB.
 17. **Upload endpoints return a path string.** `POST /api/admin/upload` (audio) returns `{ path: "/audio/{uuid}.ext" }`. `POST /api/admin/upload/image` (cover art) returns `{ thumb, detail }` paths under `/images/`. `POST /api/admin/upload/favicon` returns `{ path: "/images/favicon-{uuid}.ext" }`. `isValidMediaPath` (`utils/validation.ts`) accepts both `/audio/` and `/images/` prefixes plus http(s) URLs.
+17a. **HTTP Range requests (206 Partial Content) on `/audio/` work via `@fastify/static`'s default behavior — confirmed, not assumed.** No special config was added to enable this (issue #86); `@fastify/static` v10 handles `Range` headers out of the box. `server/tests/audio-range.test.ts` locks in that behavior with real byte-range assertions (200 without a `Range` header, 206 with `Content-Range` for a bounded/open-ended range, 416 for a range past EOF) — this is load-bearing for efficient seeking and mobile data usage, so treat any future `@fastify/static` version bump or config change to the `/audio/` registration in `app.ts` as needing this test re-run, not just the rest of the suite.
 18. **Episode duration is auto-detected client-side, not server-validated.** `duration_seconds` used to always be `0` because nothing ever set it — the admin form now probes the real audio file/URL in the browser on save (see Client gotchas) and sends the detected value. The server just stores whatever `duration_seconds` it's given (validated only as "not negative").
 18a. **Audio/favicon uploads are validated by magic bytes, not just extension/mimetype.** Both are client-supplied and trivially spoofable. `server/src/utils/magicBytes.ts`'s `peekHeader()` consumes just enough of the multipart stream to inspect the leading bytes (12 bytes covers every signature, since ISOBMFF/`m4a` needs the `ftyp` box type at offset 4-7), then returns a replay stream so the rest of the upload can still be piped to disk without buffering the whole thing in memory. `routes/admin/upload.ts` and `upload-favicon.ts` both reject with 400 if the real content doesn't match a recognized signature for the claimed extension (issue #38) — cover art upload (`upload-image.ts`) is unaffected since `sharp` already fails hard on non-image input there.
 
@@ -315,6 +316,7 @@ ear-candy/
 41. **`DetailPane`'s Play/Pause button has a distinct `aria-label`** (`"Play episode"`/`"Pause episode"`) from its visible text (`"Play"`/`"Pause"`) — deliberately, because the player bar's own transport button also has accessible name `"Play"`/`"Pause"`, and once both are mounted simultaneously (the viewed episode is also the one loaded/playing), an identical accessible name on two different buttons is a real ambiguity, not just a test-locator nuisance (`getByRole('button', { name: 'Pause' })` resolving to 2 elements is exactly the bug this fixed — hit for real when adding e2e coverage for this feature).
 42. **Deep links are one-directional URL syncing, not routing.** `App.tsx` parses `?episode=X&t=Y` once at boot (see `utils/shareUrl.ts` for the encode side); `EpisodeList.tsx` writes `?episode=` back via `history.replaceState` (never `pushState`) on every episode view. There is deliberately no `popstate` listener — since nothing ever calls `pushState`, there's no per-episode browser-history entry to go back/forward to, so this isn't a missing feature so much as a non-goal; verified empirically (`window.history.length` doesn't grow across episode switches). If `pushState`-based back/forward navigation is ever added, a `popstate` listener re-running the same boot-time deep-link resolution logic would be needed.
 43. **Shared-timestamp precedence: the listener's own progress always wins once it exists.** `AudioPlayer.tsx`'s `resumeTimeFor` prefers `getEpisodeProgress(id)` (local saved position) over a shared link's `t` — a shared timestamp only applies the *first* time that episode is loaded with no prior local progress. This needs no explicit "already consumed" flag; once any real listening happens (or the episode finishes, which clears saved progress via `handleEnded`), the ordinary resume-position logic takes over naturally.
+43a. **Resume position saves eagerly on tab-hide/close/disconnect, not just the periodic 5s tick.** `AudioPlayer.tsx` has a second effect (separate from the resume/cleanup effect above) that listens for `visibilitychange` (hidden only), `pagehide`, and `offline`, persisting `currentTimeRef.current` immediately when any fires (issue #85) — without this, a real network drop or closed tab could lose up to 5s of position, since the normal periodic save only writes when `timeUpdate` reports the position has moved ≥5s since the last write. Guarded by the same `endedRef` the cleanup effect already uses, so it won't resurrect a just-cleared position if the episode finished right before the tab was hidden. Testing note: isolate this from the periodic tick's own save (which already fires on the very first `timeUpdate` past 5s, since it starts counting from 0) by moving the position twice — once to "use up" the periodic save, then a second small move under the 5s threshold — before asserting only the eager path could be responsible for the final persisted value.
 44. **Server-rendered Open Graph tags for shared links only exist in production's single-container mode.** `server/src/app.ts`'s crawler-detection `onRequest` hook (backing `server/src/utils/crawler.ts`) is registered only inside the `if (clientDist && fs.existsSync(clientDist))` block — inert in dev's split client/server topology, active only when `SERVE_CLIENT=true`. It's scoped to exactly `/` (checked via `req.url.split('?')[0] !== '/'`) so a crawler-UA-flavored request to any other route (e.g. an API endpoint) can't be accidentally short-circuited into an OG-HTML response. `og:image` is resolved to an absolute URL (`${req.protocol}://${req.hostname}${path}`) before being emitted — cover art paths are stored/returned as site-relative paths, and the Open Graph spec requires an absolute `og:image` or link-preview unfurlers silently show no image at all (a real bug caught in a pre-production review, not a hypothetical).
 45. **`og:url`'s origin trusts the request's `Host` header by default — an optional `PUBLIC_ORIGIN` env var pins it instead (issue #53).** `req.hostname` is attacker-controllable input (the `Host`/`X-Forwarded-Host` header), reflected — HTML-escaped, so not script-injectable — into the crawler-served OG response. This was a real (low-severity, escaped, metadata-only) open-redirect-flavored issue when the response also included a `<meta http-equiv="refresh">` pointing at that same attacker-controlled origin; the refresh tag has since been removed entirely (it was genuinely non-essential — bots read `<meta>` tags, they don't follow refreshes — so removing it was strictly safer, not a feature cut). `server/src/utils/crawler.ts`'s `resolveConfiguredOrigin` validates `process.env.PUBLIC_ORIGIN` (must be a bare `scheme://host[:port]`, no path, no trailing slash) and, if set and well-formed, `app.ts`'s crawler hook uses it instead of `${req.protocol}://${req.hostname}` — malformed or unset values fall straight back to the request-derived origin rather than crashing on a typo'd env var.
 46. **`e2e/tests/sharing.spec.ts`'s OG-tag crawler tests are gated on `!process.env.BASE_URL`, not `!process.env.CI`.** Per gotcha #44, crawler OG rendering only exists in the production single-container build — CI's `e2e` job always explicitly sets `BASE_URL=http://localhost:3000` (the running production image) while local `make e2e` never sets it (defaults to the dev client's `:5173`), so that's a direct, reliable signal for "is the crawler hook even reachable here" rather than a proxy for it (issue #51). The two share-flow tests (deep-link round-trip through the real UI) run everywhere and don't need this gate.
@@ -336,7 +338,7 @@ This is convention, not a technical enforcement: GitHub branch protection rules 
 Jobs run in this order:
 
 1. `lint` — ESLint on server + client (parallel with `test`/`typecheck`)
-2. `test` — Vitest server (115 tests) + client (273 tests + 3 skipped)
+2. `test` — Vitest server (166 tests) + client (282 tests + 3 skipped)
 3. `typecheck` — `tsc --noEmit` on client
 4. `build` — builds the root `Dockerfile` image, pushes to GHCR (needs lint+test+typecheck)
 5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright (48 tests, including 2 production-image-only OG-tag crawler tests that BASE_URL-gate-skip everywhere else) against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit). Capped at `timeout-minutes: 15` (healthy runs take ~4-6 min) so a genuine hang (browser/network stall) fails fast instead of silently running for hours. Invoked directly as `npx playwright test`, not `npm test` — the npm wrapper was found to buffer all output until the child process exits normally, which hid a real ~20-minute cascading test failure behind what looked like total silence.
