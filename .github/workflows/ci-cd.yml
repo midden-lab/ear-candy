@@ -356,6 +356,17 @@ jobs:
             docker stop ear-candy || true
             docker rm ear-candy || true
 
+            # The container now runs as the image's built-in non-root `node`
+            # user (uid/gid 1000), not root (issue #36) — the bind-mounted
+            # host directory must be owned by that same uid or the app can't
+            # write its DB/uploads. Safe to run on every deploy (a no-op
+            # once already correct); done after stopping the old (root)
+            # container and before starting the new one, so there's no
+            # window where a running container's own writes could race
+            # against the ownership change.
+            echo "Ensuring data directory ownership matches the container's non-root user..."
+            chown -R 1000:1000 /opt/ear-candy/data
+
             echo "Starting new container..."
             # TRUSTED_PROXY_IPS: 172.17.0.1 is this Droplet's default Docker
             # bridge gateway — Caddy runs on the host and reverse-proxies to
