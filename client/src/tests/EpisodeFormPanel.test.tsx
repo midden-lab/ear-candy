@@ -232,6 +232,59 @@ describe('duration auto-detection', () => {
     })
   })
 
+  it('shows a CORS-aware hint when a URL-type probe fails at save time (issue #84)', async () => {
+    render(<EpisodeFormPanel seasonId={1} onSave={vi.fn()} onCancel={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText(/title/i), 'New Ep')
+    await userEvent.type(screen.getByLabelText(/episode #/i), '1')
+    await userEvent.type(screen.getByLabelText(/publish date/i), '2024-01-01')
+    await userEvent.type(screen.getByLabelText(/audio url/i), 'http://example.com/unreachable.mp3')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(fakeAudioInstances).toHaveLength(1))
+    fakeAudioInstances[0].emit('error')
+
+    await waitFor(() => {
+      expect(screen.getByText(/may not allow cross-origin/)).toBeInTheDocument()
+    })
+  })
+
+  it('clears the CORS hint once the URL is edited again', async () => {
+    render(<EpisodeFormPanel seasonId={1} onSave={vi.fn()} onCancel={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText(/title/i), 'New Ep')
+    await userEvent.type(screen.getByLabelText(/episode #/i), '1')
+    await userEvent.type(screen.getByLabelText(/publish date/i), '2024-01-01')
+    await userEvent.type(screen.getByLabelText(/audio url/i), 'http://example.com/unreachable.mp3')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(fakeAudioInstances).toHaveLength(1))
+    fakeAudioInstances[0].emit('error')
+    await waitFor(() => {
+      expect(screen.getByText(/may not allow cross-origin/)).toBeInTheDocument()
+    })
+
+    await userEvent.type(screen.getByLabelText(/audio url/i), '2')
+    expect(screen.queryByText(/may not allow cross-origin/)).not.toBeInTheDocument()
+  })
+
+  it('does not show the CORS hint when the probe succeeds', async () => {
+    render(<EpisodeFormPanel seasonId={1} onSave={vi.fn()} onCancel={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText(/title/i), 'New Ep')
+    await userEvent.type(screen.getByLabelText(/episode #/i), '1')
+    await userEvent.type(screen.getByLabelText(/publish date/i), '2024-01-01')
+    await userEvent.type(screen.getByLabelText(/audio url/i), 'http://example.com/a.mp3')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(fakeAudioInstances).toHaveLength(1))
+    fakeAudioInstances[0].duration = 90
+    fakeAudioInstances[0].emit('loadedmetadata')
+
+    await waitFor(() => {
+      expect(mockCreateEpisode).toHaveBeenCalled()
+    })
+    expect(screen.queryByText(/may not allow cross-origin/)).not.toBeInTheDocument()
+  })
+
   it('a failed re-probe on edit does not clobber a previously-known-good duration', async () => {
     render(<EpisodeFormPanel seasonId={1} episode={{ ...episode, duration_seconds: 200, audio_path: 'http://example.com/existing.mp3' }} onSave={vi.fn()} onCancel={vi.fn()} />)
 

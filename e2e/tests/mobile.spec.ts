@@ -70,7 +70,15 @@ test.describe('Mobile listener UI (< md)', () => {
     await expect(page.getByRole('button', { name: 'Collapse now playing' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Skip to start' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Back 15 seconds' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible()
+    // Also accepts "Retry playback": the seeded episode's stub audio URL is
+    // a real network resource a real browser can legitimately error on
+    // (issue #83's real error handling) — the delay from expanding the
+    // overlay is enough time for that race to resolve either way. Either
+    // state proves this is a real, tappable central transport control,
+    // which is what "all controls tappable" is actually testing here.
+    const centralControl = page.getByRole('button', { name: 'Pause', exact: true })
+      .or(page.getByRole('button', { name: 'Retry playback' }))
+    await expect(centralControl).toBeVisible()
     await expect(page.getByRole('button', { name: 'Forward 15 seconds' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Skip to end' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Playback speed' })).toBeVisible()

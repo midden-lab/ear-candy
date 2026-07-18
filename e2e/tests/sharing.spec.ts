@@ -27,7 +27,14 @@ test.describe('Episode sharing', () => {
     await expect(playerBar).toContainText('Deep Dive')
     // Deep links load the episode ready-to-play but paused — the shared
     // link never auto-plays (App.tsx's boot-time deep-link resolution).
-    await expect(playerBar.getByRole('button', { name: 'Play', exact: true })).toBeVisible()
+    // Asserting "not Pause" rather than "is Play" specifically: the stub
+    // audio URL (example.com) is a real, if fake, network resource, and a
+    // real browser can now legitimately fire a native `error` event for it
+    // even without ever pressing Play (issue #83 wires up real error
+    // handling) — timing-dependent on how fast that fires, the button may
+    // read "Play" or "Retry playback" by the time this assertion runs, but
+    // it must never read "Pause" (that would mean it auto-played).
+    await expect(playerBar.getByRole('button', { name: 'Pause' })).not.toBeVisible()
   })
 
   test('visiting a shared link for an episode not in the default season still loads it', async ({ seededPage: page, request }) => {
@@ -39,7 +46,10 @@ test.describe('Episode sharing', () => {
 
     const playerBar = page.getByTestId('player-bar')
     await expect(playerBar).toContainText('Panel Discussion')
-    await expect(playerBar.getByRole('button', { name: 'Play', exact: true })).toBeVisible()
+    // See the comment on the equivalent assertion above — the stub audio
+    // URL can legitimately error before this runs (issue #83), so this
+    // only asserts "didn't auto-play", not "shows exactly Play".
+    await expect(playerBar.getByRole('button', { name: 'Pause' })).not.toBeVisible()
   })
 })
 

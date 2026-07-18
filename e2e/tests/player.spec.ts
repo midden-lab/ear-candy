@@ -26,7 +26,16 @@ test.describe('Audio Player', () => {
     // a distinct accessible name ("Pause episode") specifically so it never
     // collides with the player bar's icon-only "Pause" button once both are
     // on screen at once.
-    await expect(page.getByTestId('player-bar').getByRole('button', { name: 'Pause' })).toBeVisible()
+    //
+    // Also accepts "Retry playback": the seeded episode's stub audio URL
+    // (https://example.com/...) is a real network resource, and a real
+    // browser can legitimately fire a native `error` event for it — issue
+    // #83 wires up real error handling, so this races against how fast
+    // that fires. Either state proves the click actually started a real
+    // playback attempt (not nothing), which is what this test checks.
+    const playerBarCentral = page.getByTestId('player-bar').getByRole('button', { name: 'Pause' })
+      .or(page.getByTestId('player-bar').getByRole('button', { name: 'Retry playback' }))
+    await expect(playerBarCentral).toBeVisible()
     await expect(page.getByRole('button', { name: 'Play', exact: true })).not.toBeVisible()
   })
 

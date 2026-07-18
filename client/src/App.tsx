@@ -41,6 +41,8 @@ export default function App() {
   const [viewingEpisode, setViewingEpisode] = useState<Episode | null>(null)
   const playerEpisode = usePlayerStore(s => s.episode)
   const playing = usePlayerStore(s => s.playing)
+  const playerLoading = usePlayerStore(s => s.loading)
+  const playerError = usePlayerStore(s => s.error)
   const [sharedStart, setSharedStart] = useState<SharedStart | undefined>(undefined)
 
   const { isDark, toggleDark } = useTheme(settings?.accent_color ?? '#5a3ef5')
@@ -225,7 +227,10 @@ export default function App() {
           seasons={seasons}
           isCurrentPlayerEpisode={playerEpisode?.id === viewingEpisode?.id}
           playing={playing}
+          loading={playerLoading}
+          error={playerError}
           onPlayPause={() => viewingEpisode && handlePlayEpisode(viewingEpisode)}
+          onRetry={() => usePlayerStore.getState().retryPlayback()}
           onBack={() => setFocusedPane('list')}
         />
       }
