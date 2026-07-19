@@ -24,6 +24,12 @@ docker --version
 # --- Step 3: Create data directory ---
 echo "Creating data directory..."
 mkdir -p /opt/ear-candy/data/uploads
+# uid/gid 1000 matches the non-root `node` user the production image runs
+# as (issue #36) — the deploy job also re-asserts this on every deploy,
+# but setting it correctly here means a fresh droplet's first deploy
+# doesn't depend on that being the very first thing that touches this
+# directory.
+chown -R 1000:1000 /opt/ear-candy/data
 
 # --- Step 4: Install Caddy ---
 echo "Installing Caddy..."
