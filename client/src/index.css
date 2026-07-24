@@ -9,6 +9,12 @@
      <main> padding-bottom so content is never hidden behind the fixed
      player bar, on any breakpoint. */
   --player-h: 0px;
+  /* Fixed height of the mobile bottom tab bar (MobileTabBar), including its
+     own safe-area padding. Static because the tab bar's height never
+     changes, unlike --player-h — no ResizeObserver needed. Used to dock the
+     mobile mini-player above the tab bar instead of at the very bottom, and
+     folded into AppShell's <main> padding-bottom on mobile. */
+  --tabbar-h: 0px;
 }
 
 body {

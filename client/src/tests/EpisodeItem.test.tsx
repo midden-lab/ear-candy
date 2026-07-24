@@ -113,3 +113,53 @@ it('shows plain total duration when remainingSeconds is omitted', () => {
   expect(screen.getByText('1:01:01')).toBeInTheDocument()
   expect(screen.queryByText(/left/)).not.toBeInTheDocument()
 })
+
+describe('mobile layout (< md)', () => {
+  const originalMatchMedia = window.matchMedia
+
+  function mockMobile() {
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+  }
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia
+  })
+
+  it('does not render guests inline (they only appear in DetailPane)', () => {
+    mockMobile()
+    render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
+    expect(screen.queryByText(/Alice, Bob/i)).not.toBeInTheDocument()
+  })
+
+  it('still renders episode number, title, publish_date, and duration', () => {
+    mockMobile()
+    render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
+    expect(screen.getByText('Ep 3')).toBeInTheDocument()
+    expect(screen.getByText('Pilot Episode')).toBeInTheDocument()
+    expect(screen.getByText('2024-01-15')).toBeInTheDocument()
+    expect(screen.getByText('1:01:01')).toBeInTheDocument()
+  })
+
+  it('renders a played-progress underline under the cover when remainingSeconds indicates partial listening', () => {
+    mockMobile()
+    // duration 3661s, 185s remaining -> played most of it
+    render(<EpisodeItem episode={episode} isActive={false} remainingSeconds={185} onClick={() => {}} />)
+    const bar = document.querySelector('.bg-\\[var\\(--accent\\)\\]')
+    expect(bar).not.toBeNull()
+  })
+
+  it('does not render a progress underline when nothing has been played', () => {
+    mockMobile()
+    render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
+    expect(document.querySelector('.absolute.inset-x-0.bottom-0')).not.toBeInTheDocument()
+  })
+})
