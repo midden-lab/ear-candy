@@ -155,6 +155,37 @@ it('shows an empty state when the season has no episodes', () => {
   expect(screen.getByText('No episodes in this season yet.')).toBeInTheDocument()
 })
 
+describe('mobile layout (< md)', () => {
+  const originalMatchMedia = window.matchMedia
+
+  function mockMobile() {
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+  }
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia
+  })
+
+  it('renders the SeasonChip dropdown and selecting a season calls onSeasonSelect', async () => {
+    mockMobile()
+    const user = userEvent.setup()
+    render(<Harness />)
+    const chip = screen.getByRole('button', { name: 'Season One' })
+    expect(chip).toHaveAttribute('aria-haspopup', 'listbox')
+    await user.click(chip)
+    await user.click(screen.getByRole('option', { name: 'Season One' }))
+  })
+})
+
 describe('URL sync on episode selection', () => {
   afterEach(() => {
     window.history.replaceState(null, '', '/')

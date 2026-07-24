@@ -217,3 +217,55 @@ it('shows an empty state when the season has no episodes', () => {
   )
   expect(screen.getByText('No episodes in this season yet.')).toBeInTheDocument()
 })
+
+describe('mobile layout (< md)', () => {
+  const originalMatchMedia = window.matchMedia
+
+  function mockMobile() {
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+  }
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia
+  })
+
+  it('renders the SeasonChip dropdown instead of the SeasonTabs pill row', () => {
+    mockMobile()
+    render(
+      <EpisodeListView
+        podcastName="Test Show"
+        seasons={seasons}
+        episodes={episodes}
+        activeSeason={1}
+        onSeasonSelect={() => {}}
+        onEpisodeClick={() => {}}
+      />
+    )
+    expect(screen.getByRole('button', { name: 'Season One' })).toHaveAttribute('aria-haspopup', 'listbox')
+  })
+
+  it('still renders the podcast name and episode items on mobile', () => {
+    mockMobile()
+    render(
+      <EpisodeListView
+        podcastName="Test Show"
+        seasons={seasons}
+        episodes={episodes}
+        activeSeason={1}
+        onSeasonSelect={() => {}}
+        onEpisodeClick={() => {}}
+      />
+    )
+    expect(screen.getByText('Test Show')).toBeInTheDocument()
+    expect(screen.getByText('First Episode')).toBeInTheDocument()
+  })
+})

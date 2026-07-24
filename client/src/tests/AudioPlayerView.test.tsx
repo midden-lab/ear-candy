@@ -503,6 +503,75 @@ describe('mobile (< md)', () => {
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Collapse now playing' })).not.toBeInTheDocument()
   })
+
+  it('mini-bar shows a lazy-loaded thumbnail when cover art is set', () => {
+    mockMobile()
+    renderView({
+      episode: { ...mockEpisode, cover_art_path: 'https://example.com/detail.webp', cover_art_thumb_path: 'https://example.com/thumb.webp' },
+    })
+    const img = screen.getByRole('img')
+    expect(img).toHaveAttribute('src', 'https://example.com/thumb.webp')
+    expect(img).toHaveAttribute('loading', 'lazy')
+  })
+
+  it('expands to the full-screen overlay when expandSignal changes', () => {
+    mockMobile()
+    const { rerender } = render(
+      <AudioPlayerView
+        episode={mockEpisode}
+        playing={false}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        expandSignal={0}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    expect(screen.queryByRole('button', { name: 'Collapse now playing' })).not.toBeInTheDocument()
+    rerender(
+      <AudioPlayerView
+        episode={mockEpisode}
+        playing={false}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        expandSignal={1}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    expect(screen.getByRole('button', { name: 'Collapse now playing' })).toBeInTheDocument()
+  })
+
+  it('does not expand on mount just because expandSignal has an initial value', () => {
+    mockMobile()
+    render(
+      <AudioPlayerView
+        episode={mockEpisode}
+        playing={false}
+        currentTime={0}
+        duration={120}
+        speed={1}
+        expandSignal={5}
+        onSeek={() => {}}
+        onTogglePlay={() => {}}
+        onSpeedChange={() => {}}
+        onTimeUpdate={() => {}}
+        onDurationChange={() => {}}
+        onEnded={() => {}}
+      />
+    )
+    expect(screen.queryByRole('button', { name: 'Collapse now playing' })).not.toBeInTheDocument()
+  })
 })
 
 describe('loading and error state (issues #82, #83)', () => {

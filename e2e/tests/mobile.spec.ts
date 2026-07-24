@@ -39,24 +39,24 @@ test.describe('Mobile listener UI (< md)', () => {
     await expect(panelDiscussionItem(page)).toBeVisible()
   })
 
-  test('player mini-bar is visible after pressing Play and does not overlap the overflow menu', async ({ seededPage: page }) => {
+  test('player mini-bar is visible after pressing Play and docks above the bottom tab bar, not overlapping it', async ({ seededPage: page }) => {
     await deepDiveItem(page).click()
     await page.getByRole('button', { name: 'Play' }).click()
     const miniBar = page.getByTestId('player-bar')
     await expect(miniBar).toBeVisible()
     await expect(miniBar).toContainText('Deep Dive')
 
-    // Back to the list, where the overflow menu header is shown, and confirm
-    // the mini-bar (still playing) and the header's overflow button don't overlap.
+    // Back to the list, where the persistent bottom tab bar is shown, and
+    // confirm the mini-bar (still playing) docks above it without overlap.
     await page.getByRole('button', { name: /back to episodes/i }).click()
-    const overflowButton = page.getByRole('button', { name: 'More options' })
-    await expect(overflowButton).toBeVisible()
+    const tabBarEpisodes = page.getByRole('button', { name: 'Episodes', exact: true })
+    await expect(tabBarEpisodes).toBeVisible()
     const barBox = await miniBar.boundingBox()
-    const overflowBox = await overflowButton.boundingBox()
+    const tabBarBox = await tabBarEpisodes.boundingBox()
     expect(barBox).not.toBeNull()
-    expect(overflowBox).not.toBeNull()
-    if (barBox && overflowBox) {
-      expect(overflowBox.y + overflowBox.height).toBeLessThanOrEqual(barBox.y)
+    expect(tabBarBox).not.toBeNull()
+    if (barBox && tabBarBox) {
+      expect(barBox.y + barBox.height).toBeLessThanOrEqual(tabBarBox.y)
     }
   })
 
@@ -88,10 +88,34 @@ test.describe('Mobile listener UI (< md)', () => {
     await expect(page.getByTestId('player-bar')).toContainText('Deep Dive')
   })
 
-  test('Admin is reachable via the mobile header overflow menu', async ({ seededPage: page }) => {
-    await page.getByRole('button', { name: 'More options' }).click()
-    await page.getByText('Admin', { exact: true }).click()
+  test('Admin is reachable via the bottom tab bar Settings tab', async ({ seededPage: page }) => {
+    await page.getByRole('button', { name: 'Settings' }).click()
+    await page.getByRole('button', { name: 'Admin dashboard' }).click()
     await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
+  })
+
+  test('the bottom tab bar is visible from the episode list, detail, and settings screens', async ({ seededPage: page }) => {
+    const episodesTab = page.getByRole('button', { name: 'Episodes', exact: true })
+    await expect(episodesTab).toBeVisible()
+
+    await deepDiveItem(page).click()
+    await expect(episodesTab).toBeVisible()
+
+    await page.getByRole('button', { name: 'Settings' }).click()
+    await expect(episodesTab).toBeVisible()
+  })
+
+  test('the Now Playing tab is disabled until an episode is loaded, then expands the overlay', async ({ seededPage: page }) => {
+    const nowPlayingTab = page.getByRole('button', { name: 'Listening' })
+    await expect(nowPlayingTab).toBeDisabled()
+
+    await deepDiveItem(page).click()
+    await page.getByRole('button', { name: 'Play' }).click()
+    await expect(nowPlayingTab).toBeEnabled()
+
+    await page.getByRole('button', { name: /back to episodes/i }).click()
+    await nowPlayingTab.click()
+    await expect(page.getByRole('button', { name: 'Collapse now playing' })).toBeVisible()
   })
 
   test('resizing across the md boundary with an episode selected preserves state', async ({ seededPage: page }) => {
@@ -120,7 +144,7 @@ test.describe('Desktop listener UI unaffected by the mobile refactor', () => {
     await expect(page.getByRole('button', { name: 'Skip to end' })).toBeVisible()
   })
 
-  test('mobile header and overflow menu are not rendered at desktop viewport', async ({ seededPage: page }) => {
-    await expect(page.getByRole('button', { name: 'More options' })).not.toBeVisible()
+  test('the bottom tab bar is not rendered at desktop viewport', async ({ seededPage: page }) => {
+    await expect(page.getByRole('button', { name: 'Listening' })).not.toBeVisible()
   })
 })

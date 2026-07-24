@@ -126,46 +126,103 @@ it('renders themeBadge in fixed bottom-right position', () => {
 })
 
 describe('mobile layout (< md)', () => {
-  it('shows only the mobile header + sidebar when focusedPane is "list", not detail or the desktop aside', () => {
+  it('shows only the tab bar + sidebar when focusedPane is "list", not detail, settings, or the desktop aside', () => {
     mockMobile()
     render(
       <AppShell
         rail={<div>Rail Content</div>}
-        mobileHeader={<div>Mobile Header</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
+        settings={<div>Settings Content</div>}
+        tabBar={<div>Tab Bar</div>}
         focusedPane="list"
       />
     )
-    expect(screen.getByText('Mobile Header')).toBeInTheDocument()
+    expect(screen.getByText('Tab Bar')).toBeInTheDocument()
     expect(screen.getByText('Sidebar Content')).toBeInTheDocument()
     expect(screen.queryByText('Detail Content')).not.toBeInTheDocument()
+    expect(screen.queryByText('Settings Content')).not.toBeInTheDocument()
     expect(screen.queryByText('Rail Content')).not.toBeInTheDocument()
     expect(document.querySelector('aside')).toBeNull()
   })
 
-  it('shows only detail (no mobile header, no sidebar) when focusedPane is "detail"', () => {
+  it('shows only detail (no sidebar, no settings) when focusedPane is "detail"', () => {
     mockMobile()
     render(
       <AppShell
         rail={<div>Rail Content</div>}
-        mobileHeader={<div>Mobile Header</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
+        settings={<div>Settings Content</div>}
+        tabBar={<div>Tab Bar</div>}
         focusedPane="detail"
       />
     )
     expect(screen.getByText('Detail Content')).toBeInTheDocument()
     expect(screen.queryByText('Sidebar Content')).not.toBeInTheDocument()
-    expect(screen.queryByText('Mobile Header')).not.toBeInTheDocument()
+    expect(screen.queryByText('Settings Content')).not.toBeInTheDocument()
   })
 
-  it('does not render the floating themeBadge on mobile (it lives in the mobile header instead)', () => {
+  it('shows only settings (no sidebar, no detail) when focusedPane is "settings"', () => {
     mockMobile()
     render(
       <AppShell
         rail={<div>Rail Content</div>}
-        mobileHeader={<div>Mobile Header</div>}
+        sidebar={<div>Sidebar Content</div>}
+        detail={<div>Detail Content</div>}
+        settings={<div>Settings Content</div>}
+        tabBar={<div>Tab Bar</div>}
+        focusedPane="settings"
+      />
+    )
+    expect(screen.getByText('Settings Content')).toBeInTheDocument()
+    expect(screen.queryByText('Sidebar Content')).not.toBeInTheDocument()
+    expect(screen.queryByText('Detail Content')).not.toBeInTheDocument()
+  })
+
+  it('renders the tab bar on every mobile pane (list, detail, and settings)', () => {
+    mockMobile()
+    const { rerender } = render(
+      <AppShell
+        rail={<div>Rail Content</div>}
+        sidebar={<div>Sidebar Content</div>}
+        detail={<div>Detail Content</div>}
+        settings={<div>Settings Content</div>}
+        tabBar={<div>Tab Bar</div>}
+        focusedPane="list"
+      />
+    )
+    expect(screen.getByText('Tab Bar')).toBeInTheDocument()
+    rerender(
+      <AppShell
+        rail={<div>Rail Content</div>}
+        sidebar={<div>Sidebar Content</div>}
+        detail={<div>Detail Content</div>}
+        settings={<div>Settings Content</div>}
+        tabBar={<div>Tab Bar</div>}
+        focusedPane="detail"
+      />
+    )
+    expect(screen.getByText('Tab Bar')).toBeInTheDocument()
+  })
+
+  it('does not render the tab bar on desktop', () => {
+    render(
+      <AppShell
+        rail={<div>Rail Content</div>}
+        sidebar={<div>Sidebar Content</div>}
+        detail={<div>Detail Content</div>}
+        tabBar={<div>Tab Bar</div>}
+      />
+    )
+    expect(screen.queryByText('Tab Bar')).not.toBeInTheDocument()
+  })
+
+  it('does not render the floating themeBadge on mobile (it lives in the Settings screen instead)', () => {
+    mockMobile()
+    render(
+      <AppShell
+        rail={<div>Rail Content</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
         themeBadge={<div>Theme Badge</div>}
@@ -180,7 +237,6 @@ describe('mobile layout (< md)', () => {
     const { rerender } = render(
       <AppShell
         rail={<div>Rail Content</div>}
-        mobileHeader={<div>Mobile Header</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
         focusedPane="list"
@@ -189,7 +245,6 @@ describe('mobile layout (< md)', () => {
     rerender(
       <AppShell
         rail={<div>Rail Content</div>}
-        mobileHeader={<div>Mobile Header</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
         focusedPane="detail"

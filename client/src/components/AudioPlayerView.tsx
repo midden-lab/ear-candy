@@ -128,6 +128,15 @@ export interface AudioPlayerViewProps {
    *  needs to be able to trigger it from wherever its own retry button
    *  lives (which may not be this component at all — e.g. DetailPane). */
   retrySignal?: number
+  /** Bumped (any change in value) to command "expand to the full-screen now
+   *  playing overlay" — e.g. from MobileTabBar's "Now Playing" tab, which
+   *  has no other way to reach this component's own expand/collapse state.
+   *  Mirrors the retrySignal pattern: the host can only ask for the
+   *  transition, not directly set the underlying boolean, so this
+   *  component keeps sole ownership of its own expanded state. No-op on
+   *  desktop (no mini-bar/overlay distinction there) or when nothing is
+   *  loaded. */
+  expandSignal?: number
   /** Fired after the view has moved the underlying <audio> element's playhead. */
   onSeek: (time: number) => void
   onTogglePlay: () => void
@@ -167,7 +176,7 @@ export interface AudioPlayerViewProps {
  * management — the host wires it to whatever store it likes.
  */
 export default function AudioPlayerView({
-  episode, playing, currentTime, duration, speed, resumeTime, loading, error, retrySignal,
+  episode, playing, currentTime, duration, speed, resumeTime, loading, error, retrySignal, expandSignal,
   onSeek, onTogglePlay, onSpeedChange, onTimeUpdate, onDurationChange, onEnded,
   onWaiting, onPlaybackResumed, onPlaybackError, onReset, onRetry, onHeightChange,
 }: AudioPlayerViewProps) {
@@ -241,6 +250,15 @@ export default function AudioPlayerView({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retrySignal])
+
+  const prevExpandSignalRef = useRef(expandSignal)
+  useEffect(() => {
+    if (!episode) return
+    if (expandSignal !== undefined && expandSignal !== prevExpandSignalRef.current) {
+      prevExpandSignalRef.current = expandSignal
+      setExpanded(true)
+    }
+  }, [expandSignal, episode])
 
   const isFullScreenOverlay = !isDesktop && expanded
 
@@ -324,8 +342,11 @@ export default function AudioPlayerView({
       <div
         ref={barRef}
         data-testid="player-bar"
-        className="fixed bottom-0 left-0 right-0 border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        className="fixed left-0 right-0 border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+        // Docks above MobileTabBar (fixed at the very bottom, which already
+        // reserves its own safe-area padding) instead of sitting flush
+        // against the screen edge itself.
+        style={{ bottom: 'var(--tabbar-h, 0px)' }}
       >
         {audioEl}
         <button
@@ -333,6 +354,13 @@ export default function AudioPlayerView({
           className="flex w-full items-center gap-3 px-4 py-2 text-left"
           aria-label={`Now playing: ${episode.title}. Tap to expand.`}
         >
+          <EpisodeCoverArt
+            thumbPath={episode.cover_art_thumb_path}
+            detailPath={null}
+            alt={episode.title}
+            variant="thumb"
+            className="h-10 w-10 shrink-0 rounded object-cover ring-1 ring-zinc-200 dark:ring-zinc-800"
+          />
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{episode.title}</div>
             <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
