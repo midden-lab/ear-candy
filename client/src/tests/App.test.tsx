@@ -385,3 +385,52 @@ describe('browsing vs. playing decoupling', () => {
     expect(usePlayerStore.getState().playing).toBe(true)
   })
 })
+
+describe('mobile tab bar navigation (< md)', () => {
+  const originalMatchMedia = window.matchMedia
+
+  function mockMobile() {
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+  }
+
+  beforeEach(() => {
+    mockMobile()
+    vi.mocked(getSettings).mockResolvedValue({
+      podcast_name: 'Test Pod',
+      tagline: '',
+      description: '',
+      cover_art_path: null,
+      favicon_path: null,
+      browser_tab_title: null,
+      accent_color: '#ff0000',
+    })
+    vi.mocked(getSeasons).mockResolvedValue([])
+    vi.mocked(getEpisodes).mockResolvedValue([])
+  })
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia
+  })
+
+  it('Settings tab reaches Admin login (replacing the old kebab menu)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    await user.click(await screen.findByRole('button', { name: 'Admin dashboard' }))
+    expect(await screen.findByRole('heading', { name: 'Admin Login' })).toBeInTheDocument()
+  })
+
+  it('the Now Playing tab is disabled until an episode is loaded', async () => {
+    render(<App />)
+    expect(await screen.findByRole('button', { name: 'Listening' })).toBeDisabled()
+  })
+})

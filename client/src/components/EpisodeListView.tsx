@@ -1,6 +1,8 @@
 import type { Season, Episode } from '../types'
 import SeasonTabs from './SeasonTabs'
+import SeasonChip from './SeasonChip'
 import EpisodeItem from './EpisodeItem'
+import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 
 export interface EpisodeListViewProps {
   podcastName: string
@@ -34,13 +36,25 @@ export interface EpisodeListViewProps {
 export default function EpisodeListView({
   podcastName, seasons, episodes, activeSeason, loading, activeEpisodeId, playingEpisodeId, playing, getRemainingSeconds, onSeasonSelect, onEpisodeClick,
 }: EpisodeListViewProps) {
+  const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
+
   return (
     <div className="flex flex-col h-full">
-      {/* Hidden on mobile: MobileHeader already shows the podcast name there. */}
-      <div className="hidden px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 md:block">
-        <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{podcastName}</h2>
-      </div>
-      <SeasonTabs seasons={seasons} activeSeason={activeSeason} onSelect={onSeasonSelect} />
+      {isDesktop ? (
+        <>
+          <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{podcastName}</h2>
+          </div>
+          <SeasonTabs seasons={seasons} activeSeason={activeSeason} onSelect={onSeasonSelect} />
+        </>
+      ) : (
+        <div className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{podcastName}</h2>
+          <div className="mt-2">
+            <SeasonChip seasons={seasons} activeSeason={activeSeason} onSelect={onSeasonSelect} />
+          </div>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {loading ? (
           <p className="p-2 text-sm text-zinc-400 dark:text-zinc-500">Loading…</p>

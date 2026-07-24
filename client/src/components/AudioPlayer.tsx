@@ -16,6 +16,10 @@ interface AudioPlayerProps {
    *  shared moment naturally stops applying after the first listen rather
    *  than needing an explicit "already consumed" flag. */
   sharedStart?: SharedStart
+  /** Passed straight through to AudioPlayerView — bump to command the
+   *  mobile full-screen "now playing" overlay to open (e.g. from
+   *  MobileTabBar's "Now Playing" tab). */
+  expandSignal?: number
 }
 
 /**
@@ -26,7 +30,7 @@ interface AudioPlayerProps {
  * playback position by episode id via `utils/episodeProgress`) and applying
  * a one-time shared-link start time when present.
  */
-export default function AudioPlayer({ sharedStart }: AudioPlayerProps) {
+export default function AudioPlayer({ sharedStart, expandSignal }: AudioPlayerProps) {
   const {
     episode, playing, currentTime, duration, speed, loading, error, retryNonce,
     setPlaying, setCurrentTime, setDuration, setSpeed, setLoading, setError, retryPlayback,
@@ -124,6 +128,7 @@ export default function AudioPlayer({ sharedStart }: AudioPlayerProps) {
       loading={loading}
       error={error}
       retrySignal={retryNonce}
+      expandSignal={expandSignal}
       onSeek={setCurrentTime}
       onTogglePlay={() => setPlaying(!playing)}
       onSpeedChange={setSpeed}

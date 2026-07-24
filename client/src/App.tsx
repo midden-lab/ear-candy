@@ -6,7 +6,8 @@ import type { Settings, Season, Episode } from './types'
 import AppShell from './components/AppShell'
 import ThemeBadge from './components/ThemeBadge'
 import IconRail from './components/IconRail'
-import MobileHeader from './components/MobileHeader'
+import MobileTabBar from './components/MobileTabBar'
+import MobileSettingsView from './components/MobileSettingsView'
 import EpisodeList from './components/EpisodeList'
 import DetailPane from './components/DetailPane'
 import AudioPlayer from './components/AudioPlayer'
@@ -31,7 +32,12 @@ export default function App() {
   // selection (not gated by device class) so a desktop window resized down
   // to phone width behaves identically to an actual phone — AppShell only
   // gives this visual effect below the `md` breakpoint.
-  const [focusedPane, setFocusedPane] = useState<'list' | 'detail'>('list')
+  const [focusedPane, setFocusedPane] = useState<'list' | 'detail' | 'settings'>('list')
+  // Bumped to command AudioPlayerView's full-screen "now playing" overlay to
+  // open, from MobileTabBar's "Now Playing" tab — mirrors the retrySignal
+  // pattern already used for the same reason (only AudioPlayerView owns its
+  // own expand/collapse state).
+  const [expandSignal, setExpandSignal] = useState(0)
   // The episode shown in the detail pane — deliberately independent of the
   // player's own episode/playing state. Browsing the list must never
   // interrupt whatever's already playing in the background; only an
@@ -201,13 +207,6 @@ export default function App() {
     <AppShell
       focusedPane={focusedPane}
       rail={<IconRail onAdminClick={() => void handleAdminClick()} />}
-      mobileHeader={
-        <MobileHeader
-          podcastName={settings.podcast_name}
-          onAdminClick={() => void handleAdminClick()}
-          themeBadge={themeBadge}
-        />
-      }
       sidebar={
         <EpisodeList
           podcastName={settings.podcast_name}
@@ -234,7 +233,22 @@ export default function App() {
           onBack={() => setFocusedPane('list')}
         />
       }
-      player={<AudioPlayer sharedStart={sharedStart} />}
+      settings={
+        <MobileSettingsView
+          onAdminClick={() => void handleAdminClick()}
+          themeBadge={themeBadge}
+        />
+      }
+      tabBar={
+        <MobileTabBar
+          activeTab={focusedPane === 'settings' ? 'settings' : 'episodes'}
+          hasPlayerEpisode={playerEpisode !== null}
+          onSelectEpisodes={() => setFocusedPane('list')}
+          onSelectSettings={() => setFocusedPane('settings')}
+          onExpandPlayer={() => setExpandSignal(n => n + 1)}
+        />
+      }
+      player={<AudioPlayer sharedStart={sharedStart} expandSignal={expandSignal} />}
       themeBadge={themeBadge}
     />
   )
