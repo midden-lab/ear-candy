@@ -157,7 +157,9 @@ ear-candy/
 │   └── tests/                  # E2E specs, 48 tests across admin/listener/mobile/player/screenshot/sharing/theme (2 skip unless running against the production image)
 │
 ├── planning/                  # Design specs and plans (historical context)
-├── scripts/hash-password.sh  # bcrypt hash helper
+├── scripts/
+│   ├── hash-password.sh        # bcrypt hash helper
+│   └── downsample-audio-dir.sh # local tool: downsample a directory of audio files to a target bitrate (gotcha #37a)
 ├── Makefile                  # Primary dev commands
 ├── docker-compose.yml        # Dev stack
 ├── docker-compose.prod.yml   # Production stack — builds/runs the root Dockerfile, NOT client/Dockerfile (see gotcha)
@@ -286,7 +288,7 @@ ear-candy/
 34. **`client/Dockerfile` + `client/nginx.conf` are unused/dead.** They describe an alternate nginx-fronted deployment (separate client/server containers, nginx proxying `/api/`+`/audio/`) that nothing in this repo actually builds or runs anymore — not `docker-compose.prod.yml`, not CI. Don't assume nginx is involved in production; it isn't. (Worth a cleanup pass to remove these if confirmed genuinely dead.)
 35. **Production compose mounts `./data` for persistence.** Without this, the SQLite DB and uploads are lost on container restart. Actual production on the Droplet uses a raw `docker run` (not `docker-compose.prod.yml`) with `-v /opt/ear-candy/data:/app/data` — see CI/CD's `deploy` job. Both this file's `logging:` block and the `deploy` job's `docker run` carry matching `json-file` log rotation (`max-size=10m`, `max-file=3`, ~30MB cap) so they stay in sync even though the compose file isn't what's actually deployed (issue #8) — logs don't survive a deploy anyway, since `deploy` does `docker stop && docker rm` before `docker run` on every release, but this bounds disk usage between releases.
 36. **Bcrypt hashes contain `$` characters.** When passing `ADMIN_PASSWORD_HASH` or `COOKIE_SECRET` to `docker run` in shell scripts (e.g., GitHub Actions deploy), always use single quotes (`'...'`) to prevent bash from interpreting `$` as variable expansion. Double quotes will corrupt the hash and login will fail silently.
-37. **One-off maintenance scripts live in `server/scripts/`, run against production via a throwaway container.** E.g. `backfill-durations.mjs` populated `duration_seconds` for upload-type episodes that predated the auto-detect-on-save feature (already run against production on 2026-07-13, fixed episodes #96-#100 — see the script's own header for status; it's idempotent and safe to re-run if the gap ever resurfaces, but no further action is expected). URL-type episodes never needed this — they self-heal automatically (re-probed unconditionally on every save); upload-type only re-probes when a new file is explicitly re-selected. Pattern for running one of these against production:
+37. **One-off maintenance scripts live in `server/scripts/`, run against production via a throwaway container.** E.g. `backfill-durations.mjs` populated `duration_seconds` for upload-type episodes that predated the auto-detect-on-save feature (already run against production on 2026-07-13, fixed episodes #96-#100 — see the script's own header for status; it's idempotent and safe to re-run if the gap ever resurfaces, but no further action is expected). URL-type episodes never needed this — they self-heal automatically (re-probed unconditionally on every save); upload-type only re-probes when a new file is explicitly re-selected. `downsample-audio.sh` is a similar one-off: it re-encodes published upload-type episode audio from its as-uploaded 192kbps down to 128kbps stereo mp3 in place on the Droplet (a DAW/export-default bitrate that was never a deliberate choice), backing up originals to `/opt/ear-candy/backups/audio-192k/` first and preserving filenames so it needs zero DB writes — see the script's own header for status/idempotency details. Unlike `backfill-durations.mjs` (pure Node against the DB), this one is bash because it orchestrates two separate containers — the deployed app image (to read the episode list) and a pinned `ffmpeg` image (to transcode) — neither of which has both capabilities alone. Pattern for running one of these against production:
     ```bash
     # from local machine, with an SSH config alias set up for the Droplet:
     scp server/scripts/<script>.mjs earcandy:/opt/ear-candy/
@@ -305,6 +307,8 @@ ear-candy/
     # it's not meant to persist there.
     ```
     Any library a one-off script needs (e.g. `music-metadata`, pure JS, no native compile needed) should be added as a server devDependency only — never part of the production image, since the Dockerfile's `deps` stage runs `npm ci --omit=dev`.
+
+37a. **`scripts/downsample-audio-dir.sh` (repo root, not `server/scripts/`) is a general-purpose LOCAL tool, not a one-off run against production.** Point it at any local directory of audio files and it downsamples each to a target bitrate (default 128kbps) via ffmpeg, writing the output alongside the original with the bitrate in the filename (e.g. `Episode 12.mp3` → `Episode 12-128k.mp3`) — it never modifies or deletes the source. It prefers a local `ffmpeg`/`ffprobe` on `PATH` and otherwise falls back to the same pinned `jrottenberg/ffmpeg:7-alpine` Docker image the production `downsample-audio.sh` uses, so it needs zero local setup beyond Docker. That image is amd64-only, so it runs under emulation on Apple Silicon (confirmed working, just slower) — `brew install ffmpeg` avoids that. Written to be portable to macOS's stock bash 3.2 (no `declare -A`; codec-by-extension lookup is a `case` statement instead) since that's what ships on a Mac with no dev tooling installed.
 
 ### Linting
 
