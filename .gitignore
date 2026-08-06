@@ -15,3 +15,5 @@ planning/*.html
 
 # Playwright screenshot artifacts from local/manual runs
 e2e/screenshots/
+
+.DS_Store

@@ -196,7 +196,8 @@ ear-candy/
 │   │   └── pages/               # AdminLogin, admin/ layout + pages
 │   └── Dockerfile.dev
 ├── scripts/
-│   └── hash-password.sh        # bcrypt password hash helper
+│   ├── hash-password.sh         # bcrypt password hash helper
+│   └── downsample-audio-dir.sh  # local tool: downsample a directory of audio files (see CLAUDE.md)
 ├── docker-compose.yml          # Dev
 ├── docker-compose.prod.yml     # Production (builds/runs the root Dockerfile)
 └── Dockerfile                  # The actual production image (multi-stage; server serves client directly)
