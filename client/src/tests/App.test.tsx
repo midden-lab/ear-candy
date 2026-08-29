@@ -111,9 +111,17 @@ it('fires trackPageView exactly once per app mount, even under StrictMode double
     track_returning_listeners: true,
   })
   render(<StrictMode><App /></StrictMode>)
-  await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
-  )
+  // Wait on the effect's own observable side effect directly, not on an
+  // unrelated DOM assertion — the "Admin settings" button commits as soon
+  // as `settings` state updates, which happens synchronously and BEFORE
+  // React's passive effects (where trackPageView() lives) are guaranteed
+  // to have run. Asserting via the button was a race that happened to
+  // resolve reliably locally but lost once in CI (0 calls observed).
+  // StrictMode's double-invoke of an effect with no cleanup runs both
+  // passes back-to-back with no async gap, so once any call is observed
+  // here, the guard's second (no-op) pass has already happened too —
+  // "wait for called" then "assert called once" is safe, not another race.
+  await waitFor(() => expect(trackPageView).toHaveBeenCalled())
   expect(trackPageView).toHaveBeenCalledTimes(1)
 })
 
