@@ -97,6 +97,7 @@ Both are required; the server will refuse to start in production if either is mi
 |----------|-------------|
 | `PUBLIC_ORIGIN` | Pins the origin (`scheme://host[:port]`, no trailing slash) used in Open Graph preview tags served to link-preview crawlers, instead of trusting the request's `Host` header. Fine to leave unset for most deployments. |
 | `TRUSTED_PROXY_IPS` | Comma-separated IPs Fastify trusts to set `X-Forwarded-For` (your reverse proxy's address, as seen from inside the app's own network namespace). Defaults to loopback only (`127.0.0.1,::1`). If your reverse proxy runs on the host while the app runs in a container, this is likely your Docker bridge gateway address, not loopback — check with `docker network inspect bridge`. |
+| `GEOIP_DB_PATH` | Path to a local `.mmdb` GeoIP country database, used to resolve listener country for the analytics dashboard's geography breakdown. Optional — analytics work fully without it, the country breakdown is just empty until it's set. Run `scripts/fetch-geoip-db.sh [path]` to download a free, no-signup-required database (DB-IP's "IP to Country Lite", CC BY 4.0 — attribute DB-IP.com wherever the country data is shown). Re-run that script periodically (roughly monthly) to keep the database current; nothing does this automatically. |
 
 ### Data persistence
 
@@ -118,9 +119,25 @@ Navigate to the listener UI and click the gear icon (bottom of the left rail) to
 From the admin panel you can:
 
 - **Episodes tab**: Create and manage seasons and episodes, set episode metadata (guests, tags, publish date, audio source, cover art). Episode duration is detected automatically from the audio file/URL — no manual entry.
-- **Settings tab**: Update the podcast name, a separate browser-tab title (falls back to the podcast name if unset), tagline, description, accent color, and site favicon.
+- **Settings tab**: Update the podcast name, a separate browser-tab title (falls back to the podcast name if unset), tagline, description, accent color, site favicon, and analytics preferences (see below).
+- **Analytics tab**: Traffic and episode-listening dashboard — see [Analytics](#analytics) below.
 
 Audio can be provided as an external URL or uploaded directly through the episode form; the same is true for episode cover art (resized to thumbnail + detail sizes automatically) and the site favicon (PNG/ICO only).
+
+---
+
+## Analytics
+
+Ear Candy includes first-party, self-hosted analytics — page views, episode plays/completions, and lightweight audience-shape breakdowns (country, device/browser/OS, referrer). Everything is stored in your own SQLite database; nothing is sent to a third party, and no external account is required for it to work.
+
+It's **on by default** — a fresh deployment shows working analytics immediately, since the data never leaves your host either way. Two independent toggles are available from the admin Settings tab:
+
+- **Enable analytics** — turns data collection off entirely if you'd rather not collect anything, even locally.
+- **Track returning listeners** — uses a persistent, random, non-identifying id (stored in the listener's own browser) to distinguish new vs. returning visits in the dashboard. When off, a fresh id is used per visit instead, and analytics still work fully — you just won't get the new-vs-returning split.
+
+Country-level geography is optional and degrades gracefully: without a `.mmdb` database configured (see `GEOIP_DB_PATH` above), the country breakdown is simply empty — nothing else is affected.
+
+**Known limitation:** raw analytics events currently accumulate indefinitely — there's no built-in pruning/retention policy in this version. This is fine at small-to-moderate scale, but worth knowing if you're running a very high-traffic deployment for a long time. Not yet tracked as an issue; worth filing one (or a maintenance script following the pattern of `server/scripts/backfill-durations.mjs`/`downsample-audio.sh`) if this becomes a real problem for your deployment.
 
 Listeners can toggle light/dark mode via the theme badge — dark is the default.
 

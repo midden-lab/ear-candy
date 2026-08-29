@@ -12,6 +12,7 @@ import { healthRoute } from './routes/health.js'
 import { settingsRoute } from './routes/settings.js'
 import { seasonsRoute } from './routes/seasons.js'
 import { episodesRoute } from './routes/episodes.js'
+import { analyticsRoute } from './routes/analytics.js'
 import { adminAuthRoute } from './routes/admin/auth.js'
 import { adminSeasonsRoute } from './routes/admin/seasons.js'
 import { adminEpisodesRoute } from './routes/admin/episodes.js'
@@ -19,6 +20,7 @@ import { adminUploadRoute } from './routes/admin/upload.js'
 import { adminUploadImageRoute } from './routes/admin/upload-image.js'
 import { adminUploadFaviconRoute } from './routes/admin/upload-favicon.js'
 import { adminSettingsRoute } from './routes/admin/settings.js'
+import { adminAnalyticsRoute } from './routes/admin/analytics.js'
 import { isKnownCrawler, renderEpisodeOgHtml, resolveConfiguredOrigin } from './utils/crawler.js'
 import type { Episode, Settings } from './types.js'
 
@@ -220,6 +222,7 @@ export function buildApp(opts: AppOptions = {}) {
   app.register(settingsRoute, { prefix: '/api' })
   app.register(seasonsRoute, { prefix: '/api' })
   app.register(episodesRoute, { prefix: '/api' })
+  app.register(analyticsRoute, { prefix: '/api' })
   app.register(adminAuthRoute, { prefix: '/api' })
   app.register(adminSeasonsRoute, { prefix: '/api' })
   app.register(adminEpisodesRoute, { prefix: '/api' })
@@ -227,6 +230,7 @@ export function buildApp(opts: AppOptions = {}) {
   app.register(adminUploadImageRoute, { prefix: '/api' })
   app.register(adminUploadFaviconRoute, { prefix: '/api' })
   app.register(adminSettingsRoute, { prefix: '/api' })
+  app.register(adminAnalyticsRoute, { prefix: '/api' })
 
   return app
 }

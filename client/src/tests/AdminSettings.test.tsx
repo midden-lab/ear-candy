@@ -12,6 +12,8 @@ vi.mock('../api', () => ({
     favicon_path: null,
     browser_tab_title: null,
     accent_color: '#5a3ef5',
+    analytics_enabled: true,
+    track_returning_listeners: true,
   }),
   updateSettings: vi.fn().mockResolvedValue({
     podcast_name: 'My Pod',
@@ -21,6 +23,8 @@ vi.mock('../api', () => ({
     favicon_path: null,
     browser_tab_title: null,
     accent_color: '#5a3ef5',
+    analytics_enabled: true,
+    track_returning_listeners: true,
   }),
   uploadFavicon: vi.fn(),
   // stub rest
@@ -47,6 +51,8 @@ describe('AdminSettings', () => {
       favicon_path: null,
       browser_tab_title: null,
       accent_color: '#5a3ef5',
+      analytics_enabled: true,
+      track_returning_listeners: true,
     })
     vi.mocked(api.updateSettings).mockResolvedValue({
       podcast_name: 'My Pod',
@@ -56,6 +62,8 @@ describe('AdminSettings', () => {
       favicon_path: null,
       browser_tab_title: null,
       accent_color: '#5a3ef5',
+      analytics_enabled: true,
+      track_returning_listeners: true,
     })
   })
 
@@ -91,6 +99,8 @@ describe('AdminSettings', () => {
         description: 'A description',
         accent_color: '#5a3ef5',
         favicon_path: null,
+        analytics_enabled: true,
+        track_returning_listeners: true,
       })
     })
   })
@@ -163,6 +173,8 @@ describe('AdminSettings', () => {
         favicon_path: '/images/favicon-existing.ico',
         browser_tab_title: null,
         accent_color: '#5a3ef5',
+        analytics_enabled: true,
+        track_returning_listeners: true,
       })
       render(<AdminSettings />)
       await waitFor(() => {
@@ -181,6 +193,8 @@ describe('AdminSettings', () => {
         favicon_path: null,
         browser_tab_title: 'Positive Sex Ed',
         accent_color: '#5a3ef5',
+        analytics_enabled: true,
+        track_returning_listeners: true,
       })
       render(<AdminSettings />)
       await waitFor(() => {
@@ -216,6 +230,8 @@ describe('AdminSettings', () => {
         favicon_path: null,
         browser_tab_title: 'Old Title',
         accent_color: '#5a3ef5',
+        analytics_enabled: true,
+        track_returning_listeners: true,
       })
       render(<AdminSettings />)
       await waitFor(() => expect(screen.getByDisplayValue('Old Title')).toBeInTheDocument())
@@ -225,6 +241,57 @@ describe('AdminSettings', () => {
 
       await waitFor(() => {
         expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ browser_tab_title: null }))
+      })
+    })
+  })
+
+  describe('analytics toggles', () => {
+    it('renders both checkboxes checked, matching loaded settings', async () => {
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('My Pod')).toBeInTheDocument())
+      expect(screen.getByLabelText('Enable analytics')).toBeChecked()
+      expect(screen.getByLabelText('Track returning listeners')).toBeChecked()
+    })
+
+    it('renders both checkboxes unchecked when loaded settings have them off', async () => {
+      vi.mocked(api.getSettings).mockResolvedValue({
+        podcast_name: 'My Pod',
+        tagline: 'A tagline',
+        description: 'A description',
+        cover_art_path: null,
+        favicon_path: null,
+        browser_tab_title: null,
+        accent_color: '#5a3ef5',
+        analytics_enabled: false,
+        track_returning_listeners: false,
+      })
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('My Pod')).toBeInTheDocument())
+      expect(screen.getByLabelText('Enable analytics')).not.toBeChecked()
+      expect(screen.getByLabelText('Track returning listeners')).not.toBeChecked()
+    })
+
+    it('unchecking "Enable analytics" and saving sends analytics_enabled: false', async () => {
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('My Pod')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByLabelText('Enable analytics'))
+      fireEvent.submit(screen.getByRole('button', { name: /save/i }).closest('form')!)
+
+      await waitFor(() => {
+        expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ analytics_enabled: false }))
+      })
+    })
+
+    it('unchecking "Track returning listeners" and saving sends track_returning_listeners: false', async () => {
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('My Pod')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByLabelText('Track returning listeners'))
+      fireEvent.submit(screen.getByRole('button', { name: /save/i }).closest('form')!)
+
+      await waitFor(() => {
+        expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ track_returning_listeners: false }))
       })
     })
   })
