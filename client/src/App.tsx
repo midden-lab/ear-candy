@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getSettings, getSeasons, getEpisodes, getEpisode, logout } from './api'
 import { useTheme } from './hooks/useTheme'
 import { usePlayerStore } from './store/playerStore'
+import { trackPageView } from './utils/analytics'
 import type { Settings, Season, Episode } from './types'
 import AppShell from './components/AppShell'
 import ThemeBadge from './components/ThemeBadge'
@@ -16,9 +17,10 @@ import AdminLogin from './pages/AdminLogin'
 import AdminLayout from './pages/admin/AdminLayout'
 import EpisodeManager from './pages/admin/EpisodeManager'
 import AdminSettings from './pages/admin/AdminSettings'
+import AdminAnalytics from './pages/admin/AdminAnalytics'
 
 type View = 'player' | 'admin-login' | 'admin'
-type AdminTab = 'episodes' | 'settings'
+type AdminTab = 'episodes' | 'settings' | 'analytics'
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -50,6 +52,11 @@ export default function App() {
   const playerLoading = usePlayerStore(s => s.loading)
   const playerError = usePlayerStore(s => s.error)
   const [sharedStart, setSharedStart] = useState<SharedStart | undefined>(undefined)
+  // Guards trackPageView() to fire exactly once per app load — the effect
+  // below also re-runs whenever `settings` changes for unrelated reasons
+  // (e.g. an admin editing settings), and React 19 StrictMode double-invokes
+  // effects in dev.
+  const pageViewSentRef = useRef(false)
 
   const { isDark, toggleDark } = useTheme(settings?.accent_color ?? '#5a3ef5')
 
@@ -101,6 +108,12 @@ export default function App() {
 
   useEffect(() => {
     if (!settings) return
+
+    if (!pageViewSentRef.current) {
+      pageViewSentRef.current = true
+      trackPageView()
+    }
+
     document.title = settings.browser_tab_title || settings.podcast_name
 
     const existingLinks = document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]')
@@ -195,8 +208,14 @@ export default function App() {
           >
             Settings
           </button>
+          <button
+            onClick={() => setAdminTab('analytics')}
+            className={`text-sm font-medium transition-colors ${adminTab === 'analytics' ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300'}`}
+          >
+            Analytics
+          </button>
         </div>
-        {adminTab === 'episodes' ? <EpisodeManager /> : <AdminSettings />}
+        {adminTab === 'episodes' ? <EpisodeManager /> : adminTab === 'settings' ? <AdminSettings /> : <AdminAnalytics />}
       </AdminLayout>
     )
   }

@@ -1,4 +1,4 @@
-import type { Settings, Season, Episode } from './types'
+import type { Settings, Season, Episode, AnalyticsOverview, AnalyticsEpisodeStat, AnalyticsBreakdowns } from './types'
 
 async function adminRequest<T>(url: string, method: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -21,6 +21,10 @@ export const deleteSeason = (id: number) => adminRequest<void>(`/api/admin/seaso
 export const createEpisode = (data: Partial<Episode>) => adminRequest<Episode>('/api/admin/episodes', 'POST', data)
 export const updateEpisode = (id: number, data: Partial<Episode>) => adminRequest<Episode>(`/api/admin/episodes/${id}`, 'PATCH', data)
 export const deleteEpisode = (id: number) => adminRequest<void>(`/api/admin/episodes/${id}`, 'DELETE')
+
+export const getAnalyticsOverview = (days = 30) => adminRequest<AnalyticsOverview>(`/api/admin/analytics/overview?days=${days}`, 'GET')
+export const getAnalyticsEpisodeStats = () => adminRequest<AnalyticsEpisodeStat[]>('/api/admin/analytics/episodes', 'GET')
+export const getAnalyticsBreakdowns = (days = 30) => adminRequest<AnalyticsBreakdowns>(`/api/admin/analytics/breakdowns?days=${days}`, 'GET')
 
 async function request<T>(url: string): Promise<T> {
   const res = await fetch(url)

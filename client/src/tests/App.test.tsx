@@ -1,10 +1,19 @@
+import { StrictMode } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi, beforeEach, afterEach, describe } from 'vitest'
 import App from '../App'
 import { usePlayerStore } from '../store/playerStore'
 import { getSettings, getSeasons, getEpisodes, getEpisode, logout } from '../api'
+import { trackPageView } from '../utils/analytics'
 import type { Season, Episode } from '../types'
+
+vi.mock('../utils/analytics', () => ({
+  trackPageView: vi.fn(),
+  trackPlayStart: vi.fn(),
+  trackListenProgress: vi.fn(),
+  trackPlayComplete: vi.fn(),
+}))
 
 vi.mock('../api', () => ({
   getSettings: vi.fn().mockResolvedValue({
@@ -15,6 +24,8 @@ vi.mock('../api', () => ({
     favicon_path: null,
     browser_tab_title: null,
     accent_color: '#ff0000',
+    analytics_enabled: true,
+    track_returning_listeners: true,
   }),
   getSeasons: vi.fn().mockResolvedValue([]),
   getEpisodes: vi.fn().mockResolvedValue([]),
@@ -78,11 +89,32 @@ it('renders player view after settings load', async () => {
     favicon_path: null,
     browser_tab_title: null,
     accent_color: '#ff0000',
+    analytics_enabled: true,
+    track_returning_listeners: true,
   })
   render(<App />)
   await waitFor(() =>
     expect(screen.getByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
   )
+})
+
+it('fires trackPageView exactly once per app mount, even under StrictMode double-invocation', async () => {
+  vi.mocked(getSettings).mockResolvedValue({
+    podcast_name: 'Test Pod',
+    tagline: '',
+    description: '',
+    cover_art_path: null,
+    favicon_path: null,
+    browser_tab_title: null,
+    accent_color: '#ff0000',
+    analytics_enabled: true,
+    track_returning_listeners: true,
+  })
+  render(<StrictMode><App /></StrictMode>)
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
+  )
+  expect(trackPageView).toHaveBeenCalledTimes(1)
 })
 
 it('navigates to admin login when admin button is clicked', async () => {
@@ -95,6 +127,8 @@ it('navigates to admin login when admin button is clicked', async () => {
     favicon_path: null,
     browser_tab_title: null,
     accent_color: '#ff0000',
+    analytics_enabled: true,
+    track_returning_listeners: true,
   })
   render(<App />)
   await waitFor(() =>
@@ -128,6 +162,8 @@ describe('admin sign out', () => {
       favicon_path: null,
       browser_tab_title: null,
       accent_color: '#ff0000',
+      analytics_enabled: true,
+      track_returning_listeners: true,
     })
     render(<App />)
 
@@ -149,6 +185,8 @@ describe('admin sign out', () => {
       favicon_path: null,
       browser_tab_title: null,
       accent_color: '#ff0000',
+      analytics_enabled: true,
+      track_returning_listeners: true,
     })
     render(<App />)
 
@@ -169,6 +207,8 @@ it('applies accent color from settings to CSS variable', async () => {
     favicon_path: null,
     browser_tab_title: null,
     accent_color: '#ff0000',
+    analytics_enabled: true,
+    track_returning_listeners: true,
   })
   render(<App />)
   await waitFor(() =>
@@ -190,6 +230,8 @@ describe('document title and favicon', () => {
       favicon_path: null,
       browser_tab_title: null,
       accent_color: '#ff0000',
+      analytics_enabled: true,
+      track_returning_listeners: true,
     })
     render(<App />)
     await waitFor(() => expect(document.title).toBe('Positive Sex Ed'))
@@ -204,6 +246,8 @@ describe('document title and favicon', () => {
       favicon_path: null,
       browser_tab_title: 'Positive Sex Ed',
       accent_color: '#ff0000',
+      analytics_enabled: true,
+      track_returning_listeners: true,
     })
     render(<App />)
     await waitFor(() => expect(document.title).toBe('Positive Sex Ed'))
@@ -218,6 +262,8 @@ describe('document title and favicon', () => {
       favicon_path: '/images/favicon-abc.png',
       browser_tab_title: null,
       accent_color: '#ff0000',
+      analytics_enabled: true,
+      track_returning_listeners: true,
     })
     render(<App />)
     await waitFor(() => {
@@ -240,6 +286,8 @@ describe('document title and favicon', () => {
       favicon_path: null,
       browser_tab_title: null,
       accent_color: '#ff0000',
+      analytics_enabled: true,
+      track_returning_listeners: true,
     })
     render(<App />)
     await waitFor(() =>
@@ -412,6 +460,8 @@ describe('mobile tab bar navigation (< md)', () => {
       favicon_path: null,
       browser_tab_title: null,
       accent_color: '#ff0000',
+      analytics_enabled: true,
+      track_returning_listeners: true,
     })
     vi.mocked(getSeasons).mockResolvedValue([])
     vi.mocked(getEpisodes).mockResolvedValue([])

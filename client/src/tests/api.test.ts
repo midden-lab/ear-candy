@@ -10,6 +10,8 @@ const mockSettings: Settings = {
   favicon_path: null,
   browser_tab_title: null,
   accent_color: '#ff6600',
+  analytics_enabled: true,
+  track_returning_listeners: true,
 }
 
 const mockSeason: Season = {

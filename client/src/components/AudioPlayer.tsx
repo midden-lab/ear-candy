@@ -2,6 +2,9 @@ import { useEffect, useRef } from 'react'
 import { usePlayerStore } from '../store/playerStore'
 import AudioPlayerView from './AudioPlayerView'
 import { getEpisodeProgress, saveEpisodeProgress, clearEpisodeProgress } from '../utils/episodeProgress'
+import { trackPlayStart, trackListenProgress, trackPlayComplete } from '../utils/analytics'
+
+const LISTEN_PROGRESS_MILESTONES = [25, 50, 75, 90] as const
 
 export interface SharedStart {
   episodeId: number
@@ -48,6 +51,15 @@ export default function AudioPlayer({ sharedStart, expandSignal }: AudioPlayerPr
   // immediately re-persist a position that was just deliberately cleared.
   const endedRef = useRef(false)
 
+  // Analytics dedup state for the currently-loaded episode — reset
+  // alongside endedRef (below) whenever `episode?.id` changes, so a
+  // play_start/listen_progress milestone fires exactly once per episode
+  // load rather than once per pause/resume or per timeUpdate tick.
+  const analyticsStateRef = useRef<{ playStartSent: boolean; milestonesSent: Set<number> }>({
+    playStartSent: false,
+    milestonesSent: new Set(),
+  })
+
   // No locally-saved progress yet + this is the episode a shared link
   // pointed at -> use the shared timestamp. Otherwise prefer the listener's
   // own saved position. Reads only props and localStorage (no refs/state),
@@ -66,6 +78,7 @@ export default function AudioPlayer({ sharedStart, expandSignal }: AudioPlayerPr
   useEffect(() => {
     const id = episode?.id
     endedRef.current = false
+    analyticsStateRef.current = { playStartSent: false, milestonesSent: new Set() }
     if (id !== undefined) {
       setCurrentTime(resumeTimeFor(id) ?? 0)
     }
@@ -107,6 +120,16 @@ export default function AudioPlayer({ sharedStart, expandSignal }: AudioPlayerPr
       saveEpisodeProgress(episode.id, t)
       lastPersistedRef.current = t
     }
+    if (episode && duration > 0) {
+      const pct = (t / duration) * 100
+      const sent = analyticsStateRef.current.milestonesSent
+      for (const milestone of LISTEN_PROGRESS_MILESTONES) {
+        if (pct >= milestone && !sent.has(milestone)) {
+          sent.add(milestone)
+          trackListenProgress(episode.id, episode.season_id, milestone)
+        }
+      }
+    }
   }
 
   const handleEnded = () => {
@@ -114,6 +137,7 @@ export default function AudioPlayer({ sharedStart, expandSignal }: AudioPlayerPr
     if (episode) {
       endedRef.current = true
       clearEpisodeProgress(episode.id)
+      trackPlayComplete(episode.id, episode.season_id)
     }
   }
 
@@ -136,7 +160,14 @@ export default function AudioPlayer({ sharedStart, expandSignal }: AudioPlayerPr
       onDurationChange={setDuration}
       onEnded={handleEnded}
       onWaiting={() => setLoading(true)}
-      onPlaybackResumed={() => { setLoading(false); setError(false) }}
+      onPlaybackResumed={() => {
+        setLoading(false)
+        setError(false)
+        if (episode && !analyticsStateRef.current.playStartSent) {
+          analyticsStateRef.current.playStartSent = true
+          trackPlayStart(episode.id, episode.season_id)
+        }
+      }}
       onPlaybackError={() => { setError(true); setLoading(false) }}
       onReset={() => { setLoading(false); setError(false) }}
       onRetry={retryPlayback}
