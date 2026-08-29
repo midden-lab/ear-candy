@@ -137,7 +137,7 @@ It's **on by default** — a fresh deployment shows working analytics immediatel
 
 Country-level geography is optional and degrades gracefully: without a `.mmdb` database configured (see `GEOIP_DB_PATH` above), the country breakdown is simply empty — nothing else is affected.
 
-**Known limitation:** raw analytics events currently accumulate indefinitely — there's no built-in pruning/retention policy in this version. This is fine at small-to-moderate scale, but worth knowing if you're running a very high-traffic deployment for a long time. Not yet tracked as an issue; worth filing one (or a maintenance script following the pattern of `server/scripts/backfill-durations.mjs`/`downsample-audio.sh`) if this becomes a real problem for your deployment.
+**Known limitation:** raw analytics events currently accumulate indefinitely — there's no built-in pruning/retention policy in this version. This is fine at small-to-moderate scale, but worth knowing if you're running a very high-traffic deployment for a long time. Tracked in [issue #102](https://github.com/midden-lab/ear-candy/issues/102).
 
 Listeners can toggle light/dark mode via the theme badge — dark is the default.
 
