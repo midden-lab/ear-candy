@@ -148,7 +148,7 @@ describe('analytics utility', () => {
       expect(JSON.parse(text).referrer).toBe('share-link')
     })
 
-    it('falls back to document.referrer when ?ref=share is absent', async () => {
+    it('falls back to document.referrer, reduced to just its origin, when ?ref=share is absent', async () => {
       mockSettings()
       const sendBeacon = vi.fn()
       vi.stubGlobal('navigator', { sendBeacon })
@@ -160,7 +160,64 @@ describe('analytics utility', () => {
       expect(sendBeacon).toHaveBeenCalledTimes(1)
       const blob = sendBeacon.mock.calls[0][1] as Blob
       const text = await readBlobText(blob)
-      expect(JSON.parse(text).referrer).toBe('https://podcasts.example/')
+      expect(JSON.parse(text).referrer).toBe('https://podcasts.example')
+    })
+
+    it('strips a PII-bearing query string from document.referrer, keeping only the origin', async () => {
+      mockSettings()
+      const sendBeacon = vi.fn()
+      vi.stubGlobal('navigator', { sendBeacon })
+      Object.defineProperty(document, 'referrer', {
+        value: 'https://newsletter.example/click?recipient=listener@example.com&campaign=42',
+        configurable: true,
+      })
+
+      trackPageView()
+      await flush()
+
+      const blob = sendBeacon.mock.calls[0][1] as Blob
+      const text = await readBlobText(blob)
+      expect(JSON.parse(text).referrer).toBe('https://newsletter.example')
+    })
+
+    it('omits referrer entirely when document.referrer is not a valid URL', async () => {
+      mockSettings()
+      const sendBeacon = vi.fn()
+      vi.stubGlobal('navigator', { sendBeacon })
+      Object.defineProperty(document, 'referrer', { value: 'not-a-url', configurable: true })
+
+      trackPageView()
+      await flush()
+
+      const blob = sendBeacon.mock.calls[0][1] as Blob
+      const text = await readBlobText(blob)
+      expect(JSON.parse(text).referrer).toBeUndefined()
+    })
+  })
+
+  describe('clearing the persistent identifier when returning-listener tracking is off', () => {
+    it('removes a pre-existing localStorage session id once track_returning_listeners is false', async () => {
+      window.localStorage.setItem('ec_session_id', 'stale-persistent-id')
+      mockSettings({ track_returning_listeners: false })
+      const sendBeacon = vi.fn()
+      vi.stubGlobal('navigator', { sendBeacon })
+
+      trackPageView()
+      await flush()
+
+      expect(window.localStorage.getItem('ec_session_id')).toBeNull()
+    })
+
+    it('leaves an existing localStorage session id alone when track_returning_listeners is true', async () => {
+      window.localStorage.setItem('ec_session_id', 'kept-persistent-id')
+      mockSettings({ track_returning_listeners: true })
+      const sendBeacon = vi.fn()
+      vi.stubGlobal('navigator', { sendBeacon })
+
+      trackPageView()
+      await flush()
+
+      expect(window.localStorage.getItem('ec_session_id')).toBe('kept-persistent-id')
     })
   })
 

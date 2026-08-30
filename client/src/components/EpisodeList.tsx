@@ -8,6 +8,9 @@ interface EpisodeListProps {
   seasons: Season[]
   episodes: Episode[]
   activeSeason: number | null
+  /** Whether first-party analytics is administratively enabled — threaded
+   *  through to PrivacyNotice via EpisodeListView. */
+  analyticsEnabled?: boolean
   loading?: boolean
   /** id of the episode currently shown in the detail pane — independent of
    *  what's actually loaded in the player, since browsing must never
@@ -27,7 +30,7 @@ interface EpisodeListProps {
  * EpisodeListView, which takes no dependency on this app's state management.
  */
 export default function EpisodeList({
-  podcastName, seasons, episodes, activeSeason, loading, viewingEpisodeId, onSeasonSelect, onEpisodeSelect, onEpisodeView,
+  podcastName, seasons, episodes, activeSeason, analyticsEnabled, loading, viewingEpisodeId, onSeasonSelect, onEpisodeSelect, onEpisodeView,
 }: EpisodeListProps) {
   const playingEpisode = usePlayerStore(state => state.episode)
   const playing = usePlayerStore(state => state.playing)
@@ -70,6 +73,7 @@ export default function EpisodeList({
       seasons={seasons}
       episodes={episodes}
       activeSeason={activeSeason}
+      analyticsEnabled={analyticsEnabled}
       loading={loading}
       activeEpisodeId={viewingEpisodeId}
       playingEpisodeId={playingEpisode?.id ?? null}

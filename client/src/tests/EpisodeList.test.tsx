@@ -57,12 +57,13 @@ interface HarnessOverrides {
   loading?: boolean
   episodes?: Episode[]
   onEpisodeSelect?: () => void
+  analyticsEnabled?: boolean
 }
 
 /** Stateful harness so onEpisodeView actually updates what's highlighted —
  *  proves the real click -> highlight wiring, not just that the callback
  *  fired. */
-function Harness({ loading, episodes: episodesOverride, onEpisodeSelect }: HarnessOverrides) {
+function Harness({ loading, episodes: episodesOverride, onEpisodeSelect, analyticsEnabled }: HarnessOverrides) {
   const [viewingEpisodeId, setViewingEpisodeId] = useState<number | null>(null)
   return (
     <EpisodeList
@@ -70,6 +71,7 @@ function Harness({ loading, episodes: episodesOverride, onEpisodeSelect }: Harne
       seasons={seasons}
       episodes={episodesOverride ?? episodes}
       activeSeason={1}
+      analyticsEnabled={analyticsEnabled}
       loading={loading}
       viewingEpisodeId={viewingEpisodeId}
       onSeasonSelect={() => {}}
@@ -148,6 +150,11 @@ it('shows a loading indicator instead of episodes when loading', () => {
   render(<Harness loading />)
   expect(screen.getByText('Loading…')).toBeInTheDocument()
   expect(screen.queryByText('First Episode')).not.toBeInTheDocument()
+})
+
+it('threads analyticsEnabled through to the PrivacyNotice disclosure', () => {
+  render(<Harness analyticsEnabled={true} />)
+  expect(screen.getByText('Anonymous listening analytics')).toBeInTheDocument()
 })
 
 it('shows an empty state when the season has no episodes', () => {
