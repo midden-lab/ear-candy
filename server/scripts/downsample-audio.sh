@@ -8,7 +8,7 @@
 # file size by ~33% with no perceptible quality loss for voice, directly
 # helping listeners on slow connections. This is a one-off content operation,
 # NOT the deferred low-bitrate-variant feature in
-# planning/2026-08-03-slow-network-audio-streaming-spike.md (still shelved).
+# plans/archive/2026-08-03-slow-network-audio-streaming-spike.md (still shelved).
 #
 # Runs entirely on the Droplet, using the already-deployed app image (to read
 # the episode list from the real DB) and a pinned ffmpeg image (to transcode).
