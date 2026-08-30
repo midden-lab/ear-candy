@@ -19,9 +19,9 @@ export default function PrivacyNotice({ analyticsEnabled }: PrivacyNoticeProps) 
         Anonymous listening analytics
       </summary>
       <p className="mt-2 leading-relaxed">
-        This site anonymously tracks page views and playback — episode, device/browser type, and a
-        country resolved from your IP address, which is never stored. No data is shared with or sent
-        to any third party.
+        This site anonymously tracks page views and playback. This includes the episode,
+        device/browser type, and a country resolved from your IP address, which is never stored.
+        No data is shared with or sent to any third party.
       </p>
     </details>
   )
