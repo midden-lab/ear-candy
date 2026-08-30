@@ -174,6 +174,35 @@ it('passes each episode through getRemainingSeconds and renders the result per r
   expect(screen.getByText('1:05').closest('span')?.parentElement).toHaveTextContent('1:05 left')
 })
 
+it('renders the PrivacyNotice disclosure when analyticsEnabled is true', () => {
+  render(
+    <EpisodeListView
+      podcastName="Test Show"
+      seasons={seasons}
+      episodes={episodes}
+      activeSeason={1}
+      analyticsEnabled={true}
+      onSeasonSelect={() => {}}
+      onEpisodeClick={() => {}}
+    />
+  )
+  expect(screen.getByText('Anonymous listening analytics')).toBeInTheDocument()
+})
+
+it('omits the PrivacyNotice disclosure when analyticsEnabled is omitted (defaults to false)', () => {
+  render(
+    <EpisodeListView
+      podcastName="Test Show"
+      seasons={seasons}
+      episodes={episodes}
+      activeSeason={1}
+      onSeasonSelect={() => {}}
+      onEpisodeClick={() => {}}
+    />
+  )
+  expect(screen.queryByText('Anonymous listening analytics')).not.toBeInTheDocument()
+})
+
 it('renders the podcast name at the top', () => {
   render(
     <EpisodeListView

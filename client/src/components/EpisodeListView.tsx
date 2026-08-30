@@ -2,6 +2,7 @@ import type { Season, Episode } from '../types'
 import SeasonTabs from './SeasonTabs'
 import SeasonChip from './SeasonChip'
 import EpisodeItem from './EpisodeItem'
+import PrivacyNotice from './PrivacyNotice'
 import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 
 export interface EpisodeListViewProps {
@@ -9,6 +10,11 @@ export interface EpisodeListViewProps {
   seasons: Season[]
   episodes: Episode[]
   activeSeason: number | null
+  /** Whether first-party analytics is administratively enabled — drives the
+   *  PrivacyNotice disclosure at the bottom of the list; renders nothing
+   *  when false. Defaults to false so callers that don't pass it (existing
+   *  tests) see no behavior change. */
+  analyticsEnabled?: boolean
   loading?: boolean
   /** id of the episode currently shown in the detail pane (drives row
    *  highlight/aria-current) — independent of which episode is actually
@@ -34,7 +40,7 @@ export interface EpisodeListViewProps {
  * how or where playback state lives.
  */
 export default function EpisodeListView({
-  podcastName, seasons, episodes, activeSeason, loading, activeEpisodeId, playingEpisodeId, playing, getRemainingSeconds, onSeasonSelect, onEpisodeClick,
+  podcastName, seasons, episodes, activeSeason, analyticsEnabled = false, loading, activeEpisodeId, playingEpisodeId, playing, getRemainingSeconds, onSeasonSelect, onEpisodeClick,
 }: EpisodeListViewProps) {
   const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
 
@@ -73,6 +79,7 @@ export default function EpisodeListView({
           ))
         )}
       </div>
+      <PrivacyNotice analyticsEnabled={analyticsEnabled} />
     </div>
   )
 }
