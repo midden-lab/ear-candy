@@ -102,6 +102,102 @@ describe('POST /api/admin/login', () => {
     }
   })
 
+  it('trips a global lockout after enough failures spread across many distinct IPs, even though none individually hits the per-IP ceiling', async () => {
+    const app = await makeApp()
+
+    // 30 distinct IPs, one failure each — no single IP gets anywhere near
+    // its own 10-attempt/15-minute ceiling, but the global counter should.
+    for (let i = 0; i < 30; i++) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/login',
+        payload: { password: 'wrongpassword' },
+        remoteAddress: `10.0.0.${i}`
+      })
+      expect(res.statusCode).toBe(401)
+    }
+
+    const limited = await app.inject({
+      method: 'POST',
+      url: '/api/admin/login',
+      payload: { password: VALID_PASSWORD },
+      remoteAddress: '10.0.0.99' // a brand-new IP, never used above
+    })
+    expect(limited.statusCode).toBe(429)
+  })
+
+  it('a single IP\'s own per-IP lockout still trips independently of the global counter', async () => {
+    const app = await makeApp()
+
+    for (let i = 0; i < 10; i++) {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/login',
+        payload: { password: 'wrongpassword' },
+        remoteAddress: '10.0.0.1'
+      })
+      expect(res.statusCode).toBe(401)
+    }
+
+    const limited = await app.inject({
+      method: 'POST',
+      url: '/api/admin/login',
+      payload: { password: 'wrongpassword' },
+      remoteAddress: '10.0.0.1'
+    })
+    expect(limited.statusCode).toBe(429)
+
+    // A different IP, having contributed only 10 of the 30 needed for the
+    // global lockout, is unaffected.
+    const otherIp = await app.inject({
+      method: 'POST',
+      url: '/api/admin/login',
+      payload: { password: VALID_PASSWORD },
+      remoteAddress: '10.0.0.2'
+    })
+    expect(otherIp.statusCode).toBe(200)
+  })
+
+  it('a successful login from one IP does not clear the global counter accumulated by others', async () => {
+    const app = await makeApp()
+
+    for (let i = 0; i < 29; i++) {
+      await app.inject({
+        method: 'POST',
+        url: '/api/admin/login',
+        payload: { password: 'wrongpassword' },
+        remoteAddress: `10.0.1.${i}`
+      })
+    }
+
+    // A real successful login from yet another IP.
+    const success = await app.inject({
+      method: 'POST',
+      url: '/api/admin/login',
+      payload: { password: VALID_PASSWORD },
+      remoteAddress: '10.0.1.200'
+    })
+    expect(success.statusCode).toBe(200)
+
+    // One more failure from a fresh IP tips the global counter to 30 —
+    // if success had cleared it, this would still return 401.
+    const oneMore = await app.inject({
+      method: 'POST',
+      url: '/api/admin/login',
+      payload: { password: 'wrongpassword' },
+      remoteAddress: '10.0.1.201'
+    })
+    expect(oneMore.statusCode).toBe(401)
+
+    const limited = await app.inject({
+      method: 'POST',
+      url: '/api/admin/login',
+      payload: { password: VALID_PASSWORD },
+      remoteAddress: '10.0.1.202'
+    })
+    expect(limited.statusCode).toBe(429)
+  })
+
   it('returns 401 on wrong password', async () => {
     const app = await makeApp()
     const res = await app.inject({
