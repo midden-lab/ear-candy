@@ -5,6 +5,17 @@ import { requireAdmin, buildSessionCookieValue, SESSION_MAX_AGE_MS } from '../..
 const MAX_FAILED_ATTEMPTS = 10
 const LOCKOUT_WINDOW_MS = 15 * 60 * 1000
 
+// A second, IP-independent counter, layered onto the per-IP one above —
+// not a tighter version of it. The per-IP lockout stops credential
+// stuffing from one address; it does nothing against an attacker with
+// access to many apparent source IPs, who gets a fresh 10-attempt
+// allowance per address. This app has exactly one credential gating full
+// content control, so a global backstop is worth the (deliberately
+// higher, so a real admin's own occasional mistyped password from one IP
+// essentially never trips it) ceiling below (red-team AUTH-2).
+const GLOBAL_MAX_FAILED_ATTEMPTS = 30
+const GLOBAL_LOCKOUT_WINDOW_MS = 30 * 60 * 1000
+
 export const adminAuthRoute: FastifyPluginAsync = async (app) => {
   // Tracks failed login attempts per IP, not all requests — a legitimate
   // user (or an e2e suite) logging in repeatedly with the *correct*
@@ -14,6 +25,7 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
   // so each buildApp() call — including each test's fresh app — gets its
   // own isolated state.
   const failedAttempts = new Map<string, { count: number; resetAt: number }>()
+  let globalFailed: { count: number; resetAt: number } | null = null
 
   function isLockedOut(ip: string): boolean {
     const entry = failedAttempts.get(ip)
@@ -34,8 +46,28 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
     }
   }
 
+  function isGloballyLockedOut(): boolean {
+    if (!globalFailed) return false
+    if (Date.now() > globalFailed.resetAt) {
+      globalFailed = null
+      return false
+    }
+    return globalFailed.count >= GLOBAL_MAX_FAILED_ATTEMPTS
+  }
+
+  function recordGlobalFailedAttempt(): void {
+    if (!globalFailed || Date.now() > globalFailed.resetAt) {
+      globalFailed = { count: 1, resetAt: Date.now() + GLOBAL_LOCKOUT_WINDOW_MS }
+    } else {
+      globalFailed.count += 1
+    }
+  }
+
   app.post<{ Body: { password: string } }>('/admin/login', async (req, reply) => {
-    if (isLockedOut(req.ip)) {
+    // Deliberately the same 429 response either way — distinguishing
+    // "your IP is locked" from "the whole app is locked" in the response
+    // would hand an attacker a signal about which control they tripped.
+    if (isLockedOut(req.ip) || isGloballyLockedOut()) {
       return reply.status(429).send({ error: 'Too many failed login attempts. Try again later.' })
     }
 
@@ -49,6 +81,7 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
     const match = await bcrypt.compare(password, hash)
     if (!match) {
       recordFailedAttempt(req.ip)
+      recordGlobalFailedAttempt()
       // Deliberately never logs the submitted password itself — only the
       // outcome and requesting IP, enough to answer "did someone get in,
       // and when" after the fact (issue #13) without logging credentials.
@@ -58,7 +91,8 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
 
     failedAttempts.delete(req.ip)
     req.log.info({ event: 'admin_login', outcome: 'success', ip: req.ip })
-    reply.setCookie('admin_session', buildSessionCookieValue(), {
+    const { session_epoch } = app.db.prepare('SELECT session_epoch FROM settings').get() as { session_epoch: number }
+    reply.setCookie('admin_session', buildSessionCookieValue(session_epoch), {
       signed: true,
       httpOnly: true,
       sameSite: 'strict',
@@ -71,6 +105,10 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
 
   app.post('/admin/logout', async (req, reply) => {
     req.log.info({ event: 'admin_logout', ip: req.ip })
+    // Bumping the epoch invalidates every outstanding session cookie
+    // server-side (issue #34), not just this browser's — there's only one
+    // admin, so "logout" and "sign out everywhere" are the same operation.
+    app.db.prepare('UPDATE settings SET session_epoch = session_epoch + 1').run()
     reply.clearCookie('admin_session', { path: '/' })
     return { ok: true }
   })

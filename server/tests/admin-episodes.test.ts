@@ -152,6 +152,22 @@ describe('Admin Episodes CRUD', () => {
       expect(res.statusCode).toBe(400)
     })
 
+    it('rejects an invalid audio_type with 400, not a raw DB CHECK-constraint error', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      const season = await createSeason(app, cookie)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: { ...BASE_EPISODE, season_id: season.id, audio_type: 'mp3' }
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.json().error).toBe('Invalid audio_type')
+    })
+
     it('rejects a javascript: URI as audio_path', async () => {
       const app = await makeApp()
       const cookie = await getAuthCookie(app)
@@ -302,6 +318,38 @@ describe('Admin Episodes CRUD', () => {
 
       expect(res.statusCode).toBe(401)
     })
+
+    it('rejects an invalid audio_type with 400, not a raw DB CHECK-constraint error', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      const season = await createSeason(app, cookie)
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: { ...BASE_EPISODE, season_id: season.id }
+      })
+      const { id } = createRes.json()
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/api/admin/episodes/${id}`,
+        headers: { cookie },
+        payload: {
+          season_id: season.id,
+          number: 1,
+          title: 'New',
+          duration_seconds: 0,
+          publish_date: '2024-01-01',
+          audio_type: 'mp3',
+          audio_path: 'https://example.com/ep.mp3'
+        }
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.json().error).toBe('Invalid audio_type')
+    })
   })
 
   describe('PATCH /api/admin/episodes/:id', () => {
@@ -415,6 +463,30 @@ describe('Admin Episodes CRUD', () => {
       })
 
       expect(res.statusCode).toBe(400)
+    })
+
+    it('rejects an invalid audio_type with 400, not a raw DB CHECK-constraint error', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      const season = await createSeason(app, cookie)
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/admin/episodes',
+        headers: { cookie },
+        payload: { ...BASE_EPISODE, season_id: season.id }
+      })
+      const created = createRes.json()
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/api/admin/episodes/${created.id}`,
+        headers: { cookie },
+        payload: { audio_type: 'mp3' }
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.json().error).toBe('Invalid audio_type')
     })
 
     it('patches cover_art_thumb_path and rejects an invalid one', async () => {
