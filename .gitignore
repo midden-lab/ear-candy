@@ -12,7 +12,7 @@ server/data/geoip/
 *.sqlite
 
 # Generated planning reports (red-team/security/DR audits) — kept locally, not tracked
-planning/*.html
+plans/archive/*.html
 
 # Playwright screenshot artifacts from local/manual runs
 e2e/screenshots/

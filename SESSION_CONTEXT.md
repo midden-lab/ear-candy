@@ -1,93 +1,24 @@
 # Ear Candy — Agent Session Context
 
+This file is a point-in-time snapshot, kept for historical continuity from the project's early setup. **`CLAUDE.md` is the authoritative, actively-maintained reference** — read that first for anything about the codebase, gotchas, or conventions. This file exists mainly to record what infrastructure exists and where, for a human or agent picking the project back up after a long gap.
+
 ## Project Overview
-Self-hostable podcast webapp. Stack: Fastify 4 + SQLite (better-sqlite3) + React 19 + Vite 5 + Tailwind CSS + Zustand. Single-container Docker deployment.
+Self-hostable podcast webapp. Stack: Fastify 5 + SQLite (`better-sqlite3`) + React 19 + Vite 5 + Tailwind CSS + Zustand. Single-container Docker deployment (see CLAUDE.md's "Docker & Deployment" gotchas for the full picture — multi-stage build, non-root runtime user, loopback-only port binding behind Caddy).
 
-## Recent Changes Made
+## Current State (as of 2026-08-30)
 
-### 1. AGENTS.md Created
-Comprehensive agent guide at repo root covering:
-- All Makefile targets and per-package scripts
-- Architecture (3-tier, no React Router, Zustand state)
-- Code organization map
-- 29 gotchas (env setup, auth cookies, DB booleans, SQLite single-row settings, etc.)
-
-### 2. Makefile Fixes
-- `make test`: Fixed by upgrading `better-sqlite3` from 11.10.0 → 12.11.1 (incompatible with Node 26)
-- `make e2e` / `make e2e-ui`: Added health check that verifies `localhost:5173` is reachable before running Playwright. Fails fast with clear error if dev stack not running.
-- `server/Dockerfile.dev`: Added `python3 make g++` to Alpine image so `better-sqlite3` can compile from source in Docker builds.
-
-### 3. GitHub Actions CI/CD Pipeline
-File: `.github/workflows/ci-cd.yml`
-Jobs:
-- `lint` — ESLint on server + client
-- `test` — Vitest server (node) + client (jsdom)
-- `typecheck` — `tsc --noEmit` on client
-- `build` — Docker image to GHCR (Node 24 compatible actions: checkout@v7, buildx@v4, login@v4, metadata@v6, build-push@v7)
-- `deploy` — SSH to Droplet, pull image, restart container, health check
-
-### 4. Planning Directory Restructured
-`planning/` now contains:
-- `2026-05-05-ear-candy.md` — Original implementation plan
-- `2026-05-05-podcast-webapp-design.md` — Design spec
-- `2026-05-06-playwright-e2e.md` — E2E plan
-- `2026-05-06-playwright-e2e-design.md` — E2E design spec
-- `2026-05-06-ux-alignment.md` — UX alignment plan
-- `2026-07-10-deploy-do-gitlab.md` — GitHub Actions deployment plan (refactored from GitLab)
-- `2026-07-10-do-droplet-setup.md` — DigitalOcean droplet setup guide
-- `mockups/` — 7 HTML UI mockups from `.superpowers/brainstorm/`
-
-### 5. Scripts Added
-- `scripts/setup-droplet.sh` — One-shot Ubuntu setup (Docker, Caddy, backups)
-
-### 6. LICENSE
-MIT License added and pushed.
-
-### 7. GitHub Repo
-Pushed to `git@github.com:midden-lab/ear-candy.git`
-
-## Current Blocker / Next Step
-DigitalOcean `doctl` CLI authentication. The `DIGITALOCEAN_ACCESS_TOKEN` env var needs to be set in the user's shell profile so `doctl` commands work across sessions.
-
-## Commands to Run After Fresh Shell
-
-### Set up doctl auth (one-time):
-```bash
-export DIGITALOCEAN_ACCESS_TOKEN="your-token-here"
-# Or add to ~/.zshrc:
-echo 'export DIGITALOCEAN_ACCESS_TOKEN="your-token-here"' >> ~/.zshrc
-```
-
-### Create Droplet:
-```bash
-doctl compute droplet create ear-candy \
-  --image ubuntu-22-04-x64 \
-  --size s-1vcpu-512mb-10gb \
-  --region nyc1 \
-  --ssh-keys $(doctl compute ssh-key list --format ID --no-header | head -1) \
-  --wait
-```
-
-### Get IP and run setup:
-```bash
-DROPLET_IP=$(doctl compute droplet get ear-candy --format PublicIPv4 --no-header)
-ssh root@$DROPLET_IP "bash -s" < scripts/setup-droplet.sh podcast.yourdomain.com $DROPLET_IP
-```
-
-### GitHub Secrets to Configure:
-| Secret | Value |
-|--------|-------|
-| `SSH_PRIVATE_KEY` | `cat ~/.ssh/ear_candy_key` |
-| `DROPLET_IP` | From above |
-| `COOKIE_SECRET` | `openssl rand -hex 32` |
-| `ADMIN_PASSWORD_HASH` | `cd server && node -e "const b=require('bcrypt'); b.hash('yourpassword',10).then(h=>console.log(h))"` |
-| `GHCR_PAT` | GitHub PAT with `read:packages` |
+- **Production is live** at `earcandy.positivesexed.com`, deployed on a DigitalOcean Droplet. `doctl`/SSH access is set up and working (the "current blocker" this file used to describe — `doctl` auth — was resolved long ago; not an open item).
+- **CI/CD** (`.github/workflows/ci-cd.yml`): `lint` → `test` → `typecheck` → `build` (pushes to GHCR by digest) → `e2e` (runs the built production image, `main`-targeting only) → `deploy` (SSH to the Droplet, pull by digest, restart) → `verify-production` (independent post-deploy health check). Every action and base image is SHA/digest-pinned; secrets flow through step-level `env:` blocks, never spliced into shell text.
+- **Branching:** `main` is production (every push deploys). Work happens on a branch off `dev`, PR into `dev`, then a separate `dev`→`main` promotion PR (squash-merge) triggers the actual deploy. See CLAUDE.md's "Branching & Workflow" section for the full convention, including the post-squash-merge `dev` resync step.
+- **Plans:** `plans/` holds active plan-architect/plan-executor plans (`NNN-kebab-case-name.md`, e.g. `plans/003-red-team-remediation.md`). `plans/archive/` holds the original pre-numbered-plan design docs (implementation plan, UX alignment, E2E design, Droplet setup, etc.) from before that convention existed — kept for historical context, not actively maintained.
+- **First-party analytics** (page views, listen tracking, geo/device/referrer breakdowns) shipped — first-party only, no third-party services, per an explicit project constraint. See `plans/001-first-party-analytics.md`.
+- **Security hardening:** issue #81 (port 3000 directly reachable) fixed — `plans/002-restrict-port-3000-to-loopback.md`. A five-agent red-team review produced 22 findings (0 critical); the actionable ones are tracked and mostly complete in `plans/003-red-team-remediation.md` (one step, raw client-IP request logging, still open by design — see that file).
 
 ## Key Files to Know
-- `AGENTS.md` — Everything an agent needs
-- `Makefile` — Dev commands
-- `.github/workflows/ci-cd.yml` — CI/CD pipeline
-- `planning/2026-07-10-do-droplet-setup.md` — Full DO setup guide
-- `scripts/setup-droplet.sh` — Droplet provisioning script
-- `Dockerfile` — Multi-stage production build
-- `docker-compose.prod.yml` — Production compose (single container)
+- `CLAUDE.md` — the actual, current source of truth for codebase knowledge, gotchas, and conventions. `AGENTS.md` is a redirect stub pointing here.
+- `Makefile` — dev commands (`make up`, `make test`, `make e2e`, etc. — always use these, not the underlying npm/docker commands directly, per CLAUDE.md).
+- `.github/workflows/ci-cd.yml` — CI/CD pipeline.
+- `plans/` — active plans; `plans/archive/` — historical design docs.
+- `scripts/setup-droplet.sh` — Droplet provisioning script (already run against the live Droplet; only relevant again if standing up a new one).
+- `docs/runbooks/rotate-secrets.md` — secret rotation procedure.
+- `Dockerfile` — multi-stage production build (the one actually deployed — see CLAUDE.md for why `client/Dockerfile`/`server/Dockerfile` are dead code, not this one).

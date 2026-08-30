@@ -156,7 +156,8 @@ ear-candy/
 │   ├── playwright.config.ts    # workers: 1, chromium only
 │   └── tests/                  # E2E specs, 48 tests across admin/listener/mobile/player/screenshot/sharing/theme (2 skip unless running against the production image)
 │
-├── planning/                  # Design specs and plans (historical context)
+├── plans/                     # Active plan-architect/plan-executor plans (NNN-kebab-case-name.md)
+│   └── archive/               # Superseded/historical design specs and plans
 ├── scripts/
 │   ├── hash-password.sh        # bcrypt hash helper
 │   └── downsample-audio-dir.sh # local tool: downsample a directory of audio files to a target bitrate (gotcha #37a)
@@ -368,7 +369,9 @@ Note: CI's `e2e` job exercises the **production image**, not `docker compose up`
 
 ## Design Documents
 
-Reference specs and plans in `planning/` for historical context on architectural decisions. Notable:
+`plans/` holds active plan-architect/plan-executor plans, one file per plan (`NNN-kebab-case-name.md`, e.g. `001-first-party-analytics.md`), each with YAML frontmatter tracking `status`/`steps_completed`/`steps_total`. These are living execution records for in-flight or completed feature/hardening work — see e.g. `plans/003-red-team-remediation.md` for the current state of that convention.
+
+`plans/archive/` holds superseded pre-plan-architect design docs — free-form specs and plans from before this repo adopted the numbered-plan convention, kept for historical context on early architectural decisions. Notable:
 - `2026-05-05-podcast-webapp-design.md` — Original design spec
 - `2026-05-06-playwright-e2e-design.md` — E2E testing design
 - `2026-07-10-deploy-do-gitlab.md` / `2026-07-10-do-droplet-setup.md` — Production deployment setup (GitHub Actions + DigitalOcean Droplet)
