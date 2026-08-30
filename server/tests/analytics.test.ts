@@ -134,6 +134,26 @@ describe('POST /api/analytics/event', () => {
       expect(countEvents(app)).toBe(0)
     })
 
+    it('rejects a referrer just over the 200-char cap, accepts one right at it', async () => {
+      const app = buildTestApp()
+      const tooLong = await app.inject({
+        method: 'POST',
+        url: '/api/analytics/event',
+        payload: { event_type: 'page_view', session_id: 'sess-1', referrer: 'x'.repeat(201) },
+      })
+      expect(tooLong.statusCode).toBe(400)
+      expect(countEvents(app)).toBe(0)
+
+      const atLimit = await app.inject({
+        method: 'POST',
+        url: '/api/analytics/event',
+        headers: { 'user-agent': REAL_UA },
+        payload: { event_type: 'page_view', session_id: 'sess-2', referrer: 'x'.repeat(200) },
+      })
+      expect(atLimit.statusCode).toBe(204)
+      expect(countEvents(app)).toBe(1)
+    })
+
     it('rejects a missing session_id with 400', async () => {
       const app = buildTestApp()
       const res = await app.inject({

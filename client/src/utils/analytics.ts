@@ -19,7 +19,18 @@ let configPromise: Promise<AnalyticsConfig> | null = null
 function loadConfig(): Promise<AnalyticsConfig> {
   if (!configPromise) {
     configPromise = getSettings()
-      .then(s => ({ analyticsEnabled: s.analytics_enabled, trackReturning: s.track_returning_listeners }))
+      .then(s => {
+        const config = { analyticsEnabled: s.analytics_enabled, trackReturning: s.track_returning_listeners }
+        // Disabling "track returning listeners" only changes which storage
+        // getSessionId reads going forward — without this, a previously
+        // written localStorage identifier sits dormant rather than deleted,
+        // and would resume correlating history if the setting were ever
+        // re-enabled.
+        if (!config.trackReturning) {
+          try { window.localStorage.removeItem(SESSION_STORAGE_KEY) } catch { /* ignore */ }
+        }
+        return config
+      })
       .catch(() => ({ analyticsEnabled: false, trackReturning: false }))
   }
   return configPromise
@@ -66,9 +77,20 @@ async function sendAnalyticsEvent(payload: AnalyticsEventPayload): Promise<void>
   }
 }
 
+// document.referrer can carry a PII-bearing query string (e.g. a
+// newsletter/campaign link's recipient token) — only the origin is ever
+// meaningful for "which site linked here," so that's all this stores.
+function sanitizeReferrer(referrer: string): string | undefined {
+  try {
+    return new URL(referrer).origin
+  } catch {
+    return undefined
+  }
+}
+
 export function trackPageView(): void {
   const params = new URLSearchParams(window.location.search)
-  const referrer = params.get('ref') === 'share' ? 'share-link' : (document.referrer || undefined)
+  const referrer = params.get('ref') === 'share' ? 'share-link' : (document.referrer ? sanitizeReferrer(document.referrer) : undefined)
   void sendAnalyticsEvent({ event_type: 'page_view', referrer })
 }
 

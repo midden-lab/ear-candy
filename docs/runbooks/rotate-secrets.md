@@ -59,7 +59,11 @@ Both secrets are passed to the production container purely as environment
 variables at `docker run` time (`deploy` job, `.github/workflows/ci-cd.yml`)
 — there's no separate env file on the Droplet to edit. Manual intervention
 means re-running the same `docker run` invocation by hand over SSH with the
-new values:
+new values. Note the loopback-only port binding below — this must match the
+`deploy` job and `docker-compose.prod.yml` (issue #81): the app is reachable
+via Caddy's `reverse_proxy localhost:3000` on the same host, so it has no
+reason to be reachable on any other interface, and re-publishing to all
+interfaces here would silently reopen #81 during an incident:
 
 ```bash
 ssh earcandy
@@ -68,7 +72,7 @@ docker run -d \
   --name ear-candy \
   --restart unless-stopped \
   --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
-  -p 3000:3000 \
+  -p 127.0.0.1:3000:3000 \
   -v /opt/ear-candy/data:/app/data \
   -e NODE_ENV=production \
   -e SERVE_CLIENT=true \
