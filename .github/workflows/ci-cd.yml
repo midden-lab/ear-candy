@@ -378,6 +378,19 @@ jobs:
             # property of this specific deployment's Docker networking, so
             # it's declared here next to the rest of the deploy config it
             # depends on, not hardcoded into application source.
+            #
+            # GEOIP_DB_PATH is always set to this same path, unconditionally
+            # — the app degrades gracefully (country breakdown just stays
+            # empty) if no file exists there yet, so there's no need to
+            # branch on whether it's actually present. The file itself
+            # lives under the bind-mounted /opt/ear-candy/data (persists
+            # across deploys/container recreation) and is NOT something
+            # this workflow downloads — run scripts/fetch-geoip-db.sh
+            # against the Droplet to populate/refresh it (see README).
+            # A real deploy once ran with this env var missing entirely —
+            # the file existed on disk but the running container was never
+            # told where to look, so country tracking silently stayed off
+            # until this was added (issue #106).
             docker run -d \
               --name ear-candy \
               --restart unless-stopped \
@@ -392,6 +405,7 @@ jobs:
               -e COOKIE_SECRET="$DEPLOY_COOKIE_SECRET" \
               -e ADMIN_PASSWORD_HASH="$DEPLOY_ADMIN_PASSWORD_HASH" \
               -e TRUSTED_PROXY_IPS="127.0.0.1,::1,172.17.0.1" \
+              -e GEOIP_DB_PATH="/app/data/geoip/dbip-country-lite.mmdb" \
               "$IMAGE"
 
             echo "Pruning dangling images..."
