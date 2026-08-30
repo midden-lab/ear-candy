@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import bcrypt from 'bcrypt'
+import { sign as signCookie } from '@fastify/cookie'
 import { buildTestApp } from './helpers.js'
 import { requireAdmin, SESSION_MAX_AGE_MS } from '../src/auth.js'
 
@@ -224,6 +225,78 @@ describe('requireAdmin preHandler', () => {
     } finally {
       Date.now = realDateNow
     }
+  })
+
+  it('rejects a session cookie replayed after logout (issue #34 — server-side revocation)', async () => {
+    const app = buildTestApp()
+    app.get('/test-protected', { preHandler: requireAdmin }, async () => ({ ok: true }))
+
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/admin/login',
+      payload: { password: VALID_PASSWORD }
+    })
+    const setCookie = loginRes.headers['set-cookie'] as string | string[]
+    const cookieStr = Array.isArray(setCookie) ? setCookie[0] : setCookie
+    const cookieValue = cookieStr.split(';')[0]
+
+    // Confirm the cookie is valid before logout.
+    const beforeLogout = await app.inject({
+      method: 'GET',
+      url: '/test-protected',
+      headers: { cookie: cookieValue }
+    })
+    expect(beforeLogout.statusCode).toBe(200)
+
+    await app.inject({ method: 'POST', url: '/api/admin/logout', headers: { cookie: cookieValue } })
+
+    // The original (now-stale) cookie must no longer authenticate, even
+    // though it's still signature-valid and well within its 24h age limit.
+    const afterLogout = await app.inject({
+      method: 'GET',
+      url: '/test-protected',
+      headers: { cookie: cookieValue }
+    })
+    expect(afterLogout.statusCode).toBe(401)
+  })
+
+  it('a fresh login after logout issues a new, valid cookie', async () => {
+    const app = buildTestApp()
+    app.get('/test-protected', { preHandler: requireAdmin }, async () => ({ ok: true }))
+
+    const firstLogin = await app.inject({ method: 'POST', url: '/api/admin/login', payload: { password: VALID_PASSWORD } })
+    const firstCookie = (Array.isArray(firstLogin.headers['set-cookie']) ? firstLogin.headers['set-cookie'][0] : firstLogin.headers['set-cookie'] as string).split(';')[0]
+    await app.inject({ method: 'POST', url: '/api/admin/logout', headers: { cookie: firstCookie } })
+
+    const secondLogin = await app.inject({ method: 'POST', url: '/api/admin/login', payload: { password: VALID_PASSWORD } })
+    const secondCookie = (Array.isArray(secondLogin.headers['set-cookie']) ? secondLogin.headers['set-cookie'][0] : secondLogin.headers['set-cookie'] as string).split(';')[0]
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/test-protected',
+      headers: { cookie: secondCookie }
+    })
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('rejects a validly-signed pre-revocation-era cookie with no epoch segment (authenticated:<ts>, no crash)', async () => {
+    const app = buildTestApp()
+    app.get('/test-protected', { preHandler: requireAdmin }, async () => ({ ok: true }))
+
+    // Simulate a cookie issued by the pre-#34 version of buildSessionCookieValue
+    // (two-part: "authenticated:<ts>", no epoch) — validly signed, so this
+    // exercises the epoch-parsing fallback specifically, not signature
+    // rejection (already covered by the "invalid signature" test above).
+    const oldFormatValue = `authenticated:${Date.now()}`
+    const signed = signCookie(oldFormatValue, process.env.COOKIE_SECRET as string)
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/test-protected',
+      headers: { cookie: `admin_session=${signed}` }
+    })
+    expect(res.statusCode).toBe(401)
+    expect(res.json()).toEqual({ error: 'Unauthorized' })
   })
 
   it('still accepts a session well within SESSION_MAX_AGE_MS', async () => {

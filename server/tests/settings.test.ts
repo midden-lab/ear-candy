@@ -44,4 +44,11 @@ describe('GET /api/settings', () => {
     expect(body.podcast_name).toBe('Ear Candy')
     expect(body.accent_color).toBe('#5a3ef5')
   })
+
+  it('never exposes the internal session_epoch counter to this public, unauthenticated endpoint', async () => {
+    const app = buildTestApp()
+    const res = await app.inject({ method: 'GET', url: '/api/settings' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).not.toHaveProperty('session_epoch')
+  })
 })

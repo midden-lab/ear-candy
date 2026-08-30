@@ -53,6 +53,12 @@ const MIGRATIONS: Migration[] = [
     alreadyApplied: db => columnExists(db, 'settings', 'track_returning_listeners'),
     up: db => { db.prepare('ALTER TABLE settings ADD COLUMN track_returning_listeners INTEGER NOT NULL DEFAULT 1').run() },
   },
+  {
+    version: 6,
+    description: 'settings.session_epoch',
+    alreadyApplied: db => columnExists(db, 'settings', 'session_epoch'),
+    up: db => { db.prepare('ALTER TABLE settings ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0').run() },
+  },
 ]
 
 /**

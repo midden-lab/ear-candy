@@ -58,7 +58,8 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
 
     failedAttempts.delete(req.ip)
     req.log.info({ event: 'admin_login', outcome: 'success', ip: req.ip })
-    reply.setCookie('admin_session', buildSessionCookieValue(), {
+    const { session_epoch } = app.db.prepare('SELECT session_epoch FROM settings').get() as { session_epoch: number }
+    reply.setCookie('admin_session', buildSessionCookieValue(session_epoch), {
       signed: true,
       httpOnly: true,
       sameSite: 'strict',
@@ -71,6 +72,10 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
 
   app.post('/admin/logout', async (req, reply) => {
     req.log.info({ event: 'admin_logout', ip: req.ip })
+    // Bumping the epoch invalidates every outstanding session cookie
+    // server-side (issue #34), not just this browser's — there's only one
+    // admin, so "logout" and "sign out everywhere" are the same operation.
+    app.db.prepare('UPDATE settings SET session_epoch = session_epoch + 1').run()
     reply.clearCookie('admin_session', { path: '/' })
     return { ok: true }
   })
