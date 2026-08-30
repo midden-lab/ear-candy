@@ -146,6 +146,8 @@ const referrer = params.get('ref') === 'share' ? 'share-link' : (document.referr
 
 ### Step 5: Stop persisting raw client IPs in request logs
 
+**Status (2026-08-30):** not yet implemented. Steps 6-9 were completed and merged to `dev` out of order, at explicit user direction (`/goal execute the plan and implement 6-9`), deliberately skipping this step for now. `steps_completed` in the frontmatter is intentionally left at 4 (not bumped to 9) since this step is the genuine next sequential gap — resuming here via `plan-executor` is correct. When Step 5 is eventually implemented, the plan is then fully complete (all of 1-9 done) even though the frontmatter will only ever have counted through a contiguous run — set `status: complete` directly at that point rather than expecting the counter to reach 9 through further steps.
+
 **Files:** `server/src/app.ts`
 **Requires review:** true — this is a logging-behavior change with a real privacy implication; the two viable approaches (disable automatic request logging vs. redact specific fields) trade off differently and deserve a deliberate choice, not a silent one.
 
@@ -175,6 +177,8 @@ Before implementing, confirm no other part of the codebase relies on the automat
 
 **Files:** `client/src/components/PrivacyNotice.tsx` (new), `client/src/components/EpisodeListView.tsx`, `client/src/components/EpisodeList.tsx`, `client/src/App.tsx`
 **Requires review:** true — placement and wording are a real design decision affecting every listener's first impression of the app; get sign-off before committing to specific copy/UI.
+
+**Status:** done — merged to `dev` via PR #113 (2026-08-30).
 
 Fixes PRIV-2 (Medium). With shipped defaults (`analytics_enabled: true`, `track_returning_listeners: true`), a listener's first page load writes a persistent cross-session `localStorage` identifier with zero in-app notice — the only disclosure lives in `README.md`, which listeners never see. Both toggles are admin-only (`client/src/pages/admin/AdminSettings.tsx`). This is a real gap for any privacy-conscious or EU-facing deployment of this open-source app.
 
@@ -217,6 +221,8 @@ export default function PrivacyNotice({ analyticsEnabled }: PrivacyNoticeProps) 
 
 **Files:** `server/src/db/migrate.ts`, `server/src/auth.ts`, `server/src/routes/admin/auth.ts`
 **Requires review:** true — auth-sensitive logic and a schema change; get explicit sign-off on the mechanism before implementing.
+
+**Status:** done — merged to `dev` via PR #114 (2026-08-30). Issue #34 will close automatically once this reaches `main` (GitHub's closing-keyword linking only fires against the repo's default branch).
 
 Fixes AUTH-1 (Medium), closes issue **#34**. Sessions are a stateless signed cookie (`authenticated:<issued-at-epoch-ms>`) with a 24h server-enforced expiry (`server/src/auth.ts`) but no server-side revocation store. `POST /admin/logout` (`server/src/routes/admin/auth.ts`) only clears the browser-side cookie — a copy of a valid signed cookie obtained any other way (XSS, a compromised browser profile, a captured log — see Step 5) stays fully valid for up to 24h after the legitimate admin logs out, with no way to forcibly kill it.
 
@@ -281,6 +287,8 @@ A cookie issued before this change (`authenticated:<ts>`, no third segment) fail
 **Files:** `server/src/routes/admin/auth.ts`
 **Requires review:** true — auth-sensitive logic; confirm the chosen ceiling/cooldown values before implementing.
 
+**Status:** done — merged to `dev` via PR #115 (2026-08-30), with the ceiling/cooldown values from this step's own text (30 attempts/30min) as written, not altered at review.
+
 Fixes AUTH-2 (Medium). The existing lockout (`failedAttempts` Map, `MAX_FAILED_ATTEMPTS = 10`, `LOCKOUT_WINDOW_MS = 15 * 60 * 1000`) is keyed strictly by `req.ip`. This app has exactly one credential gating full content control, with no secondary global cap — an attacker with access to multiple apparent source IPs gets a fresh 10-attempt allowance per address, so distributed guessing is only lightly slowed in aggregate.
 
 Add a second, IP-independent counter in the same plugin scope, checked alongside (not instead of) the existing per-IP one:
@@ -325,6 +333,8 @@ Values chosen (30 attempts / 30 minutes, vs. the per-IP 10/15) are deliberately 
 
 **Files:** `Dockerfile`
 **Requires review:** true — changes the production runtime; confirm before merging, and treat this as its own PR separate from the others in this plan given the blast radius.
+
+**Status:** done — merged to `dev` via PR #116 (2026-08-30). Verified locally (full `docker build` through all 4 stages including native-addon compilation, plus a live container smoke test against `/api/health`) and confirmed again by CI's own `build` job on `dev`. **Not yet promoted to `main`** — this step's own text scopes it to getting the change into `dev`; the `dev`→`main` promotion that would actually deploy this to production was deliberately left as a separate, explicitly-confirmed action given the runtime-level nature of the change.
 
 Fixes DEP-1 (Medium-High). All 4 stages of the root `Dockerfile` use `node:20-alpine`, pinned by digest. Node.js 20 reached end-of-life on 2026-04-30 (confirmed via the Node.js Release Working Group and independent EOL trackers, as of this plan's writing) — any Node/OpenSSL CVE disclosed since then has no official upstream fix on this image, and this is the actual production runtime (`Dockerfile`'s `runner` stage, deployed via CI's `build`/`deploy` jobs).
 
