@@ -137,6 +137,12 @@ It's **on by default** — a fresh deployment shows working analytics immediatel
 
 Country-level geography is optional and degrades gracefully: without a `.mmdb` database configured (see `GEOIP_DB_PATH` above), the country breakdown is simply empty — nothing else is affected.
 
+**Setting it up:** both `docker-compose.prod.yml` and the GitHub Actions `deploy` job (`.github/workflows/ci-cd.yml`) already point `GEOIP_DB_PATH` at the same conventional location — `/app/data/geoip/dbip-country-lite.mmdb` inside the container, i.e. `<your data dir>/geoip/dbip-country-lite.mmdb` on the host (the same bind-mounted directory that holds `db.sqlite` and `uploads/`). Setting the env var alone isn't enough, though — a file also has to actually exist there. On any host with SSH access to where the container's data directory lives:
+```bash
+scripts/fetch-geoip-db.sh <your-data-dir>/geoip/dbip-country-lite.mmdb
+```
+run it locally against a bind-mounted volume, or copy the script up and run it directly on the host (same pattern as the one-off maintenance scripts in `server/scripts/`). Re-run it periodically (roughly monthly) — nothing does this automatically. If you're deploying your own fork via a different pipeline than this repo's `ci-cd.yml`, make sure whatever starts your production container also sets `GEOIP_DB_PATH` — a new env var doesn't take effect just because a file appears on disk; the running container has to be told where to look at start time (see issue #106, which is exactly this mistake happening once already).
+
 **Known limitation:** raw analytics events currently accumulate indefinitely — there's no built-in pruning/retention policy in this version. This is fine at small-to-moderate scale, but worth knowing if you're running a very high-traffic deployment for a long time. Tracked in [issue #102](https://github.com/midden-lab/ear-candy/issues/102).
 
 Listeners can toggle light/dark mode via the theme badge — dark is the default.
