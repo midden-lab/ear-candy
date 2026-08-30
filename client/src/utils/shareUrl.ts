@@ -8,6 +8,10 @@ export function buildShareUrl(episodeId: number, t?: number): string {
   const url = new URL('/', window.location.origin)
   url.searchParams.set('episode', String(episodeId))
   if (t !== undefined && t > 0) url.searchParams.set('t', String(Math.floor(t)))
+  // Lets trackPageView() (utils/analytics.ts) attribute the resulting visit
+  // to a share link rather than falling back to document.referrer, which a
+  // social app's in-app browser or link-preview unfurl often blanks out.
+  url.searchParams.set('ref', 'share')
   return url.toString()
 }
 

@@ -177,6 +177,54 @@ describe('Admin Settings routes', () => {
       expect(res.statusCode).toBe(200)
       expect(res.json().browser_tab_title).toBeNull()
     })
+
+    it('defaults analytics_enabled and track_returning_listeners to true when omitted', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'No Analytics Fields Given',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          accent_color: '#123456'
+        }
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.analytics_enabled).toBeTruthy()
+      expect(body.track_returning_listeners).toBeTruthy()
+    })
+
+    it('persists explicit false values for analytics_enabled and track_returning_listeners', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'Analytics Off',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          accent_color: '#123456',
+          analytics_enabled: false,
+          track_returning_listeners: false,
+        }
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.analytics_enabled).toBeFalsy()
+      expect(body.track_returning_listeners).toBeFalsy()
+    })
   })
 
   describe('PATCH /api/admin/settings', () => {
@@ -334,6 +382,24 @@ describe('Admin Settings routes', () => {
       })
 
       expect(res.statusCode).toBe(400)
+    })
+
+    it('patches analytics_enabled and track_returning_listeners independently', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: { analytics_enabled: false }
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.analytics_enabled).toBeFalsy()
+      // Untouched field keeps its default.
+      expect(body.track_returning_listeners).toBeTruthy()
     })
   })
 })

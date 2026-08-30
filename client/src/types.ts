@@ -6,6 +6,40 @@ export interface Settings {
   favicon_path: string | null
   browser_tab_title: string | null
   accent_color: string
+  analytics_enabled: boolean
+  track_returning_listeners: boolean
+}
+
+export type AnalyticsEventType = 'page_view' | 'play_start' | 'listen_progress' | 'play_complete'
+
+export interface AnalyticsOverview {
+  totalPageViews: number
+  totalPlayStarts: number
+  totalPlayCompletes: number
+  uniqueSessions: number
+  newSessions: number
+  returningSessions: number
+  timeseries: { date: string; page_views: number; play_starts: number }[]
+}
+
+export interface AnalyticsEpisodeStat {
+  episode_id: number
+  title: string
+  play_starts: number
+  play_completes: number
+  completion_rate: number
+  milestone_25: number
+  milestone_50: number
+  milestone_75: number
+  milestone_90: number
+}
+
+export interface AnalyticsBreakdowns {
+  countries: { key: string; count: number }[]
+  devices: { key: string; count: number }[]
+  browsers: { key: string; count: number }[]
+  os: { key: string; count: number }[]
+  referrers: { key: string; count: number }[]
 }
 
 export interface Season {

@@ -74,7 +74,7 @@ it('copies the beginning-only URL when no currentTime is given', async () => {
   render(<ShareDialog episodeId={42} episodeTitle="Test Episode" />)
   await user.click(screen.getByRole('button'))
   await user.click(screen.getByText('Copy'))
-  expect(writeTextMock).toHaveBeenCalledWith(`${window.location.origin}/?episode=42`)
+  expect(writeTextMock).toHaveBeenCalledWith(`${window.location.origin}/?episode=42&ref=share`)
 })
 
 it('copies a timestamped URL by default when currentTime is meaningful', async () => {
@@ -82,7 +82,7 @@ it('copies a timestamped URL by default when currentTime is meaningful', async (
   render(<ShareDialog episodeId={42} episodeTitle="Test Episode" currentTime={90} />)
   await user.click(screen.getByRole('button'))
   await user.click(screen.getByText('Copy'))
-  expect(writeTextMock).toHaveBeenCalledWith(`${window.location.origin}/?episode=42&t=90`)
+  expect(writeTextMock).toHaveBeenCalledWith(`${window.location.origin}/?episode=42&t=90&ref=share`)
 })
 
 it('copies a beginning-only URL after unchecking the timestamp checkbox', async () => {
@@ -91,7 +91,7 @@ it('copies a beginning-only URL after unchecking the timestamp checkbox', async 
   await user.click(screen.getByRole('button'))
   await user.click(screen.getByRole('checkbox', { name: /start at 1:30/i }))
   await user.click(screen.getByText('Copy'))
-  expect(writeTextMock).toHaveBeenCalledWith(`${window.location.origin}/?episode=42`)
+  expect(writeTextMock).toHaveBeenCalledWith(`${window.location.origin}/?episode=42&ref=share`)
 })
 
 it('shows brief "Copied" confirmation after copying', async () => {
@@ -121,7 +121,7 @@ it('builds a correct Bluesky share intent link', async () => {
   const user = userEvent.setup()
   render(<ShareDialog episodeId={42} episodeTitle="Cool Episode" />)
   await user.click(screen.getByRole('button'))
-  const shareUrl = `${window.location.origin}/?episode=42`
+  const shareUrl = `${window.location.origin}/?episode=42&ref=share`
   expect(screen.getByRole('link', { name: 'Share to Bluesky' })).toHaveAttribute(
     'href',
     `https://bsky.app/intent/compose?text=${encodeURIComponent(`Listening to "Cool Episode"\n${shareUrl}`)}`

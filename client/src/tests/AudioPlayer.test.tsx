@@ -3,7 +3,15 @@ import { vi, beforeEach, describe } from 'vitest'
 import { usePlayerStore } from '../store/playerStore'
 import AudioPlayer from '../components/AudioPlayer'
 import { getEpisodeProgress } from '../utils/episodeProgress'
+import { trackPlayStart, trackListenProgress, trackPlayComplete } from '../utils/analytics'
 import type { Episode } from '../types'
+
+vi.mock('../utils/analytics', () => ({
+  trackPageView: vi.fn(),
+  trackPlayStart: vi.fn(),
+  trackListenProgress: vi.fn(),
+  trackPlayComplete: vi.fn(),
+}))
 
 // Full behavioral coverage (mini-bar, expand/collapse, transport controls,
 // mobile layout) lives in AudioPlayerView.test.tsx against the presentational
@@ -315,5 +323,71 @@ describe('loading/error/retry wiring to the store (issues #82, #83)', () => {
     render(<AudioPlayer />)
     act(() => usePlayerStore.setState({ episode: otherEpisode }))
     expect(usePlayerStore.getState().error).toBe(false)
+  })
+})
+
+describe('content analytics tracking', () => {
+  function setAudioTime(seconds: number) {
+    const audio = document.querySelector('audio')!
+    Object.defineProperty(audio, 'currentTime', { value: seconds, configurable: true })
+    fireEvent.timeUpdate(audio)
+  }
+
+  it('fires play_start exactly once, even across multiple pause/resume cycles', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true })
+    render(<AudioPlayer />)
+    const audio = document.querySelector('audio')!
+
+    fireEvent.playing(audio)
+    fireEvent.playing(audio) // resume after a pause — must not fire again
+
+    expect(trackPlayStart).toHaveBeenCalledTimes(1)
+    expect(trackPlayStart).toHaveBeenCalledWith(mockEpisode.id, mockEpisode.season_id)
+  })
+
+  it('fires listen_progress milestones as they are crossed, each exactly once', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true, duration: 120 })
+    render(<AudioPlayer />)
+
+    setAudioTime(36) // 30% of 120s
+    setAudioTime(72) // 60%
+    setAudioTime(90) // ticking within the same 75% bucket shouldn't re-fire it
+    setAudioTime(91)
+
+    expect(trackListenProgress).toHaveBeenCalledWith(mockEpisode.id, mockEpisode.season_id, 25)
+    expect(trackListenProgress).toHaveBeenCalledWith(mockEpisode.id, mockEpisode.season_id, 50)
+    expect(trackListenProgress).toHaveBeenCalledWith(mockEpisode.id, mockEpisode.season_id, 75)
+    expect(trackListenProgress).not.toHaveBeenCalledWith(mockEpisode.id, mockEpisode.season_id, 90)
+    expect(trackListenProgress).toHaveBeenCalledTimes(3)
+  })
+
+  it('fires play_complete exactly once on the native ended event', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true })
+    render(<AudioPlayer />)
+    const audio = document.querySelector('audio')!
+
+    fireEvent.ended(audio)
+
+    expect(trackPlayComplete).toHaveBeenCalledTimes(1)
+    expect(trackPlayComplete).toHaveBeenCalledWith(mockEpisode.id, mockEpisode.season_id)
+  })
+
+  it('resets dedup state when switching to a different episode, so the new episode can fire its own play_start/milestones', () => {
+    usePlayerStore.setState({ episode: mockEpisode, playing: true, duration: 120 })
+    render(<AudioPlayer />)
+    const audio = document.querySelector('audio')!
+    fireEvent.playing(audio)
+    setAudioTime(36) // 30% -> milestone 25
+
+    act(() => usePlayerStore.setState({ episode: otherEpisode, duration: 120 }))
+    Object.defineProperty(audio, 'currentTime', { value: 0, configurable: true })
+    fireEvent.playing(audio)
+    setAudioTime(36)
+
+    expect(trackPlayStart).toHaveBeenCalledTimes(2)
+    expect(trackPlayStart).toHaveBeenNthCalledWith(1, mockEpisode.id, mockEpisode.season_id)
+    expect(trackPlayStart).toHaveBeenNthCalledWith(2, otherEpisode.id, otherEpisode.season_id)
+    expect(trackListenProgress).toHaveBeenCalledWith(mockEpisode.id, mockEpisode.season_id, 25)
+    expect(trackListenProgress).toHaveBeenCalledWith(otherEpisode.id, otherEpisode.season_id, 25)
   })
 })

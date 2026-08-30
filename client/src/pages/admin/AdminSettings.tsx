@@ -10,6 +10,8 @@ export default function AdminSettings() {
   const [faviconPath, setFaviconPath] = useState<string | null>(null)
   const [faviconUploading, setFaviconUploading] = useState(false)
   const [faviconUploadError, setFaviconUploadError] = useState('')
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(true)
+  const [trackReturningListeners, setTrackReturningListeners] = useState(true)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -21,6 +23,8 @@ export default function AdminSettings() {
       setDescription(s.description)
       setAccentColor(s.accent_color)
       setFaviconPath(s.favicon_path)
+      setAnalyticsEnabled(s.analytics_enabled)
+      setTrackReturningListeners(s.track_returning_listeners)
     })
   }, [])
 
@@ -56,6 +60,8 @@ export default function AdminSettings() {
         description,
         accent_color: accentColor,
         favicon_path: faviconPath,
+        analytics_enabled: analyticsEnabled,
+        track_returning_listeners: trackReturningListeners,
       })
       setSaved(true)
     } finally {
@@ -120,6 +126,31 @@ export default function AdminSettings() {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+        <div className="space-y-3 border-t border-zinc-200 dark:border-zinc-800 pt-4">
+          <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Analytics</h3>
+          <div>
+            <label htmlFor="analytics_enabled" className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <input id="analytics_enabled" type="checkbox" checked={analyticsEnabled}
+                onChange={e => setAnalyticsEnabled(e.target.checked)}
+                className="rounded" />
+              Enable analytics
+            </label>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 ml-6">
+              Tracks page views and episode plays/completions. Data is stored locally in your own database and never sent to a third party.
+            </p>
+          </div>
+          <div>
+            <label htmlFor="track_returning_listeners" className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <input id="track_returning_listeners" type="checkbox" checked={trackReturningListeners}
+                onChange={e => setTrackReturningListeners(e.target.checked)}
+                className="rounded" />
+              Track returning listeners
+            </label>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 ml-6">
+              Uses a persistent, random, non-identifying id stored in the listener&apos;s own browser to distinguish new visits from returning ones in the dashboard. When off, a fresh id is used per visit instead.
+            </p>
           </div>
         </div>
         {saved && (
