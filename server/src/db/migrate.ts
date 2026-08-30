@@ -41,6 +41,18 @@ const MIGRATIONS: Migration[] = [
     alreadyApplied: db => columnExists(db, 'settings', 'browser_tab_title'),
     up: db => { db.prepare('ALTER TABLE settings ADD COLUMN browser_tab_title TEXT').run() },
   },
+  {
+    version: 4,
+    description: 'settings.analytics_enabled',
+    alreadyApplied: db => columnExists(db, 'settings', 'analytics_enabled'),
+    up: db => { db.prepare('ALTER TABLE settings ADD COLUMN analytics_enabled INTEGER NOT NULL DEFAULT 1').run() },
+  },
+  {
+    version: 5,
+    description: 'settings.track_returning_listeners',
+    alreadyApplied: db => columnExists(db, 'settings', 'track_returning_listeners'),
+    up: db => { db.prepare('ALTER TABLE settings ADD COLUMN track_returning_listeners INTEGER NOT NULL DEFAULT 1').run() },
+  },
 ]
 
 /**
@@ -104,6 +116,32 @@ export function runMigrations(db: Database, opts: { dbPath?: string } = {}): voi
       updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `).run()
+
+  // First-party content analytics (page views, plays, listen-progress
+  // milestones, completions). Not version-tracked, same as the other base
+  // tables — CREATE TABLE IF NOT EXISTS is always safe/idempotent. FK
+  // columns use ON DELETE SET NULL (not CASCADE): deleting an episode/season
+  // should orphan its historical events, not destroy them.
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS events (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_type   TEXT NOT NULL CHECK(event_type IN ('page_view','play_start','listen_progress','play_complete')),
+      episode_id   INTEGER REFERENCES episodes(id) ON DELETE SET NULL,
+      season_id    INTEGER REFERENCES seasons(id) ON DELETE SET NULL,
+      session_id   TEXT NOT NULL,
+      position_pct INTEGER CHECK(position_pct IS NULL OR position_pct IN (25,50,75,90)),
+      referrer     TEXT,
+      country      TEXT,
+      device_type  TEXT,
+      os           TEXT,
+      browser      TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `).run()
+
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_events_episode_id ON events(episode_id)').run()
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(created_at)').run()
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_events_session_dedup ON events(session_id, event_type, episode_id, created_at)').run()
 
   db.prepare(`
     CREATE TABLE IF NOT EXISTS schema_migrations (

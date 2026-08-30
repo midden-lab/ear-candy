@@ -2,14 +2,14 @@ import { describe, it, expect } from 'vitest'
 import { buildShareUrl, buildTweetIntentUrl, buildFacebookIntentUrl, buildBlueskyIntentUrl } from '../utils/shareUrl'
 
 describe('buildShareUrl', () => {
-  it('builds a URL with just the episode id when no timestamp is given', () => {
+  it('builds a URL with just the episode id (and ref=share) when no timestamp is given', () => {
     const url = buildShareUrl(123)
-    expect(url).toBe(`${window.location.origin}/?episode=123`)
+    expect(url).toBe(`${window.location.origin}/?episode=123&ref=share`)
   })
 
   it('includes a t param when a positive timestamp is given', () => {
     const url = buildShareUrl(123, 754)
-    expect(url).toBe(`${window.location.origin}/?episode=123&t=754`)
+    expect(url).toBe(`${window.location.origin}/?episode=123&t=754&ref=share`)
   })
 
   it('floors a fractional timestamp', () => {
@@ -18,8 +18,13 @@ describe('buildShareUrl', () => {
   })
 
   it('omits t entirely for a zero or undefined timestamp', () => {
-    expect(buildShareUrl(123, 0)).toBe(`${window.location.origin}/?episode=123`)
-    expect(buildShareUrl(123, undefined)).toBe(`${window.location.origin}/?episode=123`)
+    expect(buildShareUrl(123, 0)).toBe(`${window.location.origin}/?episode=123&ref=share`)
+    expect(buildShareUrl(123, undefined)).toBe(`${window.location.origin}/?episode=123&ref=share`)
+  })
+
+  it('always includes ref=share so a shared visit can be attributed by trackPageView()', () => {
+    expect(buildShareUrl(1)).toContain('ref=share')
+    expect(buildShareUrl(1, 30)).toContain('ref=share')
   })
 })
 

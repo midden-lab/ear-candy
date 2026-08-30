@@ -133,8 +133,89 @@ describe('runMigrations', () => {
     expect(row.browser_tab_title).toBeNull()
   })
 
+  describe('events table', () => {
+    it('creates the events table with the expected columns on a fresh database', () => {
+      const db = new Database(':memory:')
+      runMigrations(db)
+      expect(columns(db, 'events')).toEqual([
+        'id', 'event_type', 'episode_id', 'season_id', 'session_id',
+        'position_pct', 'referrer', 'country', 'device_type', 'os', 'browser', 'created_at',
+      ])
+    })
+
+    it('creates the expected indexes on events', () => {
+      const db = new Database(':memory:')
+      runMigrations(db)
+      const indexes = (db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='events'").all() as { name: string }[]).map(r => r.name)
+      expect(indexes).toContain('idx_events_episode_id')
+      expect(indexes).toContain('idx_events_created_at')
+      expect(indexes).toContain('idx_events_session_dedup')
+    })
+
+    it('rejects an invalid event_type via the CHECK constraint', () => {
+      const db = new Database(':memory:')
+      runMigrations(db)
+      expect(() => db.prepare(
+        "INSERT INTO events (event_type, session_id) VALUES ('bogus', 'abc')"
+      ).run()).toThrow()
+    })
+
+    it('rejects an out-of-range position_pct via the CHECK constraint', () => {
+      const db = new Database(':memory:')
+      runMigrations(db)
+      expect(() => db.prepare(
+        "INSERT INTO events (event_type, session_id, position_pct) VALUES ('listen_progress', 'abc', 33)"
+      ).run()).toThrow()
+    })
+
+    it('running migrations twice does not error and the table survives intact', () => {
+      const db = new Database(':memory:')
+      runMigrations(db)
+      expect(() => runMigrations(db)).not.toThrow()
+      expect(columns(db, 'events')).toContain('id')
+    })
+  })
+
+  it('creates analytics_enabled and track_returning_listeners on a fresh database, defaulted to enabled', () => {
+    const db = new Database(':memory:')
+    runMigrations(db)
+    expect(columns(db, 'settings')).toContain('analytics_enabled')
+    expect(columns(db, 'settings')).toContain('track_returning_listeners')
+    const row = db.prepare('SELECT analytics_enabled, track_returning_listeners FROM settings').get() as { analytics_enabled: number; track_returning_listeners: number }
+    expect(row.analytics_enabled).toBe(1)
+    expect(row.track_returning_listeners).toBe(1)
+  })
+
+  it('adds analytics_enabled and track_returning_listeners to a pre-existing settings table that predates the columns', () => {
+    // Simulate a production DB at schema version 3 — settings exists with a
+    // customized row, but lacks both analytics toggle columns.
+    const db = new Database(':memory:')
+    db.prepare(`
+      CREATE TABLE settings (
+        podcast_name       TEXT NOT NULL DEFAULT 'Ear Candy',
+        tagline            TEXT NOT NULL DEFAULT '',
+        description        TEXT NOT NULL DEFAULT '',
+        cover_art_path     TEXT,
+        favicon_path       TEXT,
+        browser_tab_title  TEXT,
+        accent_color       TEXT NOT NULL DEFAULT '#5a3ef5'
+      )
+    `).run()
+    db.prepare('INSERT INTO settings (podcast_name) VALUES (?)').run('Pre-Analytics Pod')
+    expect(columns(db, 'settings')).not.toContain('analytics_enabled')
+
+    runMigrations(db)
+
+    expect(columns(db, 'settings')).toContain('analytics_enabled')
+    expect(columns(db, 'settings')).toContain('track_returning_listeners')
+    const row = db.prepare('SELECT podcast_name, analytics_enabled, track_returning_listeners FROM settings').get() as { podcast_name: string; analytics_enabled: number; track_returning_listeners: number }
+    expect(row.podcast_name).toBe('Pre-Analytics Pod')
+    expect(row.analytics_enabled).toBe(1)
+    expect(row.track_returning_listeners).toBe(1)
+  })
+
   describe('schema_migrations tracking', () => {
-    it('records all three migrations as applied on a fresh database', () => {
+    it('records all five migrations as applied on a fresh database', () => {
       const db = new Database(':memory:')
       runMigrations(db)
       const rows = db.prepare('SELECT version, description FROM schema_migrations ORDER BY version').all()
@@ -142,6 +223,8 @@ describe('runMigrations', () => {
         { version: 1, description: 'episodes.cover_art_thumb_path' },
         { version: 2, description: 'settings.favicon_path' },
         { version: 3, description: 'settings.browser_tab_title' },
+        { version: 4, description: 'settings.analytics_enabled' },
+        { version: 5, description: 'settings.track_returning_listeners' },
       ])
     })
 
@@ -155,7 +238,7 @@ describe('runMigrations', () => {
 
       expect(() => runMigrations(db)).not.toThrow()
       const rows = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all()
-      expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }])
+      expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }])
     })
 
     it('running migrations again with everything already applied is a no-op', () => {
