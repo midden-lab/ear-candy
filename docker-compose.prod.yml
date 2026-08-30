@@ -14,6 +14,12 @@ services:
       - PORT=3000
       - COOKIE_SECRET=${COOKIE_SECRET:?COOKIE_SECRET must be set}
       - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:?ADMIN_PASSWORD_HASH must be set}
+      # Optional — analytics work fully without it, the country breakdown
+      # just stays empty until a database file actually exists at this
+      # path. Defaults to the conventional location under the bind-mounted
+      # data dir; override via your own .env if you want it elsewhere. See
+      # scripts/fetch-geoip-db.sh and the README's Analytics section.
+      - GEOIP_DB_PATH=${GEOIP_DB_PATH:-/app/data/geoip/dbip-country-lite.mmdb}
     logging:
       driver: json-file
       options:
