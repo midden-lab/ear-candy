@@ -232,6 +232,7 @@ export default function App() {
           seasons={seasons}
           episodes={episodes}
           activeSeason={activeSeason}
+          analyticsEnabled={settings.analytics_enabled}
           loading={episodesLoading}
           viewingEpisodeId={viewingEpisode?.id ?? null}
           onSeasonSelect={handleSeasonSelect}
