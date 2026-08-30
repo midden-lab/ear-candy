@@ -10,6 +10,12 @@ const ALLOWED_EPISODE_PATCH_FIELDS = new Set([
   'audio_type', 'audio_path', 'hidden'
 ])
 
+// Mirrors the ALLOWED_EVENT_TYPES pattern in routes/analytics.ts — without
+// this, an invalid audio_type only surfaced via the DB's own
+// CHECK(audio_type IN ('upload','url')) constraint, uncaught, as a raw 500
+// with internal SQLite error text instead of a clean 400.
+const ALLOWED_AUDIO_TYPES = new Set(['upload', 'url'])
+
 export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
   app.post<{
     Body: {
@@ -36,6 +42,7 @@ export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
 
     if (!title.trim()) return reply.status(400).send({ error: 'title is required' })
     if (duration_seconds < 0) return reply.status(400).send({ error: 'duration_seconds must not be negative' })
+    if (!ALLOWED_AUDIO_TYPES.has(audio_type)) return reply.status(400).send({ error: 'Invalid audio_type' })
     if (!isValidMediaPath(audio_path)) return reply.status(400).send({ error: 'Invalid audio_path' })
     if (cover_art_path && !isValidMediaPath(cover_art_path)) return reply.status(400).send({ error: 'Invalid cover_art_path' })
     if (cover_art_thumb_path && !isValidMediaPath(cover_art_thumb_path)) return reply.status(400).send({ error: 'Invalid cover_art_thumb_path' })
@@ -80,6 +87,7 @@ export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
 
     if (!title.trim()) return reply.status(400).send({ error: 'title is required' })
     if (duration_seconds < 0) return reply.status(400).send({ error: 'duration_seconds must not be negative' })
+    if (!ALLOWED_AUDIO_TYPES.has(audio_type)) return reply.status(400).send({ error: 'Invalid audio_type' })
     if (!isValidMediaPath(audio_path)) return reply.status(400).send({ error: 'Invalid audio_path' })
     if (cover_art_path && !isValidMediaPath(cover_art_path)) return reply.status(400).send({ error: 'Invalid cover_art_path' })
     if (cover_art_thumb_path && !isValidMediaPath(cover_art_thumb_path)) return reply.status(400).send({ error: 'Invalid cover_art_thumb_path' })
@@ -131,6 +139,9 @@ export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
     }
     if (updates.duration_seconds !== undefined && updates.duration_seconds < 0) {
       return reply.status(400).send({ error: 'duration_seconds must not be negative' })
+    }
+    if (updates.audio_type !== undefined && !ALLOWED_AUDIO_TYPES.has(updates.audio_type)) {
+      return reply.status(400).send({ error: 'Invalid audio_type' })
     }
     if (updates.audio_path !== undefined && !isValidMediaPath(updates.audio_path)) {
       return reply.status(400).send({ error: 'Invalid audio_path' })

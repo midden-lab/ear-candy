@@ -42,7 +42,7 @@ echo ""
 # --- GHCR_PAT ---
 echo "--- GHCR_PAT ---"
 echo "Create this manually at: https://github.com/settings/tokens"
-echo "Required scopes: read:packages, write:packages, delete:packages"
+echo "Required scopes: read:packages (read-only — the deploy job only pulls images; pushing to GHCR uses the ephemeral GITHUB_TOKEN, not this PAT)"
 echo "Paste the token value below when you have it:"
 read -rsp "GHCR_PAT: " GHCR_PAT
 echo ""

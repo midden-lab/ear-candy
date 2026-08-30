@@ -8,7 +8,12 @@ const ALLOWED_EVENT_TYPES = new Set<string>(['page_view', 'play_start', 'listen_
 const ALLOWED_POSITION_PCTS = new Set([25, 50, 75, 90])
 const DEDUP_WINDOW_SECONDS = 5
 const MAX_SESSION_ID_LENGTH = 128
-const MAX_REFERRER_LENGTH = 500
+// The client only ever sends an origin (e.g. https://example.com) or the
+// literal 'share-link' — both are well under this. Kept intentionally
+// tight (not the previous 500) as defense-in-depth against a non-browser
+// caller sending an arbitrary raw referrer string with a PII-bearing query
+// string (the client itself is already fixed to send origin-only).
+const MAX_REFERRER_LENGTH = 200
 
 interface AnalyticsEventBody {
   event_type: AnalyticsEventType
