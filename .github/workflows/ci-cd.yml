@@ -391,13 +391,22 @@ jobs:
             # the file existed on disk but the running container was never
             # told where to look, so country tracking silently stayed off
             # until this was added (issue #106).
+            # Loopback-only publish: Caddy runs on this host (not
+            # containerized) and reverse-proxies via `reverse_proxy
+            # localhost:3000` in its Caddyfile — that's loopback traffic,
+            # unaffected by this. Publishing to 0.0.0.0 (the old behavior)
+            # made the app directly reachable over plain HTTP on a
+            # non-standard port from anywhere on the internet, completely
+            # bypassing Caddy's TLS termination (confirmed live: a plain
+            # `curl http://<droplet-ip>:3000/api/health` returned 200).
+            # Fixes issue #81.
             docker run -d \
               --name ear-candy \
               --restart unless-stopped \
               --log-driver json-file \
               --log-opt max-size=10m \
               --log-opt max-file=3 \
-              -p 3000:3000 \
+              -p 127.0.0.1:3000:3000 \
               -v /opt/ear-candy/data:/app/data \
               -e NODE_ENV=production \
               -e SERVE_CLIENT=true \

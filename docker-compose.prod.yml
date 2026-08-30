@@ -4,8 +4,12 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    # Loopback-only — mirrors the deploy job's binding in ci-cd.yml
+    # (issue #81). A reverse proxy on the same host reaches this via
+    # localhost; publishing to all interfaces bypassed TLS termination
+    # entirely for anyone hitting :3000 directly.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ./data:/app/data
     environment:
