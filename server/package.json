@@ -26,7 +26,7 @@
     "@types/better-sqlite3": "^7.6.8",
     "@types/node": "^22.0.0",
     "eslint": "^10.9.1",
-    "music-metadata": "^11.13.0",
+    "music-metadata": "^11.15.0",
     "tsx": "^4.23.12",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.68.0",
