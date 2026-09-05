@@ -58,7 +58,7 @@ const mockEpisode: Episode = {
   updated_at: '2024-01-01T00:00:00Z',
 }
 
-type Overrides = Partial<Pick<AudioPlayerViewProps, 'episode' | 'playing' | 'currentTime' | 'duration' | 'speed'>>
+type Overrides = Partial<Pick<AudioPlayerViewProps, 'episode' | 'playing' | 'currentTime' | 'duration' | 'speed' | 'onTapMiniBar'>>
 
 /** Stateful harness so callback-driven interactions (play/pause, seek, speed)
  *  actually update what's rendered — proves this is a genuine controlled
@@ -77,6 +77,7 @@ function Harness(overrides: Overrides) {
       currentTime={currentTime}
       duration={duration}
       speed={speed}
+      onTapMiniBar={overrides.onTapMiniBar}
       onSeek={setCurrentTime}
       onTogglePlay={() => setPlaying(p => !p)}
       onSpeedChange={setSpeed}
@@ -441,18 +442,10 @@ describe('mobile (< md)', () => {
     expect(screen.queryByRole('button', { name: /speed/i })).not.toBeInTheDocument()
   })
 
-  it('does not show a share button on the collapsed mini-bar', () => {
+  it('does not show a share button on the mini-bar', () => {
     mockMobile()
     renderView({ episode: mockEpisode })
     expect(screen.queryByRole('button', { name: /share/i })).not.toBeInTheDocument()
-  })
-
-  it('shows a share button in the expanded full-screen overlay', async () => {
-    const user = userEvent.setup()
-    mockMobile()
-    renderView({ episode: mockEpisode })
-    await user.click(screen.getByRole('button', { name: /now playing/i }))
-    expect(screen.getByRole('button', { name: /share/i })).toBeInTheDocument()
   })
 
   it('title truncates correctly next to the play button (min-w-0 regression guard)', () => {
@@ -463,45 +456,31 @@ describe('mobile (< md)', () => {
     expect(title.parentElement).toHaveClass('min-w-0')
   })
 
-  it('tapping the mini-bar expands to the full-screen overlay with all transport controls', async () => {
+  it('does not render full transport controls on mobile at all — there is no expanded state anymore', async () => {
     const user = userEvent.setup()
     mockMobile()
     renderView({ episode: mockEpisode })
     await user.click(screen.getByRole('button', { name: /now playing/i }))
-    expect(screen.getByRole('button', { name: 'Skip to start' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /speed/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Collapse now playing' })).toBeInTheDocument()
-  })
-
-  it('now-playing overlay shows a responsive srcset image when cover art is set', async () => {
-    const user = userEvent.setup()
-    mockMobile()
-    renderView({
-      episode: { ...mockEpisode, cover_art_path: 'https://example.com/detail.webp', cover_art_thumb_path: 'https://example.com/thumb.webp' },
-    })
-    await user.click(screen.getByRole('button', { name: /now playing/i }))
-    const img = screen.getByRole('img')
-    expect(img).toHaveAttribute('loading', 'lazy')
-    expect(img).toHaveAttribute('srcset', expect.stringContaining('150w'))
-    expect(img).toHaveAttribute('srcset', expect.stringContaining('640w'))
-  })
-
-  it('collapses back to the mini-bar when the collapse control is tapped', async () => {
-    const user = userEvent.setup()
-    mockMobile()
-    renderView({ episode: mockEpisode })
-    await user.click(screen.getByRole('button', { name: /now playing/i }))
-    await user.click(screen.getByRole('button', { name: 'Collapse now playing' }))
-    expect(screen.queryByRole('button', { name: 'Collapse now playing' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Skip to start' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /speed/i })).not.toBeInTheDocument()
   })
 
-  it('mini-bar play/pause button toggles playing without expanding the overlay', () => {
+  it('tapping the mini-bar (outside the play/pause button) calls onTapMiniBar', async () => {
+    const user = userEvent.setup()
     mockMobile()
-    renderView({ episode: mockEpisode, playing: false })
+    const onTapMiniBar = vi.fn()
+    render(<Harness episode={mockEpisode} onTapMiniBar={onTapMiniBar} />)
+    await user.click(screen.getByRole('button', { name: /now playing/i }))
+    expect(onTapMiniBar).toHaveBeenCalledTimes(1)
+  })
+
+  it('mini-bar play/pause button toggles playing without calling onTapMiniBar', () => {
+    mockMobile()
+    const onTapMiniBar = vi.fn()
+    render(<Harness episode={mockEpisode} playing={false} onTapMiniBar={onTapMiniBar} />)
     fireEvent.click(screen.getByRole('button', { name: 'Play' }))
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Collapse now playing' })).not.toBeInTheDocument()
+    expect(onTapMiniBar).not.toHaveBeenCalled()
   })
 
   it('mini-bar shows a lazy-loaded thumbnail when cover art is set', () => {
@@ -512,65 +491,6 @@ describe('mobile (< md)', () => {
     const img = screen.getByRole('img')
     expect(img).toHaveAttribute('src', 'https://example.com/thumb.webp')
     expect(img).toHaveAttribute('loading', 'lazy')
-  })
-
-  it('expands to the full-screen overlay when expandSignal changes', () => {
-    mockMobile()
-    const { rerender } = render(
-      <AudioPlayerView
-        episode={mockEpisode}
-        playing={false}
-        currentTime={0}
-        duration={120}
-        speed={1}
-        expandSignal={0}
-        onSeek={() => {}}
-        onTogglePlay={() => {}}
-        onSpeedChange={() => {}}
-        onTimeUpdate={() => {}}
-        onDurationChange={() => {}}
-        onEnded={() => {}}
-      />
-    )
-    expect(screen.queryByRole('button', { name: 'Collapse now playing' })).not.toBeInTheDocument()
-    rerender(
-      <AudioPlayerView
-        episode={mockEpisode}
-        playing={false}
-        currentTime={0}
-        duration={120}
-        speed={1}
-        expandSignal={1}
-        onSeek={() => {}}
-        onTogglePlay={() => {}}
-        onSpeedChange={() => {}}
-        onTimeUpdate={() => {}}
-        onDurationChange={() => {}}
-        onEnded={() => {}}
-      />
-    )
-    expect(screen.getByRole('button', { name: 'Collapse now playing' })).toBeInTheDocument()
-  })
-
-  it('does not expand on mount just because expandSignal has an initial value', () => {
-    mockMobile()
-    render(
-      <AudioPlayerView
-        episode={mockEpisode}
-        playing={false}
-        currentTime={0}
-        duration={120}
-        speed={1}
-        expandSignal={5}
-        onSeek={() => {}}
-        onTogglePlay={() => {}}
-        onSpeedChange={() => {}}
-        onTimeUpdate={() => {}}
-        onDurationChange={() => {}}
-        onEnded={() => {}}
-      />
-    )
-    expect(screen.queryByRole('button', { name: 'Collapse now playing' })).not.toBeInTheDocument()
   })
 })
 
@@ -707,6 +627,27 @@ describe('loading and error state (issues #82, #83)', () => {
     const loadCallsBefore = (HTMLMediaElement.prototype.load as ReturnType<typeof vi.fn>).mock.calls.length
     rerender(<AudioPlayerView {...baseProps({ retrySignal: 3, currentTime: 10 })} />)
     expect((HTMLMediaElement.prototype.load as ReturnType<typeof vi.fn>).mock.calls.length).toBe(loadCallsBefore)
+  })
+
+  it('applies a seekRequest to the real <audio> element and calls onSeek — not just a display-only update', () => {
+    const onSeek = vi.fn()
+    const { rerender, container } = render(
+      <AudioPlayerView {...baseProps({ onSeek, seekRequest: { time: 30, nonce: 1 } })} />
+    )
+    rerender(<AudioPlayerView {...baseProps({ onSeek, seekRequest: { time: 75, nonce: 2 } })} />)
+    const audio = container.querySelector('audio') as HTMLAudioElement
+    expect(audio.currentTime).toBe(75)
+    expect(onSeek).toHaveBeenCalledWith(75)
+  })
+
+  it('does not re-apply a seekRequest whose nonce is unchanged on re-render', () => {
+    const onSeek = vi.fn()
+    const { rerender } = render(
+      <AudioPlayerView {...baseProps({ onSeek, seekRequest: { time: 30, nonce: 1 } })} />
+    )
+    onSeek.mockClear()
+    rerender(<AudioPlayerView {...baseProps({ onSeek, seekRequest: { time: 30, nonce: 1 }, currentTime: 5 })} />)
+    expect(onSeek).not.toHaveBeenCalled()
   })
 
   it('mini-bar reflects loading and error state too', () => {

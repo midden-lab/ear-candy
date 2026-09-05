@@ -2,6 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Self-hosted (not Google Fonts CDN) — see client/public/fonts/LICENSE-OFL.txt.
+   Ear Candy is self-hostable and open-source; a third-party font CDN would put
+   a network call to Google in front of every page view of every deployment. */
+@font-face {
+  font-family: 'Archivo';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/archivo-variable.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-500.woff2') format('woff2');
+}
+
 :root {
   --accent: #5a3ef5;
   --accent-contrast: #ffffff;
@@ -15,10 +42,28 @@
      mobile mini-player above the tab bar instead of at the very bottom, and
      folded into AppShell's <main> padding-bottom on mobile. */
   --tabbar-h: 0px;
+
+  /* Quiet Room neutral-scale tokens (plans/005) — light values. --accent
+     stays admin-configurable and is set separately by useTheme.ts. */
+  --canvas: #EEEFF0;
+  --surface: #FFFFFF;
+  --ink: #121316;
+  --ink-2: #5B5E64;
+  --ink-3: #8E9197;
+  --ink-4: #B4B7BC;
+}
+
+.dark {
+  --canvas: #121014;
+  --surface: #1B1920;
+  --ink: #F1EFF3;
+  --ink-2: #A9A6AF;
+  --ink-3: #75727A;
+  --ink-4: #4C4A51;
 }
 
 body {
-  @apply bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100;
+  @apply bg-canvas text-ink font-sans;
 }
 
 @keyframes eq-bar {

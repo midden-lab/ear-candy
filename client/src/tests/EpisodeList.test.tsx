@@ -182,14 +182,14 @@ describe('mobile layout (< md)', () => {
     window.matchMedia = originalMatchMedia
   })
 
-  it('renders the SeasonChip dropdown and selecting a season calls onSeasonSelect', async () => {
+  it('renders the SeasonPicker full-screen selector and selecting a season calls onSeasonSelect', async () => {
     mockMobile()
     const user = userEvent.setup()
     render(<Harness />)
-    const chip = screen.getByRole('button', { name: 'Season One' })
-    expect(chip).toHaveAttribute('aria-haspopup', 'listbox')
-    await user.click(chip)
-    await user.click(screen.getByRole('option', { name: 'Season One' }))
+    const trigger = screen.getByRole('button', { name: 'Season One' })
+    expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
+    await user.click(trigger)
+    await user.click(screen.getByRole('option', { name: /Season One/ }))
   })
 })
 
