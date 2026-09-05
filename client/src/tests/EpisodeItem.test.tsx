@@ -40,19 +40,23 @@ it('calls onClick with episode when clicked', async () => {
   expect(onClick).toHaveBeenCalledWith(episode)
 })
 
-it('active state: has left border class, no solid accent fill', () => {
+it('active state: surface background + shadow, no border, no solid accent fill', () => {
   render(<EpisodeItem episode={episode} isActive={true} onClick={() => {}} />)
   const btn = screen.getByRole('button')
   expect(btn).toHaveAttribute('aria-current', 'true')
-  expect(btn).toHaveClass('border-l-2')
+  expect(btn).toHaveClass('bg-surface')
+  expect(btn).toHaveClass('shadow-sm')
+  expect(btn.className).not.toMatch(/\bborder(-|\b)/)
   expect(btn).not.toHaveClass('bg-[var(--accent)]')
 })
 
-it('inactive state: no aria-current, no border-l-2', () => {
+it('inactive state: no aria-current, no active-state classes, no border', () => {
   render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
   const btn = screen.getByRole('button')
   expect(btn).not.toHaveAttribute('aria-current')
-  expect(btn).not.toHaveClass('border-l-2')
+  expect(btn).not.toHaveClass('bg-surface')
+  expect(btn).not.toHaveClass('shadow-sm')
+  expect(btn.className).not.toMatch(/\bborder(-|\b)/)
 })
 
 it('shows EQ indicator when isPlaying is true', () => {

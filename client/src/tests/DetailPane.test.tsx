@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import DetailPane from '../components/DetailPane'
@@ -187,5 +187,106 @@ describe('loading/error/retry state (issues #82, #83, #84)', () => {
   it('shows a generic message for an upload-type episode error', () => {
     render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} error={true} onPlayPause={() => {}} />)
     expect(screen.getByText('Playback interrupted — tap retry.')).toBeInTheDocument()
+  })
+})
+
+describe('share control', () => {
+  it('renders a share trigger for any viewed episode', () => {
+    render(<DetailPane episode={mockEpisode} seasons={seasons} />)
+    expect(screen.getByRole('button', { name: /Share/ })).toBeInTheDocument()
+  })
+
+  it('offers a "start at" timestamp share when this episode is the one actually playing, past the minimum threshold', async () => {
+    const user = userEvent.setup()
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} currentTime={90} />)
+    await user.click(screen.getByRole('button', { name: 'Share this moment' }))
+    expect(screen.getByText(/Start at/)).toBeInTheDocument()
+  })
+
+  it('offers only a beginning-only share when this episode is merely being viewed, not playing — even if a currentTime happens to be passed', async () => {
+    const user = userEvent.setup()
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={false} currentTime={90} />)
+    await user.click(screen.getByRole('button', { name: 'Share episode' }))
+    expect(screen.queryByText(/Start at/)).not.toBeInTheDocument()
+  })
+
+  it('offers only a beginning-only share when this episode is playing but under the minimum timestamp threshold', async () => {
+    const user = userEvent.setup()
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} currentTime={2} />)
+    await user.click(screen.getByRole('button', { name: 'Share episode' }))
+    expect(screen.queryByText(/Start at/)).not.toBeInTheDocument()
+  })
+})
+
+describe('playback transport (scrub bar, skip, speed)', () => {
+  const transportProps = {
+    episode: mockEpisode,
+    seasons,
+    isCurrentPlayerEpisode: true,
+    currentTime: 60,
+    duration: 3600,
+    speed: 1,
+    onRequestSeek: vi.fn(),
+    onSpeedChange: vi.fn(),
+  }
+
+  it('does not render transport controls when isCurrentPlayerEpisode is false, even with all other props present', () => {
+    render(<DetailPane {...transportProps} isCurrentPlayerEpisode={false} />)
+    expect(screen.queryByRole('slider', { name: 'Seek' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back 15 seconds' })).not.toBeInTheDocument()
+  })
+
+  it('does not render transport controls when required playback props are missing, even if isCurrentPlayerEpisode is true', () => {
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} />)
+    expect(screen.queryByRole('slider', { name: 'Seek' })).not.toBeInTheDocument()
+  })
+
+  it('renders the scrub bar, times, and skip/speed controls when this episode is the one playing', () => {
+    render(<DetailPane {...transportProps} />)
+    expect(screen.getByRole('slider', { name: 'Seek' })).toBeInTheDocument()
+    expect(screen.getByText('1:00')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back 15 seconds' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Forward 15 seconds' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Playback speed' })).toBeInTheDocument()
+  })
+
+  it('does not render a redundant central play/pause button inside the transport row', () => {
+    render(<DetailPane {...transportProps} />)
+    // Only DetailPane's own big "Play episode"/"Pause episode" button should
+    // exist — TransportControls' own central button must be suppressed here
+    // (showPlayButton=false), or there'd be two ambiguous play controls.
+    expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument()
+  })
+
+  it('calls onRequestSeek with a clamped target when skipping back 15 seconds', async () => {
+    const user = userEvent.setup()
+    const onRequestSeek = vi.fn()
+    render(<DetailPane {...transportProps} currentTime={10} onRequestSeek={onRequestSeek} />)
+    await user.click(screen.getByRole('button', { name: 'Back 15 seconds' }))
+    expect(onRequestSeek).toHaveBeenCalledWith(0)
+  })
+
+  it('calls onRequestSeek with a clamped target when skipping forward 15 seconds past the end', async () => {
+    const user = userEvent.setup()
+    const onRequestSeek = vi.fn()
+    render(<DetailPane {...transportProps} currentTime={3590} duration={3600} onRequestSeek={onRequestSeek} />)
+    await user.click(screen.getByRole('button', { name: 'Forward 15 seconds' }))
+    expect(onRequestSeek).toHaveBeenCalledWith(3600)
+  })
+
+  it('calls onSpeedChange with the next speed in the cycle when the speed control is clicked', async () => {
+    const user = userEvent.setup()
+    const onSpeedChange = vi.fn()
+    render(<DetailPane {...transportProps} speed={1} onSpeedChange={onSpeedChange} />)
+    await user.click(screen.getByRole('button', { name: 'Playback speed' }))
+    expect(onSpeedChange).toHaveBeenCalledWith(1.5)
+  })
+
+  it('calls onRequestSeek (not a bare setCurrentTime-style callback) when the scrub bar itself is moved', () => {
+    const onRequestSeek = vi.fn()
+    render(<DetailPane {...transportProps} onRequestSeek={onRequestSeek} />)
+    fireEvent.change(screen.getByRole('slider', { name: 'Seek' }), { target: { value: '200' } })
+    expect(onRequestSeek).toHaveBeenCalledWith(200)
   })
 })

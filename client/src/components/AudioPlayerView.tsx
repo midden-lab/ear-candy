@@ -1,110 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { Episode } from '../types'
 import ProgressBar from './ProgressBar'
 import EpisodeCoverArt from './EpisodeCoverArt'
 import ShareDialog from './ShareDialog'
 import PlaybackStatusLine from './PlaybackStatusLine'
+import TransportControls, { RetryIcon } from './TransportControls'
 import { getPlaybackStatus } from '../utils/playbackStatus'
+import { formatTime, clampSeekTime, nextSpeed } from '../utils/playback'
 import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
-
-function formatTime(seconds: number, showSign = false): string {
-  const abs = Math.floor(Math.abs(seconds))
-  const m = Math.floor(abs / 60)
-  const s = abs % 60
-  const str = `${m}:${String(s).padStart(2, '0')}`
-  return showSign && seconds < 0 ? `-${str}` : str
-}
-
-const SPEEDS = [1, 1.5, 2] as const
-
-function RetryIcon({ size }: { size: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.996 5.996 0 0 1-5.65 4c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
-    </svg>
-  )
-}
-
-interface TransportControlsProps {
-  playing: boolean
-  onTogglePlay: () => void
-  onSkipStart: () => void
-  onSkipEnd: () => void
-  onBack15: () => void
-  onForward15: () => void
-  speed: number
-  onCycleSpeed: () => void
-  /** Bumps skip/speed touch targets to >=44px for the mobile full-screen overlay. */
-  large?: boolean
-  /** True while buffering (native waiting/stalled events) — dims the
-   *  central button but leaves it clickable, so pausing can still cancel a
-   *  slow buffering attempt (issue #82). */
-  loading?: boolean
-  /** True after a real playback failure — swaps the central button to a
-   *  retry action instead of play/pause (issue #83). */
-  error?: boolean
-  onRetry?: () => void
-}
-
-function TransportControls({
-  playing, onTogglePlay, onSkipStart, onSkipEnd, onBack15, onForward15, speed, onCycleSpeed, large,
-  loading, error, onRetry,
-}: TransportControlsProps) {
-  const btnClass = large
-    ? 'flex h-11 w-11 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors'
-    : 'rounded p-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors'
-  const isLoading = !!loading && !error
-
-  return (
-    <div className="flex items-center justify-center gap-3">
-      <button onClick={onSkipStart} className={btnClass} aria-label="Skip to start">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>
-        </svg>
-      </button>
-      <button onClick={onBack15} className={btnClass} aria-label="Back 15 seconds">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8.01-8z"/>
-        </svg>
-      </button>
-      <button
-        onClick={error ? onRetry : onTogglePlay}
-        className={`rounded-full bg-[var(--accent)] p-3 text-[var(--accent-contrast)] transition-opacity hover:opacity-90 ${isLoading ? 'opacity-60' : ''}`}
-        aria-label={error ? 'Retry playback' : (playing ? 'Pause' : 'Play')}
-        aria-busy={isLoading || undefined}
-      >
-        {error ? (
-          <RetryIcon size={20} />
-        ) : playing ? (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-          </svg>
-        ) : (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        )}
-      </button>
-      <button onClick={onForward15} className={btnClass} aria-label="Forward 15 seconds">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M18 13c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6v4l5-5-5-5v4c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8h-2z"/>
-        </svg>
-      </button>
-      <button onClick={onSkipEnd} className={btnClass} aria-label="Skip to end">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M6 18l8.5-6L6 6v12zm2.5-6 5.5 3.9V8.1L8.5 12zM16 6h2v12h-2z"/>
-        </svg>
-      </button>
-      <button
-        onClick={onCycleSpeed}
-        className={`${large ? 'flex h-11 min-w-[2.75rem] items-center justify-center' : 'px-2 py-1 min-w-[2.5rem]'} rounded text-xs font-semibold text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors text-center`}
-        aria-label="Playback speed"
-      >
-        {speed}×
-      </button>
-    </div>
-  )
-}
 
 export interface AudioPlayerViewProps {
   episode: Episode | null
@@ -128,15 +31,20 @@ export interface AudioPlayerViewProps {
    *  needs to be able to trigger it from wherever its own retry button
    *  lives (which may not be this component at all — e.g. DetailPane). */
   retrySignal?: number
-  /** Bumped (any change in value) to command "expand to the full-screen now
-   *  playing overlay" — e.g. from MobileTabBar's "Now Playing" tab, which
-   *  has no other way to reach this component's own expand/collapse state.
-   *  Mirrors the retrySignal pattern: the host can only ask for the
-   *  transition, not directly set the underlying boolean, so this
-   *  component keeps sole ownership of its own expanded state. No-op on
-   *  desktop (no mini-bar/overlay distinction there) or when nothing is
-   *  loaded. */
-  expandSignal?: number
+  /** Set (a new object, with an incremented `nonce`) to request a seek to
+   *  `time` from outside this component — e.g. DetailPane's own scrub bar,
+   *  which has no <audio> ref of its own. Mirrors the retrySignal pattern:
+   *  a plain prop change the host can react to via setCurrentTime/onSeek
+   *  alone would update the *displayed* time everywhere without touching
+   *  real playback, since only this component's effect actually applies a
+   *  seek to the underlying element. */
+  seekRequest?: { time: number; nonce: number }
+  /** Fired when the mobile mini-bar itself is tapped, outside its own
+   *  Play/Pause button — the host decides what that means (this component
+   *  no longer has its own full-screen "now playing" state; navigating to
+   *  a shared detail view is the host's job, e.g. App.tsx's
+   *  handleViewPlaying). No-op on desktop, which has no mini-bar. */
+  onTapMiniBar?: () => void
   /** Fired after the view has moved the underlying <audio> element's playhead. */
   onSeek: (time: number) => void
   onTogglePlay: () => void
@@ -169,31 +77,23 @@ export interface AudioPlayerViewProps {
 /**
  * Fully self-contained audio player: owns the real <audio> element and its
  * playback wiring (play/pause, seek, speed, load-on-episode-change), and
- * renders as a desktop bar, a mobile mini-bar, or a mobile full-screen
- * "now playing" overlay depending on viewport and its own expand/collapse
- * state. Playback position/duration/playing/speed are controlled via props
- * so this component has no dependency on any particular app's state
- * management — the host wires it to whatever store it likes.
+ * renders as a desktop bar or a mobile mini-bar depending on viewport.
+ * Playback position/duration/playing/speed are controlled via props so
+ * this component has no dependency on any particular app's state
+ * management — the host wires it to whatever store it likes. On mobile,
+ * this is deliberately just a mini-bar with no full-screen state of its
+ * own — the host's "Playing" destination (e.g. App.tsx's detail pane) is
+ * where a listener actually goes to see more, reached via onTapMiniBar.
  */
 export default function AudioPlayerView({
-  episode, playing, currentTime, duration, speed, resumeTime, loading, error, retrySignal, expandSignal,
+  episode, playing, currentTime, duration, speed, resumeTime, loading, error, retrySignal, seekRequest,
+  onTapMiniBar,
   onSeek, onTogglePlay, onSpeedChange, onTimeUpdate, onDurationChange, onEnded,
   onWaiting, onPlaybackResumed, onPlaybackError, onReset, onRetry, onHeightChange,
 }: AudioPlayerViewProps) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
-  const [expanded, setExpanded] = useState(false)
-
-  // Collapse back to the mini-bar once playback stops entirely (no
-  // episode), so a later episode selection doesn't reopen the overlay from
-  // stale state. Adjusted during render (React's documented pattern for
-  // resetting state on a prop change) rather than in an effect.
-  const prevEpisodeIdRef = useRef(episode?.id)
-  if (episode?.id !== prevEpisodeIdRef.current) {
-    prevEpisodeIdRef.current = episode?.id
-    if (!episode && expanded) setExpanded(false)
-  }
 
   useEffect(() => {
     const audio = audioRef.current
@@ -251,22 +151,26 @@ export default function AudioPlayerView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retrySignal])
 
-  const prevExpandSignalRef = useRef(expandSignal)
+  // Applying a seek requested from outside this component (e.g. DetailPane's
+  // scrub bar) requires actually touching the <audio> element, not just
+  // updating the host's own displayed currentTime — same reasoning as
+  // retrySignal above, and the same nonce-comparison shape.
+  const prevSeekNonceRef = useRef(seekRequest?.nonce)
   useEffect(() => {
-    if (!episode) return
-    if (expandSignal !== undefined && expandSignal !== prevExpandSignalRef.current) {
-      prevExpandSignalRef.current = expandSignal
-      setExpanded(true)
+    const audio = audioRef.current
+    if (!audio || !episode || !seekRequest) return
+    if (seekRequest.nonce !== prevSeekNonceRef.current) {
+      prevSeekNonceRef.current = seekRequest.nonce
+      audio.currentTime = seekRequest.time
+      onSeek(seekRequest.time)
     }
-  }, [expandSignal, episode])
-
-  const isFullScreenOverlay = !isDesktop && expanded
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seekRequest])
 
   // Feed the player's actual rendered height to the host via onHeightChange,
-  // whenever it changes. Zero when nothing should reserve space (no
-  // episode, or the full-screen overlay is covering everything anyway).
+  // whenever it changes. Zero when nothing should reserve space (no episode).
   useLayoutEffect(() => {
-    if (!episode || isFullScreenOverlay) {
+    if (!episode) {
       onHeightChange?.(0)
       return
     }
@@ -281,7 +185,7 @@ export default function AudioPlayerView({
       onHeightChange?.(0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onHeightChange is expected to be a stable callback
-  }, [episode, isFullScreenOverlay])
+  }, [episode])
 
   const handleSeek = (time: number) => {
     if (audioRef.current) audioRef.current.currentTime = time
@@ -289,12 +193,11 @@ export default function AudioPlayerView({
   }
 
   const skipTo = (time: number) => {
-    handleSeek(Math.max(0, Math.min(time, duration)))
+    handleSeek(clampSeekTime(time, duration))
   }
 
   const cycleSpeed = () => {
-    const idx = SPEEDS.indexOf(speed as typeof SPEEDS[number])
-    onSpeedChange(SPEEDS[(idx + 1) % SPEEDS.length])
+    onSpeedChange(nextSpeed(speed))
   }
 
   if (!episode) return null
@@ -336,8 +239,10 @@ export default function AudioPlayerView({
     onCycleSpeed: cycleSpeed,
   }
 
-  // Mobile, collapsed: compact mini-bar.
-  if (!isDesktop && !expanded) {
+  // Mobile: compact mini-bar. Tapping it (outside the Play/Pause button)
+  // navigates to the host's own "Playing" destination via onTapMiniBar —
+  // this component no longer owns any full-screen state of its own.
+  if (!isDesktop) {
     return (
       <div
         ref={barRef}
@@ -350,9 +255,9 @@ export default function AudioPlayerView({
       >
         {audioEl}
         <button
-          onClick={() => setExpanded(true)}
+          onClick={() => onTapMiniBar?.()}
           className="flex w-full items-center gap-3 px-4 py-2 text-left"
-          aria-label={`Now playing: ${episode.title}. Tap to expand.`}
+          aria-label={`Now playing: ${episode.title}. Tap to view.`}
         >
           <EpisodeCoverArt
             thumbPath={episode.cover_art_thumb_path}
@@ -397,53 +302,6 @@ export default function AudioPlayerView({
             )}
           </span>
         </button>
-      </div>
-    )
-  }
-
-  // Mobile, expanded: full-screen "now playing" overlay.
-  if (!isDesktop && expanded) {
-    return (
-      <div
-        className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-zinc-50 dark:bg-zinc-950 transition-transform duration-300 motion-reduce:transition-none"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)', paddingTop: 'env(safe-area-inset-top)' }}
-      >
-        {audioEl}
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => setExpanded(false)}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-            aria-label="Collapse now playing"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="m6 9 6 6 6-6"/>
-            </svg>
-          </button>
-          {/* ShareDialog's own trigger is already a 44px (h-11 w-11) touch
-              target by default — no per-usage size override needed here. */}
-          <ShareDialog episodeId={episode.id} episodeTitle={episode.title} currentTime={currentTime} />
-        </div>
-        <div className="flex flex-1 flex-col items-center justify-center gap-8 px-6 pb-6">
-          <EpisodeCoverArt
-            thumbPath={episode.cover_art_thumb_path}
-            detailPath={episode.cover_art_path}
-            alt={episode.title}
-            variant="responsive"
-            className="w-full max-w-xs aspect-square object-cover rounded-xl shadow-lg ring-1 ring-zinc-200 dark:ring-zinc-800"
-          />
-          <div className="w-full max-w-xs text-center">
-            <div className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-100">{episode.title}</div>
-            <PlaybackStatusLine status={playbackStatus} className="mt-1" />
-          </div>
-          <div className="w-full max-w-xs space-y-2">
-            <ProgressBar currentTime={currentTime} duration={duration} onSeek={handleSeek} />
-            <div className="flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(remaining, true)}</span>
-            </div>
-          </div>
-          <TransportControls {...transportProps} large />
-        </div>
       </div>
     )
   }

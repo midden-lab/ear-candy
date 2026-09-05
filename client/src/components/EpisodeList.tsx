@@ -7,6 +7,15 @@ interface EpisodeListProps {
   podcastName: string
   seasons: Season[]
   episodes: Episode[]
+  /** Every visible episode across every season — powers cross-catalog
+   *  search and per-season counts, independent of the season-scoped
+   *  `episodes` list above. Defaults to empty so callers that don't pass it
+   *  (existing tests) see no behavior change. */
+  allEpisodes?: Episode[]
+  /** Cross-catalog search query. Non-empty means the list shows search
+   *  results (flattened across all seasons) instead of `episodes`. */
+  searchQuery?: string
+  onSearchChange?: (query: string) => void
   activeSeason: number | null
   /** Whether first-party analytics is administratively enabled — threaded
    *  through to PrivacyNotice via EpisodeListView. */
@@ -30,7 +39,7 @@ interface EpisodeListProps {
  * EpisodeListView, which takes no dependency on this app's state management.
  */
 export default function EpisodeList({
-  podcastName, seasons, episodes, activeSeason, analyticsEnabled, loading, viewingEpisodeId, onSeasonSelect, onEpisodeSelect, onEpisodeView,
+  podcastName, seasons, episodes, allEpisodes = [], searchQuery = '', onSearchChange = () => {}, activeSeason, analyticsEnabled, loading, viewingEpisodeId, onSeasonSelect, onEpisodeSelect, onEpisodeView,
 }: EpisodeListProps) {
   const playingEpisode = usePlayerStore(state => state.episode)
   const playing = usePlayerStore(state => state.playing)
@@ -72,6 +81,9 @@ export default function EpisodeList({
       podcastName={podcastName}
       seasons={seasons}
       episodes={episodes}
+      allEpisodes={allEpisodes}
+      searchQuery={searchQuery}
+      onSearchChange={onSearchChange}
       activeSeason={activeSeason}
       analyticsEnabled={analyticsEnabled}
       loading={loading}

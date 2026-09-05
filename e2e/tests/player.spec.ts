@@ -42,7 +42,10 @@ test.describe('Audio Player', () => {
   test('speed toggle cycles 1× → 1.5× → 2× → 1×', async ({ seededPage: page }) => {
     await page.locator('button', { hasText: 'Deep Dive' }).click()
     await page.getByRole('button', { name: 'Play' }).click()
-    const speedBtn = page.getByRole('button', { name: 'Playback speed' })
+    // Scoped to the dock — DetailPane now shows its own copy of these same
+    // controls too when viewing the playing episode, so an unscoped query
+    // would be ambiguous.
+    const speedBtn = page.getByTestId('player-bar').getByRole('button', { name: 'Playback speed' })
     await expect(speedBtn).toHaveText('1×')
     await speedBtn.click()
     await expect(speedBtn).toHaveText('1.5×')
@@ -55,10 +58,12 @@ test.describe('Audio Player', () => {
   test('all skip and seek buttons are visible', async ({ seededPage: page }) => {
     await page.locator('button', { hasText: 'Deep Dive' }).click()
     await page.getByRole('button', { name: 'Play' }).click()
-    await expect(page.getByRole('button', { name: 'Skip to start' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Back 15 seconds' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Forward 15 seconds' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Skip to end' })).toBeVisible()
+    // Scoped to the dock — see note above.
+    const dock = page.getByTestId('player-bar')
+    await expect(dock.getByRole('button', { name: 'Skip to start' })).toBeVisible()
+    await expect(dock.getByRole('button', { name: 'Back 15 seconds' })).toBeVisible()
+    await expect(dock.getByRole('button', { name: 'Forward 15 seconds' })).toBeVisible()
+    await expect(dock.getByRole('button', { name: 'Skip to end' })).toBeVisible()
   })
 
   test('elapsed and remaining timestamps are visible', async ({ seededPage: page }) => {

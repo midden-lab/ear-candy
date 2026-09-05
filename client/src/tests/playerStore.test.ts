@@ -30,7 +30,7 @@ const mockEpisode2: Episode = {
 beforeEach(() => {
   usePlayerStore.setState({
     episode: null, playing: false, currentTime: 0, duration: 0, speed: 1,
-    loading: false, error: false, retryNonce: 0,
+    loading: false, error: false, retryNonce: 0, seekRequest: null,
   })
 })
 
@@ -41,6 +41,7 @@ describe('playerStore', () => {
     expect(state.playing).toBe(false)
     expect(state.currentTime).toBe(0)
     expect(state.duration).toBe(0)
+    expect(state.seekRequest).toBeNull()
   })
 
   it('setEpisode sets the episode', () => {
@@ -150,6 +151,25 @@ describe('playerStore', () => {
       act(() => usePlayerStore.getState().retryPlayback())
       act(() => usePlayerStore.getState().retryPlayback())
       expect(usePlayerStore.getState().retryNonce).toBe(2)
+    })
+  })
+
+  describe('requestSeek', () => {
+    it('sets seekRequest with the requested time and a nonce of 1 on first call', () => {
+      act(() => usePlayerStore.getState().requestSeek(42))
+      expect(usePlayerStore.getState().seekRequest).toEqual({ time: 42, nonce: 1 })
+    })
+
+    it('increments the nonce on every subsequent call, even to the same time', () => {
+      act(() => usePlayerStore.getState().requestSeek(10))
+      act(() => usePlayerStore.getState().requestSeek(10))
+      act(() => usePlayerStore.getState().requestSeek(20))
+      expect(usePlayerStore.getState().seekRequest).toEqual({ time: 20, nonce: 3 })
+    })
+
+    it('does not itself change currentTime — that only happens once AudioPlayerView applies the seek and calls onSeek', () => {
+      act(() => usePlayerStore.getState().requestSeek(99))
+      expect(usePlayerStore.getState().currentTime).toBe(0)
     })
   })
 })
