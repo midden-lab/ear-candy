@@ -1,6 +1,6 @@
 import type { Season, Episode } from '../types'
 import SeasonTabs from './SeasonTabs'
-import SeasonChip from './SeasonChip'
+import SeasonPicker from './SeasonPicker'
 import EpisodeItem from './EpisodeItem'
 import PrivacyNotice from './PrivacyNotice'
 import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
@@ -87,7 +87,7 @@ export default function EpisodeListView({
       {!isSearching && (
         isDesktop
           ? <SeasonTabs seasons={seasons} activeSeason={activeSeason} episodeCounts={episodeCounts} onSelect={onSeasonSelect} />
-          : <div className="px-4 py-2"><SeasonChip seasons={seasons} activeSeason={activeSeason} onSelect={onSeasonSelect} /></div>
+          : <div className="px-4 py-2"><SeasonPicker seasons={seasons} activeSeason={activeSeason} episodeCounts={episodeCounts} onSelect={onSeasonSelect} /></div>
       )}
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1">

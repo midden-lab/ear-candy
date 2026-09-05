@@ -267,7 +267,7 @@ describe('mobile layout (< md)', () => {
     window.matchMedia = originalMatchMedia
   })
 
-  it('renders the SeasonChip dropdown instead of the SeasonTabs pill row', () => {
+  it('renders the SeasonPicker full-screen selector instead of the SeasonTabs pill row', () => {
     mockMobile()
     render(
       <EpisodeListView
@@ -279,7 +279,7 @@ describe('mobile layout (< md)', () => {
         onEpisodeClick={() => {}}
       />
     )
-    expect(screen.getByRole('button', { name: 'Season One' })).toHaveAttribute('aria-haspopup', 'listbox')
+    expect(screen.getByRole('button', { name: 'Season One' })).toHaveAttribute('aria-haspopup', 'dialog')
   })
 
   it('still renders the podcast name and episode items on mobile', () => {
