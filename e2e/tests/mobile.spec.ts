@@ -41,7 +41,7 @@ test.describe('Mobile listener UI (< md)', () => {
 
   test('player mini-bar is visible after pressing Play and docks above the bottom tab bar, not overlapping it', async ({ seededPage: page }) => {
     await deepDiveItem(page).click()
-    await page.getByRole('button', { name: 'Play' }).click()
+    await page.getByRole('button', { name: 'Play episode' }).click()
     const miniBar = page.getByTestId('player-bar')
     await expect(miniBar).toBeVisible()
     await expect(miniBar).toContainText('Deep Dive')
@@ -60,31 +60,35 @@ test.describe('Mobile listener UI (< md)', () => {
     }
   })
 
-  test('tapping the mini-bar opens the full-screen now-playing overlay with all controls tappable', async ({ seededPage: page }) => {
+  test('tapping the mini-bar navigates to the playing episode\'s detail view, with all transport controls tappable there', async ({ seededPage: page }) => {
+    // There is no full-screen "now playing" overlay anymore — tapping the
+    // mini-bar (outside its own Play/Pause button) routes to the same
+    // canonical detail view reached via the Playing tab or a normal row tap.
     await deepDiveItem(page).click()
     // Pressing the detail pane's Play button starts playback immediately, so
-    // the transport button already reads "Pause" by the time the overlay opens.
-    await page.getByRole('button', { name: 'Play' }).click()
+    // the transport button already reads "Pause episode" by the time we
+    // navigate away and back via the mini-bar.
+    await page.getByRole('button', { name: 'Play episode' }).click()
+    await page.getByRole('button', { name: /back to episodes/i }).click()
     await page.getByRole('button', { name: /now playing/i }).click()
 
-    await expect(page.getByRole('button', { name: 'Collapse now playing' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Deep Dive' })).toBeVisible()
+    const playingTab = page.getByRole('button', { name: 'Playing', exact: true })
+    await expect(playingTab).toHaveAttribute('aria-current', 'true')
+
     await expect(page.getByRole('button', { name: 'Skip to start' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Back 15 seconds' })).toBeVisible()
-    // Also accepts "Retry playback": the seeded episode's stub audio URL is
-    // a real network resource a real browser can legitimately error on
-    // (issue #83's real error handling) — the delay from expanding the
-    // overlay is enough time for that race to resolve either way. Either
-    // state proves this is a real, tappable central transport control,
-    // which is what "all controls tappable" is actually testing here.
-    const centralControl = page.getByRole('button', { name: 'Pause', exact: true })
-      .or(page.getByRole('button', { name: 'Retry playback' }))
+    // Also accepts "Retry episode": the seeded episode's stub audio URL is a
+    // real network resource a real browser can legitimately error on
+    // (issue #83's real error handling) — this races against how fast that
+    // resolves. Either state proves this is a real, tappable central
+    // control, which is what "all controls tappable" is actually testing.
+    const centralControl = page.getByRole('button', { name: 'Pause episode' })
+      .or(page.getByRole('button', { name: 'Retry episode' }))
     await expect(centralControl).toBeVisible()
     await expect(page.getByRole('button', { name: 'Forward 15 seconds' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Skip to end' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Playback speed' })).toBeVisible()
-
-    await page.getByRole('button', { name: 'Collapse now playing' }).click()
-    await expect(page.getByRole('button', { name: 'Collapse now playing' })).not.toBeVisible()
     await expect(page.getByTestId('player-bar')).toContainText('Deep Dive')
   })
 
@@ -105,17 +109,35 @@ test.describe('Mobile listener UI (< md)', () => {
     await expect(episodesTab).toBeVisible()
   })
 
-  test('the Now Playing tab is disabled until an episode is loaded, then expands the overlay', async ({ seededPage: page }) => {
-    const nowPlayingTab = page.getByRole('button', { name: 'Listening' })
-    await expect(nowPlayingTab).toBeDisabled()
+  test('the Playing tab is always enabled, and navigates to the detail placeholder when nothing has ever played', async ({ seededPage: page }) => {
+    const playingTab = page.getByRole('button', { name: 'Playing', exact: true })
+    await expect(playingTab).toBeEnabled()
+    await playingTab.click()
+    await expect(page.getByText('Select an episode to begin')).toBeVisible()
+    await expect(playingTab).toHaveAttribute('aria-current', 'true')
+  })
 
+  test('tapping Playing after starting an episode navigates to its detail view and highlights the Playing tab', async ({ seededPage: page }) => {
+    const playingTab = page.getByRole('button', { name: 'Playing', exact: true })
     await deepDiveItem(page).click()
-    await page.getByRole('button', { name: 'Play' }).click()
-    await expect(nowPlayingTab).toBeEnabled()
-
+    await page.getByRole('button', { name: 'Play episode' }).click()
     await page.getByRole('button', { name: /back to episodes/i }).click()
-    await nowPlayingTab.click()
-    await expect(page.getByRole('button', { name: 'Collapse now playing' })).toBeVisible()
+    await expect(playingTab).not.toHaveAttribute('aria-current', 'true')
+
+    await playingTab.click()
+    await expect(page.getByRole('heading', { name: 'Deep Dive' })).toBeVisible()
+    await expect(playingTab).toHaveAttribute('aria-current', 'true')
+  })
+
+  test('browsing to a different, non-playing episode\'s detail highlights no tab at all', async ({ seededPage: page }) => {
+    await deepDiveItem(page).click()
+    await page.getByRole('button', { name: 'Play episode' }).click()
+    await page.getByRole('button', { name: /back to episodes/i }).click()
+    await panelDiscussionItem(page).click()
+
+    await expect(page.getByRole('button', { name: 'Playing', exact: true })).not.toHaveAttribute('aria-current', 'true')
+    await expect(page.getByRole('button', { name: 'Episodes', exact: true })).not.toHaveAttribute('aria-current', 'true')
+    await expect(page.getByRole('button', { name: 'Settings', exact: true })).not.toHaveAttribute('aria-current', 'true')
   })
 
   test('resizing across the md boundary with an episode selected preserves state', async ({ seededPage: page }) => {
@@ -139,12 +161,18 @@ test.describe('Desktop listener UI unaffected by the mobile refactor', () => {
   test('full transport controls still resolve by role/label at desktop viewport', async ({ seededPage: page }) => {
     await deepDiveItem(page).click()
     await page.getByRole('button', { name: 'Play' }).click()
-    await expect(page.getByRole('button', { name: 'Playback speed' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Skip to start' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Skip to end' })).toBeVisible()
+    // Scoped to the dock (player-bar) — DetailPane now shows its own copy of
+    // these same controls too when viewing the playing episode, so an
+    // unscoped query would be ambiguous. This test's own concern is
+    // specifically the persistent dock, which is what "unaffected by the
+    // mobile refactor" is actually about.
+    const dock = page.getByTestId('player-bar')
+    await expect(dock.getByRole('button', { name: 'Playback speed' })).toBeVisible()
+    await expect(dock.getByRole('button', { name: 'Skip to start' })).toBeVisible()
+    await expect(dock.getByRole('button', { name: 'Skip to end' })).toBeVisible()
   })
 
-  test('the bottom tab bar is not rendered at desktop viewport', async ({ seededPage: page }) => {
-    await expect(page.getByRole('button', { name: 'Listening' })).not.toBeVisible()
+  test('the mobile bottom tab bar is not rendered at desktop viewport', async ({ seededPage: page }) => {
+    await expect(page.getByRole('button', { name: 'Playing', exact: true })).not.toBeVisible()
   })
 })
