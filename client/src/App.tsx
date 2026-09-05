@@ -26,8 +26,17 @@ export default function App() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [seasons, setSeasons] = useState<Season[]>([])
   const [episodes, setEpisodes] = useState<Episode[]>([])
+  // Every visible episode across every season, fetched once at boot via
+  // getEpisodes() with no season_id — powers cross-catalog search and
+  // per-season counts in the season selectors, independent of whichever
+  // single season `episodes` is currently scoped to.
+  const [allEpisodes, setAllEpisodes] = useState<Episode[]>([])
   const [activeSeason, setActiveSeason] = useState<number | null>(null)
   const [episodesLoading, setEpisodesLoading] = useState(false)
+  // Cross-catalog search query. Non-empty means the episode list shows
+  // searchAllEpisodes(allEpisodes, ...) results instead of the
+  // season-scoped `episodes` list. Cleared whenever a season is selected.
+  const [searchQuery, setSearchQuery] = useState('')
   const [view, setView] = useState<View>('player')
   const [adminTab, setAdminTab] = useState<AdminTab>('episodes')
   // Which pane is focused on mobile. Set unconditionally on episode
@@ -62,6 +71,10 @@ export default function App() {
 
   useEffect(() => {
     void getSettings().then(setSettings).catch(console.error)
+
+    // Independent of the season-scoped fetch below — powers cross-catalog
+    // search and season counts, not affected by which season is active.
+    void getEpisodes().then(setAllEpisodes).catch(console.error)
 
     // A shared episode link looks like `?episode=123&t=754` (see
     // utils/shareUrl.ts). `t` is only meaningful alongside a valid
@@ -151,6 +164,7 @@ export default function App() {
 
   const handleSeasonSelect = (seasonId: number) => {
     setActiveSeason(seasonId)
+    setSearchQuery('')
     setEpisodesLoading(true)
     void getEpisodes(seasonId).then(setEpisodes).catch(console.error).finally(() => setEpisodesLoading(false))
   }
@@ -231,6 +245,9 @@ export default function App() {
           podcastName={settings.podcast_name}
           seasons={seasons}
           episodes={episodes}
+          allEpisodes={allEpisodes}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
           activeSeason={activeSeason}
           analyticsEnabled={settings.analytics_enabled}
           loading={episodesLoading}

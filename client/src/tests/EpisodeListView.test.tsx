@@ -298,3 +298,156 @@ describe('mobile layout (< md)', () => {
     expect(screen.getByText('First Episode')).toBeInTheDocument()
   })
 })
+
+describe('cross-catalog search', () => {
+  const seasonTwo: Season = { id: 2, number: 2, title: 'Season Two', description: '', cover_art_path: null, hidden: false, created_at: '2024-04-01T00:00:00Z' }
+  const seasonTwoEpisode: Episode = {
+    ...episodes[0],
+    id: 20,
+    season_id: 2,
+    number: 1,
+    title: 'A Very Different Topic',
+    guests: 'Special Guest',
+  }
+  const allEpisodes = [...episodes, seasonTwoEpisode]
+
+  it('filters the visible list to search matches across every season, not just the active one', () => {
+    render(
+      <EpisodeListView
+        podcastName="Test Show"
+        seasons={[seasons[0], seasonTwo]}
+        episodes={episodes}
+        allEpisodes={allEpisodes}
+        searchQuery="Different Topic"
+        onSearchChange={() => {}}
+        activeSeason={1}
+        onSeasonSelect={() => {}}
+        onEpisodeClick={() => {}}
+      />
+    )
+    expect(screen.getByText('A Very Different Topic')).toBeInTheDocument()
+    expect(screen.queryByText('First Episode')).not.toBeInTheDocument()
+    expect(screen.queryByText('Second Episode')).not.toBeInTheDocument()
+  })
+
+  it('tags a cross-season search result with its origin season', () => {
+    render(
+      <EpisodeListView
+        podcastName="Test Show"
+        seasons={[seasons[0], seasonTwo]}
+        episodes={episodes}
+        allEpisodes={allEpisodes}
+        searchQuery="Different Topic"
+        onSearchChange={() => {}}
+        activeSeason={1}
+        onSeasonSelect={() => {}}
+        onEpisodeClick={() => {}}
+      />
+    )
+    expect(screen.getByText('S2')).toBeInTheDocument()
+  })
+
+  it('matches on guest name across seasons too', () => {
+    render(
+      <EpisodeListView
+        podcastName="Test Show"
+        seasons={[seasons[0], seasonTwo]}
+        episodes={episodes}
+        allEpisodes={allEpisodes}
+        searchQuery="special guest"
+        onSearchChange={() => {}}
+        activeSeason={1}
+        onSeasonSelect={() => {}}
+        onEpisodeClick={() => {}}
+      />
+    )
+    expect(screen.getByText('A Very Different Topic')).toBeInTheDocument()
+  })
+
+  it('shows a no-results message when nothing matches the search', () => {
+    render(
+      <EpisodeListView
+        podcastName="Test Show"
+        seasons={[seasons[0], seasonTwo]}
+        episodes={episodes}
+        allEpisodes={allEpisodes}
+        searchQuery="nonexistent"
+        onSearchChange={() => {}}
+        activeSeason={1}
+        onSeasonSelect={() => {}}
+        onEpisodeClick={() => {}}
+      />
+    )
+    expect(screen.getByText(/No episodes match/)).toBeInTheDocument()
+  })
+
+  it('reverts to season-scoped browsing when the search query is cleared', () => {
+    const { rerender } = render(
+      <EpisodeListView
+        podcastName="Test Show"
+        seasons={[seasons[0], seasonTwo]}
+        episodes={episodes}
+        allEpisodes={allEpisodes}
+        searchQuery="Different Topic"
+        onSearchChange={() => {}}
+        activeSeason={1}
+        onSeasonSelect={() => {}}
+        onEpisodeClick={() => {}}
+      />
+    )
+    expect(screen.queryByText('First Episode')).not.toBeInTheDocument()
+
+    rerender(
+      <EpisodeListView
+        podcastName="Test Show"
+        seasons={[seasons[0], seasonTwo]}
+        episodes={episodes}
+        allEpisodes={allEpisodes}
+        searchQuery=""
+        onSearchChange={() => {}}
+        activeSeason={1}
+        onSeasonSelect={() => {}}
+        onEpisodeClick={() => {}}
+      />
+    )
+    expect(screen.getByText('First Episode')).toBeInTheDocument()
+    expect(screen.queryByText('A Very Different Topic')).not.toBeInTheDocument()
+  })
+
+  it('hides the season selector while a search is active', () => {
+    render(
+      <EpisodeListView
+        podcastName="Test Show"
+        seasons={[seasons[0], seasonTwo]}
+        episodes={episodes}
+        allEpisodes={allEpisodes}
+        searchQuery="Different Topic"
+        onSearchChange={() => {}}
+        activeSeason={1}
+        onSeasonSelect={() => {}}
+        onEpisodeClick={() => {}}
+      />
+    )
+    expect(screen.queryByRole('button', { name: 'Season One' })).not.toBeInTheDocument()
+  })
+
+  it('calls onSearchChange as the user types into the search box', async () => {
+    const user = userEvent.setup()
+    const onSearchChange = vi.fn()
+    render(
+      <EpisodeListView
+        podcastName="Test Show"
+        seasons={seasons}
+        episodes={episodes}
+        allEpisodes={allEpisodes}
+        searchQuery=""
+        onSearchChange={onSearchChange}
+        activeSeason={1}
+        onSeasonSelect={() => {}}
+        onEpisodeClick={() => {}}
+      />
+    )
+    await user.type(screen.getByRole('textbox', { name: 'Search episodes' }), 'x')
+    expect(onSearchChange).toHaveBeenCalledWith('x')
+  })
+})

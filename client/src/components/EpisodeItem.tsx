@@ -18,10 +18,15 @@ interface EpisodeItemProps {
   /** Seconds left, for an episode partially listened to. Renders "X left"
    *  in place of the plain total duration when present. */
   remainingSeconds?: number
+  /** Small inline label (e.g. "S9") showing this episode's origin season —
+   *  only passed for cross-catalog search results, where rows from
+   *  multiple seasons appear in one flattened list and need a way to tell
+   *  them apart at a glance. Omitted in normal season-scoped browsing. */
+  seasonTag?: string
   onClick: (episode: Episode) => void
 }
 
-export default function EpisodeItem({ episode, isActive, isPlaying = false, remainingSeconds, onClick }: EpisodeItemProps) {
+export default function EpisodeItem({ episode, isActive, isPlaying = false, remainingSeconds, seasonTag, onClick }: EpisodeItemProps) {
   // Calmer row on mobile: bigger cover, one meta line, no inline guests (already
   // shown in DetailPane) — desktop keeps today's denser row unchanged.
   const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
@@ -57,6 +62,9 @@ export default function EpisodeItem({ episode, isActive, isPlaying = false, rema
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">Ep {episode.number}</span>
+          {seasonTag && (
+            <span className="text-[10px] font-mono text-ink-4 shrink-0">{seasonTag}</span>
+          )}
           <span className="text-sm font-medium truncate">{episode.title}</span>
         </div>
         <div className="flex items-center gap-2 mt-0.5 min-w-0">
