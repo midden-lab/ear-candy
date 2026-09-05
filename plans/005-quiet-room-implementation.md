@@ -45,6 +45,12 @@ Builds the "Quiet Room" design direction (recorded as a reference in `plans/004-
 - Any new server/API endpoint — confirmed unnecessary (see `getEpisodes` finding above).
 - An accessibility audit beyond preserving/improving on `MobileTabBar.tsx`'s existing tested `aria-current` conventions.
 
+**Quality gate — required for every step, not just Step 10.** This plan touches several of the most heavily-tested files in the client package (`DetailPane.test.tsx`: 19+ existing cases, `AudioPlayerView.test.tsx`: 46, `MobileTabBar.test.tsx`, `SeasonTabs.test.tsx`, `EpisodeItem.test.tsx`), and several steps deliberately change behavior those existing tests were written to lock in (the border-based active row, the disabled Playing tab, `onExpandPlayer`, the flat season row). That is expected, not a warning sign — but it means "the tests still pass" is not automatically true after any of these steps, and is not optional:
+
+- **Existing tests that assert now-obsolete behavior must be refactored or rewritten in the same step that changes the behavior** — never left red, never deleted without a replacement assertion for the new behavior, and never skipped/`.todo`'d to keep the suite green artificially. The Testing section below names the specific existing test cases each step invalidates.
+- **New behavior introduced by a step ships with test coverage in that same step**, not deferred to a later cleanup pass — the Testing section below also names the new coverage each step requires.
+- **`cd client && npm test`, `npm run typecheck`, and `npm run lint` must all pass, in full, before a step is considered done** — each step's acceptance criteria includes this explicitly so it isn't implicit or easy to skip. Step 10 exists as a final repo-wide confirmation and orphaned-reference sweep, not as the only point in the plan where this is actually checked.
+
 ## Steps
 
 ### Step 1: Design tokens — neutral-scale palette + dark-mode-safe accent
@@ -99,6 +105,7 @@ Caveat this formula honestly at review, don't just trust it blind: for an *alrea
 - [ ] `getDarkModeAccent('#5a3ef5')` returns a lighter purple with HSL lightness in `[0.65, 0.85]`; `getDarkModeAccent('#ffef00')` (already very light) is not pushed past 0.85 lightness.
 - [ ] Toggling dark mode while an episode's accent-colored button is visible updates its color live, without a page reload.
 - [ ] Existing `getContrastTextColor` tests still pass unmodified; new tests cover `getDarkModeAccent` (see Testing).
+- [ ] `cd client && npm test`, `npm run typecheck`, and `npm run lint` all pass with this step's changes in place (see Quality gate in Context).
 
 ---
 
@@ -126,6 +133,7 @@ Apply `font-sans` at the `body` level in `index.css` (alongside the existing `bg
 - [ ] `client/public/fonts/LICENSE-OFL.txt` (or equivalent) is present and committed alongside the font files.
 - [ ] `body` uses `bg-canvas text-ink` instead of the old hardcoded `zinc-*` pair; app renders with no visual regression outside of the font/color swap itself.
 - [ ] No network request to any external font host appears in the browser's network tab on page load.
+- [ ] `cd client && npm test`, `npm run typecheck`, and `npm run lint` all pass with this step's changes in place (see Quality gate in Context).
 
 ---
 
@@ -161,6 +169,7 @@ Add a `searchQuery: string` state to `App.tsx` (or, if cleaner given `EpisodeLis
 - [ ] Clearing the search box reverts to the currently-active season's episode list.
 - [ ] Selecting a different season while a search is active clears the search and returns to season-scoped browsing.
 - [ ] `matchesEpisodeQuery`/`searchAllEpisodes` have unit tests covering case-insensitivity, guest-list matching, and empty-query behavior.
+- [ ] `cd client && npm test`, `npm run typecheck`, and `npm run lint` all pass with this step's changes in place (see Quality gate in Context).
 
 ---
 
@@ -179,6 +188,7 @@ Rewrite `SeasonTabs.tsx` from a flat button row into a fixed-width trigger (`"{a
 - [ ] Popover closes on outside click and on Escape.
 - [ ] Popover and options are reachable via keyboard (Tab to trigger, Enter/Space to open, arrow keys or Tab through options — match whatever level `SeasonChip.tsx` already achieves at minimum, do not regress).
 - [ ] `SeasonTabs.test.tsx` is rewritten for the new markup (see Testing).
+- [ ] `cd client && npm test`, `npm run typecheck`, and `npm run lint` all pass with this step's changes in place (see Quality gate in Context).
 
 ---
 
@@ -196,6 +206,7 @@ Delete `SeasonChip.tsx` and replace it with a new `client/src/components/SeasonP
 - [ ] Tapping a season selects it and closes the overlay; tapping the close button or pressing Escape closes it without changing the selection.
 - [ ] Body scroll is locked while the overlay is open.
 - [ ] `SeasonChip.test.tsx` is deleted; a new `SeasonPicker.test.tsx` covers the above.
+- [ ] `cd client && npm test`, `npm run typecheck`, and `npm run lint` all pass with this step's changes in place (see Quality gate in Context).
 
 ---
 
@@ -213,6 +224,7 @@ Leave `AudioPlayerView.tsx`'s two existing `ShareDialog` render sites (desktop b
 - [ ] Sharing from `DetailPane` while viewing the actively-playing episode offers the "start at {timestamp}" option; viewing a different (non-playing) episode's detail offers a beginning-only share.
 - [ ] No visual change to `AudioPlayerView.tsx`'s existing two Share locations in this step.
 - [ ] New `DetailPane.test.tsx` cases cover both the with-timestamp and without-timestamp paths.
+- [ ] `cd client && npm test`, `npm run typecheck`, and `npm run lint` all pass with this step's changes in place (see Quality gate in Context).
 
 ---
 
@@ -246,6 +258,7 @@ This step must land and be verified working **before** Step 9 removes `AudioPlay
 - [ ] Changing speed from `DetailPane` audibly changes playback rate, confirmed via the existing `speed`-prop-driven effect (no new mechanism needed for this one).
 - [ ] Viewing any other (non-playing) episode's detail pane shows no transport controls at all — only the Play button.
 - [ ] `AudioPlayerView.test.tsx`'s existing transport-related assertions still pass against the extracted component; new `DetailPane.test.tsx` cases cover the conditional-visibility rule and that seek/skip/speed actions call `requestSeek`/`setSpeed`, not a bare `setCurrentTime`.
+- [ ] `cd client && npm test`, `npm run typecheck`, and `npm run lint` all pass with this step's changes in place (see Quality gate in Context).
 
 ---
 
@@ -260,6 +273,7 @@ Replace the active-row treatment (`border-l-2 border-[var(--accent)] bg-zinc-200
 - [ ] The active row has no border in either theme; it's visually distinguished by background/shadow only.
 - [ ] The `isPlaying` (EQ bars) treatment is unchanged.
 - [ ] `EpisodeItem.test.tsx`'s two border-specific assertions ("active state: has left border class, no solid accent fill" and "inactive state: no aria-current, no border-l-2") are rewritten to assert the new classes instead (see Testing).
+- [ ] `cd client && npm test`, `npm run typecheck`, and `npm run lint` all pass with this step's changes in place (see Quality gate in Context).
 
 ---
 
@@ -298,6 +312,7 @@ This is the plan's most architecturally significant step and depends on Step 7 a
 - [ ] The Playing tab's accessible name matches its visible text ("Playing"); the mini-bar's accessible name is a distinct full sentence ("Now playing: {title}. Tap to view.") — no leftover "Listening" label anywhere.
 - [ ] Tapping the mini-bar (outside its own Play/Pause button) navigates to the same `DetailPane` view as tapping "Playing" — there is no longer any full-screen "now playing" overlay reachable from anywhere.
 - [ ] `MobileTabBar.test.tsx` and `AudioPlayerView.test.tsx` are rewritten for the above (see Testing) — this step has the largest test-file impact in the plan.
+- [ ] `cd client && npm test`, `npm run typecheck`, and `npm run lint` all pass with this step's changes in place (see Quality gate in Context).
 
 ---
 
@@ -316,7 +331,7 @@ After Step 9, grep the client source and test suite for `expandSignal`, `isFullS
 
 ## Testing
 
-Run `cd client && npm test` after every step, not just at the end — several steps (7, 9 especially) touch heavily-tested files and a regression is much cheaper to catch immediately after the step that caused it.
+**This is a gate, not a suggestion** (see Quality gate in Context): run `cd client && npm test`, `npm run typecheck`, and `npm run lint` after every step, not just at the end, and do not proceed to the next step while any of them are red. Several steps (7, 9 especially) touch heavily-tested files, and a regression is far cheaper to find and fix immediately after the step that caused it than to untangle at Step 10 alongside nine other steps' worth of changes.
 
 **Tests that will fail and need rewriting (not just re-running), by step:**
 - Step 4 — `SeasonTabs.test.tsx`'s 3 tests (`renders season titles as buttons`, `clicking a season calls onSelect`, `active season button has aria-selected=true`) all assert the old flat-button-row markup; rewrite against the new trigger+popover.
