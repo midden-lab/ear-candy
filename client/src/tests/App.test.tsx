@@ -6,6 +6,7 @@ import App from '../App'
 import { usePlayerStore } from '../store/playerStore'
 import { getSettings, getSeasons, getEpisodes, getEpisode, logout } from '../api'
 import { trackPageView } from '../utils/analytics'
+import { getDarkModeAccent } from '../utils/color'
 import type { Season, Episode } from '../types'
 
 vi.mock('../utils/analytics', () => ({
@@ -219,8 +220,12 @@ it('applies accent color from settings to CSS variable', async () => {
     track_returning_listeners: true,
   })
   render(<App />)
+  // No 'theme' localStorage preference is set anywhere in this test file, so
+  // the app renders in its dark-as-default mode, which lightens the raw
+  // accent color (see useTheme.ts / getDarkModeAccent) rather than passing
+  // it through unchanged.
   await waitFor(() =>
-    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#ff0000')
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe(getDarkModeAccent('#ff0000'))
   )
 })
 
