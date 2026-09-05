@@ -189,3 +189,31 @@ describe('loading/error/retry state (issues #82, #83, #84)', () => {
     expect(screen.getByText('Playback interrupted — tap retry.')).toBeInTheDocument()
   })
 })
+
+describe('share control', () => {
+  it('renders a share trigger for any viewed episode', () => {
+    render(<DetailPane episode={mockEpisode} seasons={seasons} />)
+    expect(screen.getByRole('button', { name: /Share/ })).toBeInTheDocument()
+  })
+
+  it('offers a "start at" timestamp share when this episode is the one actually playing, past the minimum threshold', async () => {
+    const user = userEvent.setup()
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} currentTime={90} />)
+    await user.click(screen.getByRole('button', { name: 'Share this moment' }))
+    expect(screen.getByText(/Start at/)).toBeInTheDocument()
+  })
+
+  it('offers only a beginning-only share when this episode is merely being viewed, not playing — even if a currentTime happens to be passed', async () => {
+    const user = userEvent.setup()
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={false} currentTime={90} />)
+    await user.click(screen.getByRole('button', { name: 'Share episode' }))
+    expect(screen.queryByText(/Start at/)).not.toBeInTheDocument()
+  })
+
+  it('offers only a beginning-only share when this episode is playing but under the minimum timestamp threshold', async () => {
+    const user = userEvent.setup()
+    render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} currentTime={2} />)
+    await user.click(screen.getByRole('button', { name: 'Share episode' }))
+    expect(screen.queryByText(/Start at/)).not.toBeInTheDocument()
+  })
+})

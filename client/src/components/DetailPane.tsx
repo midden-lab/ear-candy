@@ -2,6 +2,7 @@ import type { Episode, Season } from '../types'
 import PillBadge from './PillBadge'
 import EpisodeCoverArt from './EpisodeCoverArt'
 import PlaybackStatusLine from './PlaybackStatusLine'
+import ShareDialog from './ShareDialog'
 import { getPlaybackStatus } from '../utils/playbackStatus'
 
 interface DetailPaneProps {
@@ -25,10 +26,15 @@ interface DetailPaneProps {
    *  only relevant when `isCurrentPlayerEpisode && error`. */
   onRetry?: () => void
   onBack?: () => void
+  /** Current playback position — pass only when `isCurrentPlayerEpisode` is
+   *  true, mirroring ShareDialog's own contract. Omitted entirely renders a
+   *  beginning-only share (no "start at" option), which is correct when
+   *  this episode isn't the one actually playing. */
+  currentTime?: number
 }
 
 export default function DetailPane({
-  episode, seasons, isCurrentPlayerEpisode, playing, loading, error, onPlayPause, onRetry, onBack,
+  episode, seasons, isCurrentPlayerEpisode, playing, loading, error, onPlayPause, onRetry, onBack, currentTime,
 }: DetailPaneProps) {
   if (!episode) {
     return (
@@ -69,7 +75,15 @@ export default function DetailPane({
         variant="responsive"
         className="mb-6 w-48 aspect-square object-cover rounded-xl shadow-lg ring-1 ring-zinc-200 dark:ring-zinc-800"
       />
-      <p className="mb-1 text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{seasonLabel}</p>
+      <div className="mb-1 flex items-baseline justify-between gap-4">
+        <p className="text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{seasonLabel}</p>
+        <ShareDialog
+          episodeId={episode.id}
+          episodeTitle={episode.title}
+          currentTime={isCurrentPlayerEpisode ? currentTime : undefined}
+          className="shrink-0"
+        />
+      </div>
       <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{episode.title}</h1>
       <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{episode.publish_date}</p>
 
