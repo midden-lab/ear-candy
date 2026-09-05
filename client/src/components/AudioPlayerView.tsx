@@ -4,107 +4,10 @@ import ProgressBar from './ProgressBar'
 import EpisodeCoverArt from './EpisodeCoverArt'
 import ShareDialog from './ShareDialog'
 import PlaybackStatusLine from './PlaybackStatusLine'
+import TransportControls, { RetryIcon } from './TransportControls'
 import { getPlaybackStatus } from '../utils/playbackStatus'
+import { formatTime, clampSeekTime, nextSpeed } from '../utils/playback'
 import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
-
-function formatTime(seconds: number, showSign = false): string {
-  const abs = Math.floor(Math.abs(seconds))
-  const m = Math.floor(abs / 60)
-  const s = abs % 60
-  const str = `${m}:${String(s).padStart(2, '0')}`
-  return showSign && seconds < 0 ? `-${str}` : str
-}
-
-const SPEEDS = [1, 1.5, 2] as const
-
-function RetryIcon({ size }: { size: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.996 5.996 0 0 1-5.65 4c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
-    </svg>
-  )
-}
-
-interface TransportControlsProps {
-  playing: boolean
-  onTogglePlay: () => void
-  onSkipStart: () => void
-  onSkipEnd: () => void
-  onBack15: () => void
-  onForward15: () => void
-  speed: number
-  onCycleSpeed: () => void
-  /** Bumps skip/speed touch targets to >=44px for the mobile full-screen overlay. */
-  large?: boolean
-  /** True while buffering (native waiting/stalled events) — dims the
-   *  central button but leaves it clickable, so pausing can still cancel a
-   *  slow buffering attempt (issue #82). */
-  loading?: boolean
-  /** True after a real playback failure — swaps the central button to a
-   *  retry action instead of play/pause (issue #83). */
-  error?: boolean
-  onRetry?: () => void
-}
-
-function TransportControls({
-  playing, onTogglePlay, onSkipStart, onSkipEnd, onBack15, onForward15, speed, onCycleSpeed, large,
-  loading, error, onRetry,
-}: TransportControlsProps) {
-  const btnClass = large
-    ? 'flex h-11 w-11 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors'
-    : 'rounded p-1 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors'
-  const isLoading = !!loading && !error
-
-  return (
-    <div className="flex items-center justify-center gap-3">
-      <button onClick={onSkipStart} className={btnClass} aria-label="Skip to start">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>
-        </svg>
-      </button>
-      <button onClick={onBack15} className={btnClass} aria-label="Back 15 seconds">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8.01-8z"/>
-        </svg>
-      </button>
-      <button
-        onClick={error ? onRetry : onTogglePlay}
-        className={`rounded-full bg-[var(--accent)] p-3 text-[var(--accent-contrast)] transition-opacity hover:opacity-90 ${isLoading ? 'opacity-60' : ''}`}
-        aria-label={error ? 'Retry playback' : (playing ? 'Pause' : 'Play')}
-        aria-busy={isLoading || undefined}
-      >
-        {error ? (
-          <RetryIcon size={20} />
-        ) : playing ? (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-          </svg>
-        ) : (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        )}
-      </button>
-      <button onClick={onForward15} className={btnClass} aria-label="Forward 15 seconds">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M18 13c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6v4l5-5-5-5v4c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8h-2z"/>
-        </svg>
-      </button>
-      <button onClick={onSkipEnd} className={btnClass} aria-label="Skip to end">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M6 18l8.5-6L6 6v12zm2.5-6 5.5 3.9V8.1L8.5 12zM16 6h2v12h-2z"/>
-        </svg>
-      </button>
-      <button
-        onClick={onCycleSpeed}
-        className={`${large ? 'flex h-11 min-w-[2.75rem] items-center justify-center' : 'px-2 py-1 min-w-[2.5rem]'} rounded text-xs font-semibold text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors text-center`}
-        aria-label="Playback speed"
-      >
-        {speed}×
-      </button>
-    </div>
-  )
-}
 
 export interface AudioPlayerViewProps {
   episode: Episode | null
@@ -128,6 +31,14 @@ export interface AudioPlayerViewProps {
    *  needs to be able to trigger it from wherever its own retry button
    *  lives (which may not be this component at all — e.g. DetailPane). */
   retrySignal?: number
+  /** Set (a new object, with an incremented `nonce`) to request a seek to
+   *  `time` from outside this component — e.g. DetailPane's own scrub bar,
+   *  which has no <audio> ref of its own. Mirrors the retrySignal pattern:
+   *  a plain prop change the host can react to via setCurrentTime/onSeek
+   *  alone would update the *displayed* time everywhere without touching
+   *  real playback, since only this component's effect actually applies a
+   *  seek to the underlying element. */
+  seekRequest?: { time: number; nonce: number }
   /** Bumped (any change in value) to command "expand to the full-screen now
    *  playing overlay" — e.g. from MobileTabBar's "Now Playing" tab, which
    *  has no other way to reach this component's own expand/collapse state.
@@ -176,7 +87,7 @@ export interface AudioPlayerViewProps {
  * management — the host wires it to whatever store it likes.
  */
 export default function AudioPlayerView({
-  episode, playing, currentTime, duration, speed, resumeTime, loading, error, retrySignal, expandSignal,
+  episode, playing, currentTime, duration, speed, resumeTime, loading, error, retrySignal, seekRequest, expandSignal,
   onSeek, onTogglePlay, onSpeedChange, onTimeUpdate, onDurationChange, onEnded,
   onWaiting, onPlaybackResumed, onPlaybackError, onReset, onRetry, onHeightChange,
 }: AudioPlayerViewProps) {
@@ -251,6 +162,22 @@ export default function AudioPlayerView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retrySignal])
 
+  // Applying a seek requested from outside this component (e.g. DetailPane's
+  // scrub bar) requires actually touching the <audio> element, not just
+  // updating the host's own displayed currentTime — same reasoning as
+  // retrySignal above, and the same nonce-comparison shape.
+  const prevSeekNonceRef = useRef(seekRequest?.nonce)
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !episode || !seekRequest) return
+    if (seekRequest.nonce !== prevSeekNonceRef.current) {
+      prevSeekNonceRef.current = seekRequest.nonce
+      audio.currentTime = seekRequest.time
+      onSeek(seekRequest.time)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seekRequest])
+
   const prevExpandSignalRef = useRef(expandSignal)
   useEffect(() => {
     if (!episode) return
@@ -289,12 +216,11 @@ export default function AudioPlayerView({
   }
 
   const skipTo = (time: number) => {
-    handleSeek(Math.max(0, Math.min(time, duration)))
+    handleSeek(clampSeekTime(time, duration))
   }
 
   const cycleSpeed = () => {
-    const idx = SPEEDS.indexOf(speed as typeof SPEEDS[number])
-    onSpeedChange(SPEEDS[(idx + 1) % SPEEDS.length])
+    onSpeedChange(nextSpeed(speed))
   }
 
   if (!episode) return null

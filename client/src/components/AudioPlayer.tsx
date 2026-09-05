@@ -35,7 +35,7 @@ interface AudioPlayerProps {
  */
 export default function AudioPlayer({ sharedStart, expandSignal }: AudioPlayerProps) {
   const {
-    episode, playing, currentTime, duration, speed, loading, error, retryNonce,
+    episode, playing, currentTime, duration, speed, loading, error, retryNonce, seekRequest,
     setPlaying, setCurrentTime, setDuration, setSpeed, setLoading, setError, retryPlayback,
   } = usePlayerStore()
 
@@ -152,6 +152,7 @@ export default function AudioPlayer({ sharedStart, expandSignal }: AudioPlayerPr
       loading={loading}
       error={error}
       retrySignal={retryNonce}
+      seekRequest={seekRequest ?? undefined}
       expandSignal={expandSignal}
       onSeek={setCurrentTime}
       onTogglePlay={() => setPlaying(!playing)}

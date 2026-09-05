@@ -61,6 +61,8 @@ export default function App() {
   const playerLoading = usePlayerStore(s => s.loading)
   const playerError = usePlayerStore(s => s.error)
   const playerCurrentTime = usePlayerStore(s => s.currentTime)
+  const playerDuration = usePlayerStore(s => s.duration)
+  const playerSpeed = usePlayerStore(s => s.speed)
   const [sharedStart, setSharedStart] = useState<SharedStart | undefined>(undefined)
   // Guards trackPageView() to fire exactly once per app load — the effect
   // below also re-runs whenever `settings` changes for unrelated reasons
@@ -267,6 +269,10 @@ export default function App() {
           loading={playerLoading}
           error={playerError}
           currentTime={playerCurrentTime}
+          duration={playerDuration}
+          speed={playerSpeed}
+          onRequestSeek={(time) => usePlayerStore.getState().requestSeek(time)}
+          onSpeedChange={(speed) => usePlayerStore.getState().setSpeed(speed)}
           onPlayPause={() => viewingEpisode && handlePlayEpisode(viewingEpisode)}
           onRetry={() => usePlayerStore.getState().retryPlayback()}
           onBack={() => setFocusedPane('list')}

@@ -22,6 +22,13 @@ interface PlayerState {
    *  in an effect is simpler than plumbing an imperative retry function
    *  through every caller. */
   retryNonce: number
+  /** Set by requestSeek() below when something outside AudioPlayerView
+   *  needs to move playback (e.g. DetailPane's own scrub bar, which has no
+   *  <audio> ref of its own) — only AudioPlayerView can actually apply a
+   *  seek to the real element, so this is a request for it to react to via
+   *  its own effect, not a substitute for setCurrentTime (which only
+   *  updates the displayed value, same reasoning as retryNonce above). */
+  seekRequest: { time: number; nonce: number } | null
   setEpisode: (ep: Episode) => void
   setPlaying: (playing: boolean) => void
   setCurrentTime: (t: number) => void
@@ -30,6 +37,7 @@ interface PlayerState {
   setLoading: (loading: boolean) => void
   setError: (error: boolean) => void
   retryPlayback: () => void
+  requestSeek: (time: number) => void
 }
 
 export const usePlayerStore = create<PlayerState>()((set) => ({
@@ -41,6 +49,7 @@ export const usePlayerStore = create<PlayerState>()((set) => ({
   loading: false,
   error: false,
   retryNonce: 0,
+  seekRequest: null,
   setEpisode: (ep) => set({ episode: ep }),
   // Pausing cancels whatever the browser was doing to fulfil a pending
   // play() attempt, so a stale "buffering" indicator should clear with it —
@@ -53,4 +62,5 @@ export const usePlayerStore = create<PlayerState>()((set) => ({
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
   retryPlayback: () => set(state => ({ retryNonce: state.retryNonce + 1, error: false, loading: true })),
+  requestSeek: (time) => set(state => ({ seekRequest: { time, nonce: (state.seekRequest?.nonce ?? 0) + 1 } })),
 }))

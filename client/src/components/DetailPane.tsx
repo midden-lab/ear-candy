@@ -3,7 +3,10 @@ import PillBadge from './PillBadge'
 import EpisodeCoverArt from './EpisodeCoverArt'
 import PlaybackStatusLine from './PlaybackStatusLine'
 import ShareDialog from './ShareDialog'
+import ProgressBar from './ProgressBar'
+import TransportControls from './TransportControls'
 import { getPlaybackStatus } from '../utils/playbackStatus'
+import { formatTime, clampSeekTime, nextSpeed } from '../utils/playback'
 
 interface DetailPaneProps {
   episode: Episode | null
@@ -29,12 +32,25 @@ interface DetailPaneProps {
   /** Current playback position — pass only when `isCurrentPlayerEpisode` is
    *  true, mirroring ShareDialog's own contract. Omitted entirely renders a
    *  beginning-only share (no "start at" option), which is correct when
-   *  this episode isn't the one actually playing. */
+   *  this episode isn't the one actually playing. Also drives the scrub
+   *  bar/transport row below, which only render at all when
+   *  `isCurrentPlayerEpisode` — scrubbing or skipping an episode that isn't
+   *  loaded doesn't mean anything. */
   currentTime?: number
+  duration?: number
+  speed?: number
+  /** Moves the actual <audio> element's playhead — wired to the player
+   *  store's requestSeek, not a bare setCurrentTime (which would only
+   *  update the displayed time everywhere, not real playback, since
+   *  DetailPane has no <audio> ref of its own). Used by both the scrub bar
+   *  and the ±15s/start/end skip buttons. */
+  onRequestSeek?: (time: number) => void
+  onSpeedChange?: (speed: number) => void
 }
 
 export default function DetailPane({
-  episode, seasons, isCurrentPlayerEpisode, playing, loading, error, onPlayPause, onRetry, onBack, currentTime,
+  episode, seasons, isCurrentPlayerEpisode, playing, loading, error, onPlayPause, onRetry, onBack,
+  currentTime, duration, speed, onRequestSeek, onSpeedChange,
 }: DetailPaneProps) {
   if (!episode) {
     return (
@@ -133,6 +149,25 @@ export default function DetailPane({
         status={getPlaybackStatus(episode, { loading: isCurrentPlayerEpisode && loading, error: isCurrentPlayerEpisode && error })}
         className="mt-2"
       />
+
+      {isCurrentPlayerEpisode && duration !== undefined && currentTime !== undefined && speed !== undefined && onRequestSeek && onSpeedChange && (
+        <div className="mt-4 max-w-sm space-y-2">
+          <ProgressBar currentTime={currentTime} duration={duration} onSeek={onRequestSeek} />
+          <div className="flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
+            <span className="font-mono">{formatTime(currentTime)}</span>
+            <span className="font-mono">{formatTime(currentTime - duration, true)}</span>
+          </div>
+          <TransportControls
+            showPlayButton={false}
+            speed={speed}
+            onCycleSpeed={() => onSpeedChange(nextSpeed(speed))}
+            onSkipStart={() => onRequestSeek(0)}
+            onSkipEnd={() => onRequestSeek(duration)}
+            onBack15={() => onRequestSeek(clampSeekTime(currentTime - 15, duration))}
+            onForward15={() => onRequestSeek(clampSeekTime(currentTime + 15, duration))}
+          />
+        </div>
+      )}
 
       {guestList.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">

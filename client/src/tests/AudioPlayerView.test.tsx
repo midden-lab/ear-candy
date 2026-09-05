@@ -709,6 +709,27 @@ describe('loading and error state (issues #82, #83)', () => {
     expect((HTMLMediaElement.prototype.load as ReturnType<typeof vi.fn>).mock.calls.length).toBe(loadCallsBefore)
   })
 
+  it('applies a seekRequest to the real <audio> element and calls onSeek — not just a display-only update', () => {
+    const onSeek = vi.fn()
+    const { rerender, container } = render(
+      <AudioPlayerView {...baseProps({ onSeek, seekRequest: { time: 30, nonce: 1 } })} />
+    )
+    rerender(<AudioPlayerView {...baseProps({ onSeek, seekRequest: { time: 75, nonce: 2 } })} />)
+    const audio = container.querySelector('audio') as HTMLAudioElement
+    expect(audio.currentTime).toBe(75)
+    expect(onSeek).toHaveBeenCalledWith(75)
+  })
+
+  it('does not re-apply a seekRequest whose nonce is unchanged on re-render', () => {
+    const onSeek = vi.fn()
+    const { rerender } = render(
+      <AudioPlayerView {...baseProps({ onSeek, seekRequest: { time: 30, nonce: 1 } })} />
+    )
+    onSeek.mockClear()
+    rerender(<AudioPlayerView {...baseProps({ onSeek, seekRequest: { time: 30, nonce: 1 }, currentTime: 5 })} />)
+    expect(onSeek).not.toHaveBeenCalled()
+  })
+
   it('mini-bar reflects loading and error state too', () => {
     mockMobile()
     const { rerender } = render(<AudioPlayerView {...baseProps({ loading: true })} />)
