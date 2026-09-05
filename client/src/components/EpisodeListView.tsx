@@ -56,6 +56,10 @@ export default function EpisodeListView({
   const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
   const isSearching = searchQuery.trim() !== ''
   const searchResults = isSearching ? searchAllEpisodes(allEpisodes, searchQuery) : []
+  const episodeCounts = allEpisodes.reduce<Record<number, number>>((acc, ep) => {
+    acc[ep.season_id] = (acc[ep.season_id] ?? 0) + 1
+    return acc
+  }, {})
 
   return (
     <div className="flex flex-col h-full">
@@ -82,7 +86,7 @@ export default function EpisodeListView({
 
       {!isSearching && (
         isDesktop
-          ? <SeasonTabs seasons={seasons} activeSeason={activeSeason} onSelect={onSeasonSelect} />
+          ? <SeasonTabs seasons={seasons} activeSeason={activeSeason} episodeCounts={episodeCounts} onSelect={onSeasonSelect} />
           : <div className="px-4 py-2"><SeasonChip seasons={seasons} activeSeason={activeSeason} onSelect={onSeasonSelect} /></div>
       )}
 

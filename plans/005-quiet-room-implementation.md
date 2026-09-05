@@ -4,7 +4,7 @@ title: "Implement the Quiet Room design system in the real client app"
 status: in-progress
 priority: 1
 created: 2026-09-05
-steps_completed: 3
+steps_completed: 4
 steps_total: 10
 tags: [redesign, quiet-room, frontend, ux, design-system, mobile]
 ---
