@@ -17,11 +17,13 @@ test.describe('Listener UI', () => {
     await expect(item).toContainText('Alice Chen')
   })
 
-  test('clicking an episode gives it a left accent border, not a solid fill', async ({ seededPage: page }) => {
+  test('clicking an episode gives it a surface/shadow highlight, not a border or a solid fill', async ({ seededPage: page }) => {
     const item = page.locator('button', { hasText: 'Deep Dive' })
     await item.click()
     await expect(item).toHaveAttribute('aria-current', 'true')
-    await expect(item).toHaveClass(/border-l-2/)
+    await expect(item).toHaveClass(/bg-surface/)
+    await expect(item).toHaveClass(/shadow-sm/)
+    await expect(item).not.toHaveClass(/border-l-2/)
     await expect(item).not.toHaveClass(/bg-\[var\(--accent\)\]/)
   })
 

@@ -26,8 +26,17 @@ export default function App() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [seasons, setSeasons] = useState<Season[]>([])
   const [episodes, setEpisodes] = useState<Episode[]>([])
+  // Every visible episode across every season, fetched once at boot via
+  // getEpisodes() with no season_id — powers cross-catalog search and
+  // per-season counts in the season selectors, independent of whichever
+  // single season `episodes` is currently scoped to.
+  const [allEpisodes, setAllEpisodes] = useState<Episode[]>([])
   const [activeSeason, setActiveSeason] = useState<number | null>(null)
   const [episodesLoading, setEpisodesLoading] = useState(false)
+  // Cross-catalog search query. Non-empty means the episode list shows
+  // searchAllEpisodes(allEpisodes, ...) results instead of the
+  // season-scoped `episodes` list. Cleared whenever a season is selected.
+  const [searchQuery, setSearchQuery] = useState('')
   const [view, setView] = useState<View>('player')
   const [adminTab, setAdminTab] = useState<AdminTab>('episodes')
   // Which pane is focused on mobile. Set unconditionally on episode
@@ -35,11 +44,6 @@ export default function App() {
   // to phone width behaves identically to an actual phone — AppShell only
   // gives this visual effect below the `md` breakpoint.
   const [focusedPane, setFocusedPane] = useState<'list' | 'detail' | 'settings'>('list')
-  // Bumped to command AudioPlayerView's full-screen "now playing" overlay to
-  // open, from MobileTabBar's "Now Playing" tab — mirrors the retrySignal
-  // pattern already used for the same reason (only AudioPlayerView owns its
-  // own expand/collapse state).
-  const [expandSignal, setExpandSignal] = useState(0)
   // The episode shown in the detail pane — deliberately independent of the
   // player's own episode/playing state. Browsing the list must never
   // interrupt whatever's already playing in the background; only an
@@ -51,6 +55,9 @@ export default function App() {
   const playing = usePlayerStore(s => s.playing)
   const playerLoading = usePlayerStore(s => s.loading)
   const playerError = usePlayerStore(s => s.error)
+  const playerCurrentTime = usePlayerStore(s => s.currentTime)
+  const playerDuration = usePlayerStore(s => s.duration)
+  const playerSpeed = usePlayerStore(s => s.speed)
   const [sharedStart, setSharedStart] = useState<SharedStart | undefined>(undefined)
   // Guards trackPageView() to fire exactly once per app load — the effect
   // below also re-runs whenever `settings` changes for unrelated reasons
@@ -62,6 +69,10 @@ export default function App() {
 
   useEffect(() => {
     void getSettings().then(setSettings).catch(console.error)
+
+    // Independent of the season-scoped fetch below — powers cross-catalog
+    // search and season counts, not affected by which season is active.
+    void getEpisodes().then(setAllEpisodes).catch(console.error)
 
     // A shared episode link looks like `?episode=123&t=754` (see
     // utils/shareUrl.ts). `t` is only meaningful alongside a valid
@@ -149,8 +160,20 @@ export default function App() {
     }
   }
 
+  // Navigates the detail pane to whatever's currently loaded in the player
+  // — the mobile "Playing" tab's action, also used by the mini-player's own
+  // tap target. If nothing has ever played, this still navigates (the tab
+  // is never disabled); DetailPane's existing null-episode placeholder
+  // ("Select an episode to begin") covers that case, so there's no need for
+  // a bespoke empty state here.
+  const handleViewPlaying = () => {
+    setViewingEpisode(playerEpisode)
+    setFocusedPane('detail')
+  }
+
   const handleSeasonSelect = (seasonId: number) => {
     setActiveSeason(seasonId)
+    setSearchQuery('')
     setEpisodesLoading(true)
     void getEpisodes(seasonId).then(setEpisodes).catch(console.error).finally(() => setEpisodesLoading(false))
   }
@@ -231,6 +254,9 @@ export default function App() {
           podcastName={settings.podcast_name}
           seasons={seasons}
           episodes={episodes}
+          allEpisodes={allEpisodes}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
           activeSeason={activeSeason}
           analyticsEnabled={settings.analytics_enabled}
           loading={episodesLoading}
@@ -248,6 +274,11 @@ export default function App() {
           playing={playing}
           loading={playerLoading}
           error={playerError}
+          currentTime={playerCurrentTime}
+          duration={playerDuration}
+          speed={playerSpeed}
+          onRequestSeek={(time) => usePlayerStore.getState().requestSeek(time)}
+          onSpeedChange={(speed) => usePlayerStore.getState().setSpeed(speed)}
           onPlayPause={() => viewingEpisode && handlePlayEpisode(viewingEpisode)}
           onRetry={() => usePlayerStore.getState().retryPlayback()}
           onBack={() => setFocusedPane('list')}
@@ -261,14 +292,23 @@ export default function App() {
       }
       tabBar={
         <MobileTabBar
-          activeTab={focusedPane === 'settings' ? 'settings' : 'episodes'}
-          hasPlayerEpisode={playerEpisode !== null}
+          activeTab={
+            focusedPane === 'settings'
+              ? 'settings'
+              : focusedPane === 'detail'
+                // Both null (nothing has ever played, reached via the
+                // Playing tab's own placeholder) counts as a match too —
+                // ?.id on null is undefined on both sides, so this also
+                // correctly covers that case without a separate branch.
+                ? (viewingEpisode?.id === playerEpisode?.id ? 'playing' : null)
+                : 'episodes'
+          }
+          onSelectPlaying={handleViewPlaying}
           onSelectEpisodes={() => setFocusedPane('list')}
           onSelectSettings={() => setFocusedPane('settings')}
-          onExpandPlayer={() => setExpandSignal(n => n + 1)}
         />
       }
-      player={<AudioPlayer sharedStart={sharedStart} expandSignal={expandSignal} />}
+      player={<AudioPlayer sharedStart={sharedStart} onTapMiniBar={handleViewPlaying} />}
       themeBadge={themeBadge}
     />
   )

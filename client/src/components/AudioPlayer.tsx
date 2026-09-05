@@ -19,10 +19,11 @@ interface AudioPlayerProps {
    *  shared moment naturally stops applying after the first listen rather
    *  than needing an explicit "already consumed" flag. */
   sharedStart?: SharedStart
-  /** Passed straight through to AudioPlayerView — bump to command the
-   *  mobile full-screen "now playing" overlay to open (e.g. from
-   *  MobileTabBar's "Now Playing" tab). */
-  expandSignal?: number
+  /** Passed straight through to AudioPlayerView — fires when the mobile
+   *  mini-bar itself is tapped (outside its own Play/Pause button). Wired
+   *  by the host to the same action as MobileTabBar's "Playing" tab, since
+   *  both mean "show me the episode that's playing." */
+  onTapMiniBar?: () => void
 }
 
 /**
@@ -33,9 +34,9 @@ interface AudioPlayerProps {
  * playback position by episode id via `utils/episodeProgress`) and applying
  * a one-time shared-link start time when present.
  */
-export default function AudioPlayer({ sharedStart, expandSignal }: AudioPlayerProps) {
+export default function AudioPlayer({ sharedStart, onTapMiniBar }: AudioPlayerProps) {
   const {
-    episode, playing, currentTime, duration, speed, loading, error, retryNonce,
+    episode, playing, currentTime, duration, speed, loading, error, retryNonce, seekRequest,
     setPlaying, setCurrentTime, setDuration, setSpeed, setLoading, setError, retryPlayback,
   } = usePlayerStore()
 
@@ -152,7 +153,8 @@ export default function AudioPlayer({ sharedStart, expandSignal }: AudioPlayerPr
       loading={loading}
       error={error}
       retrySignal={retryNonce}
-      expandSignal={expandSignal}
+      seekRequest={seekRequest ?? undefined}
+      onTapMiniBar={onTapMiniBar}
       onSeek={setCurrentTime}
       onTogglePlay={() => setPlaying(!playing)}
       onSpeedChange={setSpeed}
