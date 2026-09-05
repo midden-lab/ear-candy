@@ -492,8 +492,87 @@ describe('mobile tab bar navigation (< md)', () => {
     expect(await screen.findByRole('heading', { name: 'Admin Login' })).toBeInTheDocument()
   })
 
-  it('the Now Playing tab is disabled until an episode is loaded', async () => {
+  it('the Playing tab is always enabled, and navigates to the detail placeholder when nothing has ever played', async () => {
+    const user = userEvent.setup()
     render(<App />)
-    expect(await screen.findByRole('button', { name: 'Listening' })).toBeDisabled()
+    const playingTab = await screen.findByRole('button', { name: 'Playing' })
+    expect(playingTab).toBeEnabled()
+    await user.click(playingTab)
+    expect(await screen.findByText('Select an episode to begin')).toBeInTheDocument()
+  })
+})
+
+describe('Playing tab reflects actual playback state (< md)', () => {
+  const originalMatchMedia = window.matchMedia
+
+  function mockMobile() {
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+  }
+
+  const season: Season = {
+    id: 1, number: 1, title: 'Season One', description: '', cover_art_path: null, hidden: false, created_at: '2024-01-01T00:00:00Z',
+  }
+  const episodeA: Episode = {
+    id: 1, season_id: 1, number: 1, title: 'Episode A', description: '', guests: '', tags: '',
+    cover_art_path: null, cover_art_thumb_path: null, duration_seconds: 100, publish_date: '2024-01-01',
+    audio_type: 'url', audio_path: 'https://example.com/a.mp3', hidden: false,
+    created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z',
+  }
+  const episodeB: Episode = { ...episodeA, id: 2, number: 2, title: 'Episode B', audio_path: 'https://example.com/b.mp3' }
+
+  beforeEach(() => {
+    mockMobile()
+    vi.mocked(getSeasons).mockResolvedValue([season])
+    vi.mocked(getEpisodes).mockResolvedValue([episodeA, episodeB])
+  })
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia
+  })
+
+  it('tapping Playing after starting an episode navigates to its detail view and highlights the Playing tab', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByText('Episode A'))
+    await user.click(await screen.findByText('Play'))
+    await user.click(await screen.findByRole('button', { name: 'Episodes' }))
+    await user.click(await screen.findByRole('button', { name: 'Playing' }))
+    // Both the still-visible mini-bar and DetailPane's own heading show
+    // "Episode A" once it's playing — target the heading specifically to
+    // disambiguate, rather than the ambiguous plain text.
+    expect(await screen.findByRole('heading', { name: 'Episode A' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Playing' })).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('tapping the mini-bar itself (not the tab) also navigates to the playing episode\'s detail view', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByText('Episode A'))
+    await user.click(await screen.findByText('Play'))
+    await user.click(await screen.findByRole('button', { name: 'Episodes' }))
+    await user.click(await screen.findByRole('button', { name: /Now playing: Episode A/ }))
+    expect(await screen.findByRole('heading', { name: 'Episode A' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Playing' })).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('browsing to a different, non-playing episode\'s detail highlights no tab at all', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByText('Episode A'))
+    await user.click(await screen.findByText('Play'))
+    await user.click(await screen.findByRole('button', { name: 'Episodes' }))
+    await user.click(await screen.findByText('Episode B'))
+    expect(screen.getByRole('button', { name: 'Playing' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('button', { name: 'Episodes' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('button', { name: 'Settings' })).not.toHaveAttribute('aria-current')
   })
 })

@@ -3,92 +3,70 @@ import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import MobileTabBar from '../components/MobileTabBar'
 
-it('marks the Episodes tab current when active', () => {
-  render(
+function renderBar(overrides: Partial<Parameters<typeof MobileTabBar>[0]> = {}) {
+  return render(
     <MobileTabBar
       activeTab="episodes"
-      hasPlayerEpisode={false}
+      onSelectPlaying={() => {}}
       onSelectEpisodes={() => {}}
       onSelectSettings={() => {}}
-      onExpandPlayer={() => {}}
+      {...overrides}
     />
   )
-  expect(screen.getByText('Episodes').closest('button')).toHaveAttribute('aria-current', 'true')
-  expect(screen.getByText('Settings').closest('button')).not.toHaveAttribute('aria-current')
+}
+
+it('renders all three tabs with no icons, just text labels', () => {
+  renderBar()
+  expect(screen.getByRole('button', { name: 'Playing' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Episodes' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
+  expect(document.querySelector('svg')).not.toBeInTheDocument()
+})
+
+it('marks the Episodes tab current when active', () => {
+  renderBar({ activeTab: 'episodes' })
+  expect(screen.getByRole('button', { name: 'Episodes' })).toHaveAttribute('aria-current', 'true')
+  expect(screen.getByRole('button', { name: 'Settings' })).not.toHaveAttribute('aria-current')
+  expect(screen.getByRole('button', { name: 'Playing' })).not.toHaveAttribute('aria-current')
 })
 
 it('marks the Settings tab current when active', () => {
-  render(
-    <MobileTabBar
-      activeTab="settings"
-      hasPlayerEpisode={false}
-      onSelectEpisodes={() => {}}
-      onSelectSettings={() => {}}
-      onExpandPlayer={() => {}}
-    />
-  )
-  expect(screen.getByText('Settings').closest('button')).toHaveAttribute('aria-current', 'true')
+  renderBar({ activeTab: 'settings' })
+  expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'true')
+})
+
+it('marks the Playing tab current when active', () => {
+  renderBar({ activeTab: 'playing' })
+  expect(screen.getByRole('button', { name: 'Playing' })).toHaveAttribute('aria-current', 'true')
+})
+
+it('marks no tab current when activeTab is null (browsing a non-playing episode\'s detail)', () => {
+  renderBar({ activeTab: null })
+  expect(screen.getByRole('button', { name: 'Playing' })).not.toHaveAttribute('aria-current')
+  expect(screen.getByRole('button', { name: 'Episodes' })).not.toHaveAttribute('aria-current')
+  expect(screen.getByRole('button', { name: 'Settings' })).not.toHaveAttribute('aria-current')
 })
 
 it('calls onSelectEpisodes and onSelectSettings when tapped', async () => {
   const user = userEvent.setup()
   const onSelectEpisodes = vi.fn()
   const onSelectSettings = vi.fn()
-  render(
-    <MobileTabBar
-      activeTab="episodes"
-      hasPlayerEpisode={false}
-      onSelectEpisodes={onSelectEpisodes}
-      onSelectSettings={onSelectSettings}
-      onExpandPlayer={() => {}}
-    />
-  )
-  await user.click(screen.getByText('Settings'))
+  renderBar({ onSelectEpisodes, onSelectSettings })
+  await user.click(screen.getByRole('button', { name: 'Settings' }))
   expect(onSelectSettings).toHaveBeenCalledTimes(1)
-  await user.click(screen.getByText('Episodes'))
+  await user.click(screen.getByRole('button', { name: 'Episodes' }))
   expect(onSelectEpisodes).toHaveBeenCalledTimes(1)
 })
 
-it('disables the Now Playing tab when nothing is loaded', () => {
-  render(
-    <MobileTabBar
-      activeTab="episodes"
-      hasPlayerEpisode={false}
-      onSelectEpisodes={() => {}}
-      onSelectSettings={() => {}}
-      onExpandPlayer={() => {}}
-    />
-  )
-  expect(screen.getByRole('button', { name: 'Listening' })).toBeDisabled()
+it('the Playing tab is always enabled (never disabled), even with nothing implied to be loaded', () => {
+  renderBar()
+  expect(screen.getByRole('button', { name: 'Playing' })).toBeEnabled()
 })
 
-it('calls onExpandPlayer when Now Playing is tapped and an episode is loaded', async () => {
+it('calls onSelectPlaying when the Playing tab is tapped', async () => {
   const user = userEvent.setup()
-  const onExpandPlayer = vi.fn()
-  render(
-    <MobileTabBar
-      activeTab="episodes"
-      hasPlayerEpisode
-      onSelectEpisodes={() => {}}
-      onSelectSettings={() => {}}
-      onExpandPlayer={onExpandPlayer}
-    />
-  )
-  const nowPlayingButton = screen.getByRole('button', { name: 'Listening' })
-  expect(nowPlayingButton).toBeEnabled()
-  await user.click(nowPlayingButton)
-  expect(onExpandPlayer).toHaveBeenCalledTimes(1)
-})
-
-it('does not change activeTab styling when Now Playing is tapped', () => {
-  render(
-    <MobileTabBar
-      activeTab="episodes"
-      hasPlayerEpisode
-      onSelectEpisodes={() => {}}
-      onSelectSettings={() => {}}
-      onExpandPlayer={() => {}}
-    />
-  )
-  expect(screen.getByRole('button', { name: 'Listening' })).not.toHaveAttribute('aria-current')
+  const onSelectPlaying = vi.fn()
+  renderBar({ onSelectPlaying })
+  await user.click(screen.getByRole('button', { name: 'Playing' }))
+  expect(onSelectPlaying).toHaveBeenCalledTimes(1)
 })

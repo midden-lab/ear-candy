@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { Episode } from '../types'
 import ProgressBar from './ProgressBar'
 import EpisodeCoverArt from './EpisodeCoverArt'
@@ -39,15 +39,12 @@ export interface AudioPlayerViewProps {
    *  real playback, since only this component's effect actually applies a
    *  seek to the underlying element. */
   seekRequest?: { time: number; nonce: number }
-  /** Bumped (any change in value) to command "expand to the full-screen now
-   *  playing overlay" — e.g. from MobileTabBar's "Now Playing" tab, which
-   *  has no other way to reach this component's own expand/collapse state.
-   *  Mirrors the retrySignal pattern: the host can only ask for the
-   *  transition, not directly set the underlying boolean, so this
-   *  component keeps sole ownership of its own expanded state. No-op on
-   *  desktop (no mini-bar/overlay distinction there) or when nothing is
-   *  loaded. */
-  expandSignal?: number
+  /** Fired when the mobile mini-bar itself is tapped, outside its own
+   *  Play/Pause button — the host decides what that means (this component
+   *  no longer has its own full-screen "now playing" state; navigating to
+   *  a shared detail view is the host's job, e.g. App.tsx's
+   *  handleViewPlaying). No-op on desktop, which has no mini-bar. */
+  onTapMiniBar?: () => void
   /** Fired after the view has moved the underlying <audio> element's playhead. */
   onSeek: (time: number) => void
   onTogglePlay: () => void
@@ -80,31 +77,23 @@ export interface AudioPlayerViewProps {
 /**
  * Fully self-contained audio player: owns the real <audio> element and its
  * playback wiring (play/pause, seek, speed, load-on-episode-change), and
- * renders as a desktop bar, a mobile mini-bar, or a mobile full-screen
- * "now playing" overlay depending on viewport and its own expand/collapse
- * state. Playback position/duration/playing/speed are controlled via props
- * so this component has no dependency on any particular app's state
- * management — the host wires it to whatever store it likes.
+ * renders as a desktop bar or a mobile mini-bar depending on viewport.
+ * Playback position/duration/playing/speed are controlled via props so
+ * this component has no dependency on any particular app's state
+ * management — the host wires it to whatever store it likes. On mobile,
+ * this is deliberately just a mini-bar with no full-screen state of its
+ * own — the host's "Playing" destination (e.g. App.tsx's detail pane) is
+ * where a listener actually goes to see more, reached via onTapMiniBar.
  */
 export default function AudioPlayerView({
-  episode, playing, currentTime, duration, speed, resumeTime, loading, error, retrySignal, seekRequest, expandSignal,
+  episode, playing, currentTime, duration, speed, resumeTime, loading, error, retrySignal, seekRequest,
+  onTapMiniBar,
   onSeek, onTogglePlay, onSpeedChange, onTimeUpdate, onDurationChange, onEnded,
   onWaiting, onPlaybackResumed, onPlaybackError, onReset, onRetry, onHeightChange,
 }: AudioPlayerViewProps) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
-  const [expanded, setExpanded] = useState(false)
-
-  // Collapse back to the mini-bar once playback stops entirely (no
-  // episode), so a later episode selection doesn't reopen the overlay from
-  // stale state. Adjusted during render (React's documented pattern for
-  // resetting state on a prop change) rather than in an effect.
-  const prevEpisodeIdRef = useRef(episode?.id)
-  if (episode?.id !== prevEpisodeIdRef.current) {
-    prevEpisodeIdRef.current = episode?.id
-    if (!episode && expanded) setExpanded(false)
-  }
 
   useEffect(() => {
     const audio = audioRef.current
@@ -178,22 +167,10 @@ export default function AudioPlayerView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seekRequest])
 
-  const prevExpandSignalRef = useRef(expandSignal)
-  useEffect(() => {
-    if (!episode) return
-    if (expandSignal !== undefined && expandSignal !== prevExpandSignalRef.current) {
-      prevExpandSignalRef.current = expandSignal
-      setExpanded(true)
-    }
-  }, [expandSignal, episode])
-
-  const isFullScreenOverlay = !isDesktop && expanded
-
   // Feed the player's actual rendered height to the host via onHeightChange,
-  // whenever it changes. Zero when nothing should reserve space (no
-  // episode, or the full-screen overlay is covering everything anyway).
+  // whenever it changes. Zero when nothing should reserve space (no episode).
   useLayoutEffect(() => {
-    if (!episode || isFullScreenOverlay) {
+    if (!episode) {
       onHeightChange?.(0)
       return
     }
@@ -208,7 +185,7 @@ export default function AudioPlayerView({
       onHeightChange?.(0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onHeightChange is expected to be a stable callback
-  }, [episode, isFullScreenOverlay])
+  }, [episode])
 
   const handleSeek = (time: number) => {
     if (audioRef.current) audioRef.current.currentTime = time
@@ -262,8 +239,10 @@ export default function AudioPlayerView({
     onCycleSpeed: cycleSpeed,
   }
 
-  // Mobile, collapsed: compact mini-bar.
-  if (!isDesktop && !expanded) {
+  // Mobile: compact mini-bar. Tapping it (outside the Play/Pause button)
+  // navigates to the host's own "Playing" destination via onTapMiniBar —
+  // this component no longer owns any full-screen state of its own.
+  if (!isDesktop) {
     return (
       <div
         ref={barRef}
@@ -276,9 +255,9 @@ export default function AudioPlayerView({
       >
         {audioEl}
         <button
-          onClick={() => setExpanded(true)}
+          onClick={() => onTapMiniBar?.()}
           className="flex w-full items-center gap-3 px-4 py-2 text-left"
-          aria-label={`Now playing: ${episode.title}. Tap to expand.`}
+          aria-label={`Now playing: ${episode.title}. Tap to view.`}
         >
           <EpisodeCoverArt
             thumbPath={episode.cover_art_thumb_path}
@@ -323,53 +302,6 @@ export default function AudioPlayerView({
             )}
           </span>
         </button>
-      </div>
-    )
-  }
-
-  // Mobile, expanded: full-screen "now playing" overlay.
-  if (!isDesktop && expanded) {
-    return (
-      <div
-        className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-zinc-50 dark:bg-zinc-950 transition-transform duration-300 motion-reduce:transition-none"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)', paddingTop: 'env(safe-area-inset-top)' }}
-      >
-        {audioEl}
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => setExpanded(false)}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-            aria-label="Collapse now playing"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="m6 9 6 6 6-6"/>
-            </svg>
-          </button>
-          {/* ShareDialog's own trigger is already a 44px (h-11 w-11) touch
-              target by default — no per-usage size override needed here. */}
-          <ShareDialog episodeId={episode.id} episodeTitle={episode.title} currentTime={currentTime} />
-        </div>
-        <div className="flex flex-1 flex-col items-center justify-center gap-8 px-6 pb-6">
-          <EpisodeCoverArt
-            thumbPath={episode.cover_art_thumb_path}
-            detailPath={episode.cover_art_path}
-            alt={episode.title}
-            variant="responsive"
-            className="w-full max-w-xs aspect-square object-cover rounded-xl shadow-lg ring-1 ring-zinc-200 dark:ring-zinc-800"
-          />
-          <div className="w-full max-w-xs text-center">
-            <div className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-100">{episode.title}</div>
-            <PlaybackStatusLine status={playbackStatus} className="mt-1" />
-          </div>
-          <div className="w-full max-w-xs space-y-2">
-            <ProgressBar currentTime={currentTime} duration={duration} onSeek={handleSeek} />
-            <div className="flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(remaining, true)}</span>
-            </div>
-          </div>
-          <TransportControls {...transportProps} large />
-        </div>
       </div>
     )
   }

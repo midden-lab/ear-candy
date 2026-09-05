@@ -44,11 +44,6 @@ export default function App() {
   // to phone width behaves identically to an actual phone — AppShell only
   // gives this visual effect below the `md` breakpoint.
   const [focusedPane, setFocusedPane] = useState<'list' | 'detail' | 'settings'>('list')
-  // Bumped to command AudioPlayerView's full-screen "now playing" overlay to
-  // open, from MobileTabBar's "Now Playing" tab — mirrors the retrySignal
-  // pattern already used for the same reason (only AudioPlayerView owns its
-  // own expand/collapse state).
-  const [expandSignal, setExpandSignal] = useState(0)
   // The episode shown in the detail pane — deliberately independent of the
   // player's own episode/playing state. Browsing the list must never
   // interrupt whatever's already playing in the background; only an
@@ -163,6 +158,17 @@ export default function App() {
       store.setEpisode(ep)
       store.setPlaying(true)
     }
+  }
+
+  // Navigates the detail pane to whatever's currently loaded in the player
+  // — the mobile "Playing" tab's action, also used by the mini-player's own
+  // tap target. If nothing has ever played, this still navigates (the tab
+  // is never disabled); DetailPane's existing null-episode placeholder
+  // ("Select an episode to begin") covers that case, so there's no need for
+  // a bespoke empty state here.
+  const handleViewPlaying = () => {
+    setViewingEpisode(playerEpisode)
+    setFocusedPane('detail')
   }
 
   const handleSeasonSelect = (seasonId: number) => {
@@ -286,14 +292,19 @@ export default function App() {
       }
       tabBar={
         <MobileTabBar
-          activeTab={focusedPane === 'settings' ? 'settings' : 'episodes'}
-          hasPlayerEpisode={playerEpisode !== null}
+          activeTab={
+            focusedPane === 'settings'
+              ? 'settings'
+              : focusedPane === 'detail'
+                ? (playerEpisode !== null && viewingEpisode?.id === playerEpisode.id ? 'playing' : null)
+                : 'episodes'
+          }
+          onSelectPlaying={handleViewPlaying}
           onSelectEpisodes={() => setFocusedPane('list')}
           onSelectSettings={() => setFocusedPane('settings')}
-          onExpandPlayer={() => setExpandSignal(n => n + 1)}
         />
       }
-      player={<AudioPlayer sharedStart={sharedStart} expandSignal={expandSignal} />}
+      player={<AudioPlayer sharedStart={sharedStart} onTapMiniBar={handleViewPlaying} />}
       themeBadge={themeBadge}
     />
   )
