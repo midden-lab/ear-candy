@@ -296,7 +296,11 @@ export default function App() {
             focusedPane === 'settings'
               ? 'settings'
               : focusedPane === 'detail'
-                ? (playerEpisode !== null && viewingEpisode?.id === playerEpisode.id ? 'playing' : null)
+                // Both null (nothing has ever played, reached via the
+                // Playing tab's own placeholder) counts as a match too —
+                // ?.id on null is undefined on both sides, so this also
+                // correctly covers that case without a separate branch.
+                ? (viewingEpisode?.id === playerEpisode?.id ? 'playing' : null)
                 : 'episodes'
           }
           onSelectPlaying={handleViewPlaying}

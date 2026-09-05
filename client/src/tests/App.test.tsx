@@ -499,6 +499,9 @@ describe('mobile tab bar navigation (< md)', () => {
     expect(playingTab).toBeEnabled()
     await user.click(playingTab)
     expect(await screen.findByText('Select an episode to begin')).toBeInTheDocument()
+    // Both viewingEpisode and playerEpisode are null here — this must still
+    // count as "on the Playing tab", not fall through to no-tab-active.
+    expect(playingTab).toHaveAttribute('aria-current', 'true')
   })
 })
 
