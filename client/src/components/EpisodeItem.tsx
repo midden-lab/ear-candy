@@ -40,7 +40,7 @@ export default function EpisodeItem({ episode, isActive, isPlaying = false, rema
       onClick={() => onClick(episode)}
       className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-start gap-2 md:gap-2 ${
         isActive
-          ? 'border-l-2 border-[var(--accent)] bg-zinc-200/60 text-zinc-900 dark:bg-zinc-800/60 dark:text-zinc-100'
+          ? 'bg-surface shadow-sm text-ink'
           : 'hover:bg-zinc-100 text-zinc-600 dark:hover:bg-zinc-800 dark:text-zinc-300'
       }`}
       aria-current={isActive ? 'true' : undefined}
