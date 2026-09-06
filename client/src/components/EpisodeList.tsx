@@ -4,7 +4,6 @@ import { getEpisodeProgress } from '../utils/episodeProgress'
 import EpisodeListView from './EpisodeListView'
 
 interface EpisodeListProps {
-  podcastName: string
   seasons: Season[]
   episodes: Episode[]
   /** Every visible episode across every season — powers cross-catalog
@@ -39,7 +38,7 @@ interface EpisodeListProps {
  * EpisodeListView, which takes no dependency on this app's state management.
  */
 export default function EpisodeList({
-  podcastName, seasons, episodes, allEpisodes = [], searchQuery = '', onSearchChange = () => {}, activeSeason, analyticsEnabled, loading, viewingEpisodeId, onSeasonSelect, onEpisodeSelect, onEpisodeView,
+  seasons, episodes, allEpisodes = [], searchQuery = '', onSearchChange = () => {}, activeSeason, analyticsEnabled, loading, viewingEpisodeId, onSeasonSelect, onEpisodeSelect, onEpisodeView,
 }: EpisodeListProps) {
   const playingEpisode = usePlayerStore(state => state.episode)
   const playing = usePlayerStore(state => state.playing)
@@ -78,7 +77,6 @@ export default function EpisodeList({
 
   return (
     <EpisodeListView
-      podcastName={podcastName}
       seasons={seasons}
       episodes={episodes}
       allEpisodes={allEpisodes}

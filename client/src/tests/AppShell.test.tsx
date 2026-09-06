@@ -21,15 +21,15 @@ afterEach(() => {
   window.matchMedia = originalMatchMedia
 })
 
-it('renders rail, sidebar, and detail content', () => {
+it('renders masthead, sidebar, and detail content', () => {
   render(
     <AppShell
-      rail={<div>Rail Content</div>}
+      masthead={<div>Masthead Content</div>}
       sidebar={<div>Sidebar Content</div>}
       detail={<div>Detail Content</div>}
     />
   )
-  expect(screen.getByText('Rail Content')).toBeInTheDocument()
+  expect(screen.getByText('Masthead Content')).toBeInTheDocument()
   expect(screen.getByText('Sidebar Content')).toBeInTheDocument()
   expect(screen.getByText('Detail Content')).toBeInTheDocument()
 })
@@ -37,7 +37,7 @@ it('renders rail, sidebar, and detail content', () => {
 it('has a light-mode page background with a dark: override, not a dark-only class', () => {
   const { container } = render(
     <AppShell
-      rail={<div>Rail Content</div>}
+      masthead={<div>Masthead Content</div>}
       sidebar={<div>Sidebar Content</div>}
       detail={<div>Detail Content</div>}
     />
@@ -47,10 +47,10 @@ it('has a light-mode page background with a dark: override, not a dark-only clas
   expect(root.className).toContain('dark:bg-zinc-950')
 })
 
-it('aside reserves the same bottom padding as main for the fixed player bar (regression: rail buttons must never sit under the player bar)', () => {
+it('aside reserves the same bottom padding as main for the fixed player bar', () => {
   render(
     <AppShell
-      rail={<div>Rail Content</div>}
+      masthead={<div>Masthead Content</div>}
       sidebar={<div>Sidebar Content</div>}
       detail={<div>Detail Content</div>}
     />
@@ -61,35 +61,25 @@ it('aside reserves the same bottom padding as main for the fixed player bar (reg
   expect(aside?.style.paddingBottom).toContain('var(--player-h')
 })
 
-it('renders rail content inside an aside', () => {
+it('renders masthead content outside of main and aside, above both', () => {
   render(
     <AppShell
-      rail={<div>Rail Content</div>}
+      masthead={<div>Masthead Content</div>}
       sidebar={<div>Sidebar Content</div>}
       detail={<div>Detail Content</div>}
     />
   )
+  const main = document.querySelector('main')
   const aside = document.querySelector('aside')
-  expect(aside).not.toBeNull()
-  expect(aside).toHaveTextContent('Rail Content')
+  expect(main).not.toHaveTextContent('Masthead Content')
+  expect(aside).not.toHaveTextContent('Masthead Content')
+  expect(screen.getByText('Masthead Content')).toBeInTheDocument()
 })
 
-it('renders sidebar content inside the aside', () => {
+it('renders detail content inside main (main is the primary/left pane)', () => {
   render(
     <AppShell
-      rail={<div>Rail Content</div>}
-      sidebar={<div>Sidebar Content</div>}
-      detail={<div>Detail Content</div>}
-    />
-  )
-  const aside = document.querySelector('aside')
-  expect(aside).toHaveTextContent('Sidebar Content')
-})
-
-it('renders detail content inside main', () => {
-  render(
-    <AppShell
-      rail={<div>Rail Content</div>}
+      masthead={<div>Masthead Content</div>}
       sidebar={<div>Sidebar Content</div>}
       detail={<div>Detail Content</div>}
     />
@@ -99,30 +89,33 @@ it('renders detail content inside main', () => {
   expect(main).toHaveTextContent('Detail Content')
 })
 
-it('renders themeBadge when provided', () => {
+it('renders sidebar content inside an aside (the secondary/right pane)', () => {
   render(
     <AppShell
-      rail={<div>Rail Content</div>}
+      masthead={<div>Masthead Content</div>}
       sidebar={<div>Sidebar Content</div>}
       detail={<div>Detail Content</div>}
-      themeBadge={<div>Theme Badge</div>}
     />
   )
-  expect(screen.getByText('Theme Badge')).toBeInTheDocument()
+  const aside = document.querySelector('aside')
+  expect(aside).not.toBeNull()
+  expect(aside).toHaveTextContent('Sidebar Content')
 })
 
-it('renders themeBadge in fixed bottom-right position', () => {
+it('places the aside after main in DOM order (right-hand sidebar)', () => {
   render(
     <AppShell
-      rail={<div>Rail Content</div>}
+      masthead={<div>Masthead Content</div>}
       sidebar={<div>Sidebar Content</div>}
       detail={<div>Detail Content</div>}
-      themeBadge={<div>Theme Badge</div>}
     />
   )
-  const badgeContainer = document.querySelector('.fixed.bottom-4.right-4.z-50')
-  expect(badgeContainer).not.toBeNull()
-  expect(badgeContainer).toHaveTextContent('Theme Badge')
+  const main = document.querySelector('main')
+  const aside = document.querySelector('aside')
+  expect(main?.compareDocumentPosition(aside!) ?? 0).toBeTruthy()
+  expect(
+    (main?.compareDocumentPosition(aside!) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy()
 })
 
 describe('mobile layout (< md)', () => {
@@ -130,7 +123,7 @@ describe('mobile layout (< md)', () => {
     mockMobile()
     render(
       <AppShell
-        rail={<div>Rail Content</div>}
+        masthead={<div>Masthead Content</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
         settings={<div>Settings Content</div>}
@@ -142,7 +135,6 @@ describe('mobile layout (< md)', () => {
     expect(screen.getByText('Sidebar Content')).toBeInTheDocument()
     expect(screen.queryByText('Detail Content')).not.toBeInTheDocument()
     expect(screen.queryByText('Settings Content')).not.toBeInTheDocument()
-    expect(screen.queryByText('Rail Content')).not.toBeInTheDocument()
     expect(document.querySelector('aside')).toBeNull()
   })
 
@@ -150,7 +142,7 @@ describe('mobile layout (< md)', () => {
     mockMobile()
     render(
       <AppShell
-        rail={<div>Rail Content</div>}
+        masthead={<div>Masthead Content</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
         settings={<div>Settings Content</div>}
@@ -167,7 +159,7 @@ describe('mobile layout (< md)', () => {
     mockMobile()
     render(
       <AppShell
-        rail={<div>Rail Content</div>}
+        masthead={<div>Masthead Content</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
         settings={<div>Settings Content</div>}
@@ -184,7 +176,7 @@ describe('mobile layout (< md)', () => {
     mockMobile()
     const { rerender } = render(
       <AppShell
-        rail={<div>Rail Content</div>}
+        masthead={<div>Masthead Content</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
         settings={<div>Settings Content</div>}
@@ -195,7 +187,7 @@ describe('mobile layout (< md)', () => {
     expect(screen.getByText('Tab Bar')).toBeInTheDocument()
     rerender(
       <AppShell
-        rail={<div>Rail Content</div>}
+        masthead={<div>Masthead Content</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
         settings={<div>Settings Content</div>}
@@ -206,10 +198,34 @@ describe('mobile layout (< md)', () => {
     expect(screen.getByText('Tab Bar')).toBeInTheDocument()
   })
 
+  it('renders the masthead on every mobile pane too (list, detail, and settings)', () => {
+    mockMobile()
+    const { rerender } = render(
+      <AppShell
+        masthead={<div>Masthead Content</div>}
+        sidebar={<div>Sidebar Content</div>}
+        detail={<div>Detail Content</div>}
+        settings={<div>Settings Content</div>}
+        focusedPane="list"
+      />
+    )
+    expect(screen.getByText('Masthead Content')).toBeInTheDocument()
+    rerender(
+      <AppShell
+        masthead={<div>Masthead Content</div>}
+        sidebar={<div>Sidebar Content</div>}
+        detail={<div>Detail Content</div>}
+        settings={<div>Settings Content</div>}
+        focusedPane="settings"
+      />
+    )
+    expect(screen.getByText('Masthead Content')).toBeInTheDocument()
+  })
+
   it('does not render the tab bar on desktop', () => {
     render(
       <AppShell
-        rail={<div>Rail Content</div>}
+        masthead={<div>Masthead Content</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
         tabBar={<div>Tab Bar</div>}
@@ -218,25 +234,11 @@ describe('mobile layout (< md)', () => {
     expect(screen.queryByText('Tab Bar')).not.toBeInTheDocument()
   })
 
-  it('does not render the floating themeBadge on mobile (it lives in the Settings screen instead)', () => {
-    mockMobile()
-    render(
-      <AppShell
-        rail={<div>Rail Content</div>}
-        sidebar={<div>Sidebar Content</div>}
-        detail={<div>Detail Content</div>}
-        themeBadge={<div>Theme Badge</div>}
-        focusedPane="list"
-      />
-    )
-    expect(document.querySelector('.fixed.bottom-4.right-4.z-50')).toBeNull()
-  })
-
   it('moves focus to the main content region when focusedPane changes', () => {
     mockMobile()
     const { rerender } = render(
       <AppShell
-        rail={<div>Rail Content</div>}
+        masthead={<div>Masthead Content</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
         focusedPane="list"
@@ -244,7 +246,7 @@ describe('mobile layout (< md)', () => {
     )
     rerender(
       <AppShell
-        rail={<div>Rail Content</div>}
+        masthead={<div>Masthead Content</div>}
         sidebar={<div>Sidebar Content</div>}
         detail={<div>Detail Content</div>}
         focusedPane="detail"

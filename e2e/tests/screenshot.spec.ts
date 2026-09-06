@@ -27,7 +27,7 @@ test('before - admin login overlap', async ({ page }) => {
     await episodeBtn.click()
     await page.waitForTimeout(500)
   }
-  await page.getByRole('button', { name: 'Admin settings' }).click()
+  await page.getByRole('button', { name: 'Admin' }).click()
   await page.waitForTimeout(500)
   await page.screenshot({ path: path.join(screenshotsDir, 'before-admin-overlap.png') })
 })
