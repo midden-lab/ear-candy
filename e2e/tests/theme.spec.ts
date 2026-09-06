@@ -13,30 +13,29 @@ test.describe('Dark/light mode toggle', () => {
     await page.reload()
   })
 
-  test('Dark is shown as the active toggle on load (dark is the default)', async ({ page }) => {
-    const dark = page.getByRole('button', { name: 'Dark' })
-    const light = page.getByRole('button', { name: 'Light' })
-    await expect(dark).toHaveAttribute('aria-pressed', 'true')
-    await expect(light).toHaveAttribute('aria-pressed', 'false')
-    await expect(page.locator('html')).toHaveClass(/dark/)
+  test('moon badge is visible in the bottom-right corner on load (dark is the default)', async ({ page }) => {
+    const badge = page.getByRole('button', { name: /toggle light mode/i })
+    await expect(badge).toBeVisible()
+    await expect(badge).toContainText('🌙')
   })
 
-  test('clicking Light removes dark class from <html> and marks Light active', async ({ page }) => {
-    await page.getByRole('button', { name: 'Light' }).click()
+  test('clicking the badge removes dark class from <html> and shows sun', async ({ page }) => {
+    const badge = page.getByRole('button', { name: /toggle light mode/i })
+    await badge.click()
     await expect(page.locator('html')).not.toHaveClass(/dark/)
-    await expect(page.getByRole('button', { name: 'Light' })).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.getByRole('button', { name: /toggle dark mode/i })).toContainText('☀️')
   })
 
-  test('clicking Dark again adds dark class back and marks Dark active', async ({ page }) => {
-    await page.getByRole('button', { name: 'Light' }).click()
-    await page.getByRole('button', { name: 'Dark' }).click()
+  test('clicking again adds dark class and shows moon', async ({ page }) => {
+    const badge = page.getByRole('button', { name: /toggle light mode/i })
+    await badge.click()  // → light
+    await page.getByRole('button', { name: /toggle dark mode/i }).click()  // → dark
     await expect(page.locator('html')).toHaveClass(/dark/)
-    await expect(page.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: /toggle light mode/i })).toContainText('🌙')
   })
 
   test('light mode preference persists across page reload', async ({ page }) => {
-    await page.getByRole('button', { name: 'Light' }).click()
+    await page.getByRole('button', { name: /toggle light mode/i }).click()
     await expect(page.locator('html')).not.toHaveClass(/dark/)
     const stored = await page.evaluate(() => localStorage.getItem('theme'))
     expect(stored).toBe('light')
