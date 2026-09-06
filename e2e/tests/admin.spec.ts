@@ -4,7 +4,7 @@ import { test as base } from '@playwright/test'
 base.describe('Admin login', () => {
   base.test('wrong password shows error message', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await page.getByRole('button', { name: 'Admin' }).click()
     await page.getByLabel('Password').fill('wrongpassword')
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByRole('alert')).toContainText('Invalid password')
@@ -13,7 +13,7 @@ base.describe('Admin login', () => {
   base.test('correct password navigates to admin panel', async ({ page }) => {
     const pw = process.env.TEST_ADMIN_PASSWORD ?? 'changeme'
     await page.goto('/')
-    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await page.getByRole('button', { name: 'Admin' }).click()
     await page.getByLabel('Password').fill(pw)
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByText('Ear Candy Admin')).toBeVisible()
@@ -140,7 +140,7 @@ test.describe('Admin panel — episode management', () => {
 
     // Return to the admin panel so the shared afterEach can find and clean
     // up the season/episode created above.
-    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await page.getByRole('button', { name: 'Admin' }).click()
     await expect(page.getByText('Ear Candy Admin')).toBeVisible()
   })
 
@@ -219,8 +219,8 @@ test.describe('Admin panel — settings', () => {
 test.describe('Admin panel — logout', () => {
   test('Sign out returns to the listener UI', async ({ adminPage: page }) => {
     await page.getByRole('button', { name: 'Sign out' }).click()
-    // Listener shell is visible (AppShell has a <nav> and a <main>)
-    await expect(page.locator('nav').first()).toBeVisible()
+    // Listener shell is visible again (masthead's Admin control + <main>)
+    await expect(page.getByRole('button', { name: 'Admin' })).toBeVisible()
     await expect(page.locator('main').first()).toBeVisible()
     // Admin header is gone
     await expect(page.getByText('Ear Candy Admin')).not.toBeVisible()
@@ -232,7 +232,7 @@ test.describe('Admin panel — logout', () => {
   base.test('signing out and reopening admin prompts for the password again', async ({ page }) => {
     const pw = process.env.TEST_ADMIN_PASSWORD ?? 'changeme'
     await page.goto('/')
-    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await page.getByRole('button', { name: 'Admin' }).click()
     await page.getByLabel('Password').fill(pw)
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByText('Ear Candy Admin')).toBeVisible()
@@ -240,7 +240,7 @@ test.describe('Admin panel — logout', () => {
     await page.getByRole('button', { name: 'Sign out' }).click()
     await expect(page.getByText('Ear Candy Admin')).not.toBeVisible()
 
-    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await page.getByRole('button', { name: 'Admin' }).click()
     await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
     await expect(page.getByText('Ear Candy Admin')).not.toBeVisible()
   })
