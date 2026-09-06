@@ -67,6 +67,7 @@ function Harness({ loading, episodes: episodesOverride, onEpisodeSelect, analyti
   const [viewingEpisodeId, setViewingEpisodeId] = useState<number | null>(null)
   return (
     <EpisodeList
+      podcastName="Test Show"
       seasons={seasons}
       episodes={episodesOverride ?? episodes}
       activeSeason={1}
@@ -130,6 +131,11 @@ it('EQ indicator follows the actually-playing episode, not the viewed one', asyn
   // ...but the EQ bars stay on the row that's actually playing (Second Episode).
   expect(secondEpBtn.querySelector('.eq-bars')).toBeInTheDocument()
   expect(firstEpBtn.querySelector('.eq-bars')).not.toBeInTheDocument()
+})
+
+it('renders the podcast name at the top', () => {
+  render(<Harness />)
+  expect(screen.getByText('Test Show')).toBeInTheDocument()
 })
 
 it('calls onEpisodeSelect when an episode is clicked', async () => {

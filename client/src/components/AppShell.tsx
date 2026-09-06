@@ -2,32 +2,29 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 
 interface AppShellProps {
-  /** Full-width header rendered above everything else, on both desktop and
-   *  mobile. Callers build the right variant (with or without the desktop
-   *  Light/Dark + Admin controls) themselves — AppShell stays
-   *  breakpoint-agnostic for this prop like all its others. */
-  masthead: ReactNode
+  rail: ReactNode
   sidebar: ReactNode
   detail: ReactNode
   /** Mobile Settings screen content, shown when focusedPane is 'settings'.
-   *  Ignored on desktop (reached via the masthead's Admin control there
-   *  instead). */
+   *  Ignored on desktop (reached via the rail's admin icon there instead). */
   settings?: ReactNode
   player?: ReactNode
   /** MobileTabBar (or equivalent), fixed at the very bottom on mobile.
    *  Ignored on desktop. */
   tabBar?: ReactNode
+  themeBadge?: ReactNode
   /** Which pane is focused on mobile; has no visual effect at `md` and up. */
   focusedPane?: 'list' | 'detail' | 'settings'
 }
 
 export default function AppShell({
-  masthead,
+  rail,
   sidebar,
   detail,
   settings,
   player,
   tabBar,
+  themeBadge,
   focusedPane = 'list',
 }: AppShellProps) {
   const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
@@ -49,38 +46,43 @@ export default function AppShell({
   } as CSSProperties
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-zinc-50 dark:bg-zinc-950" style={rootStyle}>
-      {masthead}
-
-      <div className="flex flex-1 overflow-hidden md:flex-row">
-        <main
-          ref={mainRef}
-          tabIndex={-1}
-          className="flex-1 overflow-y-auto"
+    <div className="flex h-dvh flex-col overflow-hidden bg-zinc-50 dark:bg-zinc-950 md:flex-row" style={rootStyle}>
+      {isDesktop && (
+        <aside
+          className="flex flex-shrink-0"
           style={{ paddingBottom: 'calc(var(--player-h, 0px) + var(--tabbar-h, 0px) + env(safe-area-inset-bottom, 0px))' }}
         >
-          {isDesktop
-            ? detail
-            : focusedPane === 'list'
-              ? sidebar
-              : focusedPane === 'settings'
-                ? settings
-                : detail}
-        </main>
-
-        {isDesktop && (
-          <aside
-            className="w-64 flex-shrink-0 overflow-y-auto border-l border-zinc-200 dark:border-zinc-800"
-            style={{ paddingBottom: 'calc(var(--player-h, 0px) + var(--tabbar-h, 0px) + env(safe-area-inset-bottom, 0px))' }}
-          >
+          {rail}
+          <div className="w-64 overflow-y-auto border-r border-zinc-200 dark:border-zinc-800">
             {sidebar}
-          </aside>
-        )}
-      </div>
+          </div>
+        </aside>
+      )}
+
+      <main
+        ref={mainRef}
+        tabIndex={-1}
+        className="flex-1 overflow-y-auto"
+        style={{ paddingBottom: 'calc(var(--player-h, 0px) + var(--tabbar-h, 0px) + env(safe-area-inset-bottom, 0px))' }}
+      >
+        {isDesktop
+          ? detail
+          : focusedPane === 'list'
+            ? sidebar
+            : focusedPane === 'settings'
+              ? settings
+              : detail}
+      </main>
 
       {player}
 
       {!isDesktop && tabBar}
+
+      {themeBadge && isDesktop && (
+        <div className="fixed bottom-4 right-4 z-50">
+          {themeBadge}
+        </div>
+      )}
     </div>
   )
 }
