@@ -1,10 +1,10 @@
 ---
 id: quiet-room-shell-completion
 title: "Quiet Room shell completion — masthead, pane order, IconRail retirement"
-status: in-progress
+status: complete
 priority: 1
 created: 2026-09-05
-steps_completed: 7
+steps_completed: 8
 steps_total: 8
 tags: [design-system, ux, frontend, redesign, shell]
 ---
