@@ -1,15 +1,28 @@
 ---
 id: quiet-room-shell-completion
 title: "Quiet Room shell completion — masthead, pane order, IconRail retirement"
-status: in-progress
+status: reverted
 priority: 1
 created: 2026-09-05
-steps_completed: 7
+steps_completed: 8
 steps_total: 8
 tags: [design-system, ux, frontend, redesign, shell]
 ---
 
 # Quiet Room Shell Completion
+
+## Reverted (2026-09-06)
+
+This plan's implementation was deployed to production, then reverted at the
+user's explicit direction ("Revert what was deployed. This does not match
+the mockups.") — issued immediately after a post-deploy screenshot
+comparison that the model itself judged as matching the reference mockups.
+Given the model's repeated overconfidence earlier in this same session
+about whether production matched the mockups (see the session transcript),
+the revert was executed without re-litigating the visual judgment call.
+**Before re-attempting this plan, get the user's own direct, specific
+description of what differs from the mockups** — do not re-derive it from
+screenshots alone a second time.
 
 ## Summary
 

@@ -7,6 +7,7 @@ import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 import { searchAllEpisodes } from '../utils/search'
 
 export interface EpisodeListViewProps {
+  podcastName: string
   seasons: Season[]
   episodes: Episode[]
   /** Every visible episode across every season — powers cross-catalog
@@ -50,7 +51,7 @@ export interface EpisodeListViewProps {
  * has no dependency on how or where playback state lives.
  */
 export default function EpisodeListView({
-  seasons, episodes, allEpisodes = [], searchQuery = '', onSearchChange = () => {}, activeSeason, analyticsEnabled = false, loading, activeEpisodeId, playingEpisodeId, playing, getRemainingSeconds, onSeasonSelect, onEpisodeClick,
+  podcastName, seasons, episodes, allEpisodes = [], searchQuery = '', onSearchChange = () => {}, activeSeason, analyticsEnabled = false, loading, activeEpisodeId, playingEpisodeId, playing, getRemainingSeconds, onSeasonSelect, onEpisodeClick,
 }: EpisodeListViewProps) {
   const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
   const isSearching = searchQuery.trim() !== ''
@@ -62,6 +63,16 @@ export default function EpisodeListView({
 
   return (
     <div className="flex flex-col h-full">
+      {isDesktop ? (
+        <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{podcastName}</h2>
+        </div>
+      ) : (
+        <div className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
+          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{podcastName}</h2>
+        </div>
+      )}
+
       <div className="px-4 py-2 border-b border-zinc-200 dark:border-zinc-800">
         <input
           type="text"
