@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { getSettings, getSeasons, getEpisodes, getEpisode, logout } from './api'
 import { useTheme } from './hooks/useTheme'
-import { useBreakpoint, MD_BREAKPOINT_QUERY } from './hooks/useBreakpoint'
 import { usePlayerStore } from './store/playerStore'
 import { trackPageView } from './utils/analytics'
 import type { Settings, Season, Episode } from './types'
 import AppShell from './components/AppShell'
-import Masthead from './components/Masthead'
 import ThemeBadge from './components/ThemeBadge'
+import IconRail from './components/IconRail'
 import MobileTabBar from './components/MobileTabBar'
 import MobileSettingsView from './components/MobileSettingsView'
 import EpisodeList from './components/EpisodeList'
@@ -67,7 +66,6 @@ export default function App() {
   const pageViewSentRef = useRef(false)
 
   const { isDark, toggleDark } = useTheme(settings?.accent_color ?? '#5a3ef5')
-  const isDesktopShell = useBreakpoint(MD_BREAKPOINT_QUERY)
 
   useEffect(() => {
     void getSettings().then(setSettings).catch(console.error)
@@ -246,23 +244,14 @@ export default function App() {
   }
 
   const themeBadge = <ThemeBadge isDark={isDark} onToggle={toggleDark} />
-  const masthead = (
-    <Masthead
-      podcastName={settings.podcast_name}
-      tagline={settings.tagline}
-      showControls={isDesktopShell}
-      isDark={isDark}
-      onToggleTheme={toggleDark}
-      onAdminClick={() => void handleAdminClick()}
-    />
-  )
 
   return (
     <AppShell
       focusedPane={focusedPane}
-      masthead={masthead}
+      rail={<IconRail onAdminClick={() => void handleAdminClick()} />}
       sidebar={
         <EpisodeList
+          podcastName={settings.podcast_name}
           seasons={seasons}
           episodes={episodes}
           allEpisodes={allEpisodes}
@@ -320,6 +309,7 @@ export default function App() {
         />
       }
       player={<AudioPlayer sharedStart={sharedStart} onTapMiniBar={handleViewPlaying} />}
+      themeBadge={themeBadge}
     />
   )
 }

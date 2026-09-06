@@ -95,7 +95,7 @@ it('renders player view after settings load', async () => {
   })
   render(<App />)
   await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Admin' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
   )
 })
 
@@ -113,7 +113,7 @@ it('fires trackPageView exactly once per app mount, even under StrictMode double
   })
   render(<StrictMode><App /></StrictMode>)
   // Wait on the effect's own observable side effect directly, not on an
-  // unrelated DOM assertion — the "Admin" button commits as soon
+  // unrelated DOM assertion — the "Admin settings" button commits as soon
   // as `settings` state updates, which happens synchronously and BEFORE
   // React's passive effects (where trackPageView() lives) are guaranteed
   // to have run. Asserting via the button was a race that happened to
@@ -141,9 +141,9 @@ it('navigates to admin login when admin button is clicked', async () => {
   })
   render(<App />)
   await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Admin' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
   )
-  await user.click(screen.getByRole('button', { name: 'Admin' }))
+  await user.click(screen.getByRole('button', { name: 'Admin settings' }))
   expect(screen.getByRole('heading', { name: 'Admin Login' })).toBeInTheDocument()
 })
 
@@ -176,11 +176,11 @@ describe('admin sign out', () => {
     })
     render(<App />)
 
-    await user.click(await screen.findByRole('button', { name: 'Admin' }))
+    await user.click(await screen.findByRole('button', { name: 'Admin settings' }))
     await user.click(await screen.findByText('Sign out'))
 
     expect(logout).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('button', { name: 'Admin' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
   })
 
   it('still returns to the player view if the logout request fails', async () => {
@@ -199,11 +199,11 @@ describe('admin sign out', () => {
     })
     render(<App />)
 
-    await user.click(await screen.findByRole('button', { name: 'Admin' }))
+    await user.click(await screen.findByRole('button', { name: 'Admin settings' }))
     await user.click(await screen.findByText('Sign out'))
 
     expect(logout).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('button', { name: 'Admin' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Admin settings' })).toBeInTheDocument()
   })
 })
 
