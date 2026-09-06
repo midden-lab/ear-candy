@@ -36,19 +36,19 @@ Closes the real, fully-verified remaining gap between Ear Candy's listener UI an
 
 **Files involved:** `client/src/components/Masthead.tsx` (new), `client/src/components/AppShell.tsx`, `client/src/components/IconRail.tsx` (deleted), `client/src/components/EpisodeListView.tsx`, `client/src/components/EpisodeList.tsx`, `client/src/App.tsx`, `client/src/components/ShareDialog.tsx`, `client/src/components/AudioPlayerView.tsx`, `client/src/components/SeasonTabs.tsx`, `client/src/components/SeasonPicker.tsx`, plus corresponding test files and `e2e/fixtures.ts`/`e2e/tests/admin.spec.ts`/`e2e/tests/screenshot.spec.ts`/`e2e/tests/theme.spec.ts`.
 
-## Open questions — resolve with the user before or during Step 1, not silently
+## Decisions (resolved with the user 2026-09-06)
 
-- **Masthead station callout.** The mockup shows `KDUR 91.9 / 93.9 FM` in the masthead's right side (desktop) and Settings pane (mobile). `Settings` has no field for this today. Options: (a) skip it entirely (simplest — it's flavor, not load-bearing), (b) add a new optional `station` settings field end-to-end (server migration + admin UI + client). Recommend (a) unless the user wants it.
-- **Tagline surfacing.** `Settings.tagline` already exists and is already populated in production data but has never been rendered. Confirm the masthead should finally show it (recommended — it's real, already-entered content).
+- **Masthead station callout.** Include it, but as a **hardcoded string** in `Masthead.tsx` for now — not backed by a real settings field. Ear Candy has no `station` field in `Settings` today, and adding one (migration + admin UI + API) is explicitly deferred as a separate follow-up decision, not part of this plan. Removing the hardcoded text entirely is also an option at that later point.
+- **Tagline.** Yes — surface `Settings.tagline` in the masthead. It already exists, is already populated in production (`"Because it feels good to be in the know!"`, confirmed live via `GET /api/settings`), and has never been rendered anywhere in the listener-facing app until now.
 
 ## Steps
 
 ### Step 1: Build `Masthead.tsx`
 
-**Files:** `client/src/components/Masthead.tsx` (new), `client/src/tests/Masthead.test.tsx` (new)
+**Files:** `client/src/components/Masthead.tsx` (new), `client/src/tests/Masthead.test.tsx` (new), `client/src/components/MobileSettingsView.tsx`, its test file
 **Requires review:** false
 
-Full-width header: wordmark (`podcastName`) + tagline (`Settings.tagline`) on the left. When `showControls` is true (desktop only — mobile shows just the wordmark/tagline, persistently, across all three tabs), render on the right: a `Light`/`Dark` text-toggle pair (two buttons, `aria-pressed`, matching `plans/007-mockups/desktop.html`'s `.themeswitch` — not the emoji `ThemeBadge`) and a plain-text `Admin` button (not a real `<a href>`, consistent with this app's client-side view switching). No icons anywhere in this component.
+Full-width header: wordmark (`podcastName`) + tagline (`Settings.tagline`) on the left. When `showControls` is true (desktop only — mobile shows just the wordmark/tagline, persistently, across all three tabs), render on the right: a hardcoded station string (`"KDUR 91.9 / 93.9 FM"` — a literal string constant, not sourced from `Settings`; see this plan's Decisions section on why), a `Light`/`Dark` text-toggle pair (two buttons, `aria-pressed`, matching `plans/007-mockups/desktop.html`'s `.themeswitch` — not the emoji `ThemeBadge`), and a plain-text `Admin` button (not a real `<a href>`, consistent with this app's client-side view switching). No icons anywhere in this component.
 
 ```ts
 interface MastheadProps {
@@ -61,9 +61,12 @@ interface MastheadProps {
 }
 ```
 
+Also add the same hardcoded station string as a row in `MobileSettingsView.tsx` (mirroring `plans/007-mockups/mobile.html`'s `.m-settings-row` "Station" row) — the mobile masthead itself stays wordmark/tagline-only, matching the mockup's persistent `.m-header`.
+
 **Acceptance criteria:**
 - [ ] Renders `podcastName`/`tagline` unconditionally; renders no controls when `showControls` is false/omitted.
-- [ ] `showControls=true` renders `Light`/`Dark` with `aria-pressed` reflecting `isDark`, wired to `onToggleTheme`; renders `Admin` wired to `onAdminClick`.
+- [ ] `showControls=true` renders the station string, `Light`/`Dark` with `aria-pressed` reflecting `isDark` wired to `onToggleTheme`, and `Admin` wired to `onAdminClick`.
+- [ ] `MobileSettingsView` shows the same station string in a settings row.
 - [ ] New test file covers all of the above.
 
 ---
