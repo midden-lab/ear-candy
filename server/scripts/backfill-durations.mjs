@@ -23,11 +23,31 @@
 //   DB_PATH      default: data/db.sqlite
 //   UPLOADS_DIR  default: data/uploads
 //
-// STATUS: already run against production on 2026-07-13 (--apply, no
-// --season-id yet). Fixed episodes #96-#100 (all upload-type episodes with
-// duration_seconds = 0 at the time). Safe to re-run if the gap ever
-// resurfaces — it's idempotent, only touching rows still at
-// duration_seconds = 0/NULL.
+// STATUS:
+// - 2026-07-13 (--apply, no --season-id yet): fixed episodes #96-#100 (all
+//   upload-type episodes with duration_seconds = 0 at the time).
+// - 2026-09-08 (--apply --season-id=69, plans/013): fixed episodes #101-122
+//   (Season 1's remaining 22 zero-duration episodes, from a single Aug
+//   11-12 admin session whose uploads — large, ~57-58MB files — silently
+//   timed out the client-side duration probe at save time; see plans/013's
+//   Context for the full root-cause investigation). ~44 more episodes
+//   across Seasons 2-4 have the same issue and are intentionally not yet
+//   backfilled — re-run with the appropriate --season-id when ready.
+// Safe to re-run if the gap ever resurfaces — it's idempotent, only
+// touching rows still at duration_seconds = 0/NULL.
+//
+// Operational note: running `npm install <pkg> --no-save` directly in
+// /app (as the one-off-script procedure below describes) can silently
+// no-op — "up to date, audited N packages" with nothing actually added —
+// when NODE_ENV=production is set (it is, in the deployed image) combined
+// with /app's own package-lock.json. Confirmed working around this by
+// installing into an unrelated scratch directory instead and copying the
+// result into /app/node_modules:
+//   mkdir -p /tmp/scratch && cd /tmp/scratch && npm init -y &&
+//   npm install <pkg> --silent && cp -r node_modules/. /app/node_modules/
+// NODE_PATH does NOT help here even though it looks like it should — it
+// only affects CommonJS require() resolution, not ESM import (which this
+// script and this whole codebase use throughout).
 
 import Database from 'better-sqlite3'
 import { parseFile } from 'music-metadata'
