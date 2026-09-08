@@ -110,12 +110,14 @@ export default function EpisodeListView({
         </>
       )}
 
-      {/* overflow-x-visible: .list/.m-list's negative horizontal margin
-          (bleeding rows full-bleed past the parent's own edges, per the
-          mockup) would otherwise get clipped — setting only overflow-y
-          non-visible makes the browser compute overflow-x as auto too (CSS
-          Overflow §3), which clips instead of letting the bleed show. */}
-      <div className={`${isDesktop ? 'list' : 'm-list'} flex-1 overflow-y-auto overflow-x-visible`}>
+      {/* No overflow/flex utilities here — .list/.m-list declare none in
+          the mockup either. This was previously a second, redundant,
+          nested scroll region (inside aside.index on desktop, inside
+          .m-scroll on mobile) — dormant since content never needed to
+          scroll independently at this level, but wrong on both breakpoints
+          (plans/012). The real scroll region is the document itself on
+          desktop, or .m-scroll on mobile. */}
+      <div className={isDesktop ? 'list' : 'm-list'}>
         {isSearching ? (
           searchResults.length === 0 ? (
             <p className="empty-note">No episodes match &ldquo;{searchQuery.trim()}&rdquo;.</p>

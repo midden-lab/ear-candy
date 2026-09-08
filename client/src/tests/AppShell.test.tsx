@@ -46,7 +46,7 @@ it('uses the canvas token for its background, not a hardcoded zinc class (plans/
   expect(root.className).toContain('bg-canvas')
 })
 
-it('aside reserves the same bottom padding as main for the fixed player bar', () => {
+it('reserves dock-clearance padding on .room itself, not per-pane, on desktop (plans/012 — single document scroll, not two independent panes)', () => {
   render(
     <AppShell
       masthead={<div>Masthead Content</div>}
@@ -56,8 +56,34 @@ it('aside reserves the same bottom padding as main for the fixed player bar', ()
   )
   const aside = document.querySelector('aside')
   const main = document.querySelector('main')
-  expect(aside?.style.paddingBottom).toBe(main?.style.paddingBottom)
-  expect(aside?.style.paddingBottom).toContain('var(--player-h')
+  const room = document.querySelector('.room') as HTMLElement | null
+  expect(room?.style.paddingBottom).toContain('var(--player-h')
+  expect(aside?.style.paddingBottom).toBeFalsy()
+  expect(main?.style.paddingBottom).toBeFalsy()
+})
+
+it('reserves dock+tabbar-clearance padding on the mobile scroll region itself (unchanged mobile model)', () => {
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia
+  render(
+    <AppShell
+      masthead={<div>Masthead Content</div>}
+      sidebar={<div>Sidebar Content</div>}
+      detail={<div>Detail Content</div>}
+    />
+  )
+  const main = document.querySelector('main.m-scroll') as HTMLElement | null
+  expect(main?.style.paddingBottom).toContain('var(--player-h')
+  expect(main?.style.paddingBottom).toContain('var(--tabbar-h')
+  window.matchMedia = originalMatchMedia
 })
 
 it('renders masthead content outside of main and aside, above both', () => {

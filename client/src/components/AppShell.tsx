@@ -40,70 +40,95 @@ export default function AppShell({
     if (!isDesktop) mainRef.current?.focus()
   }, [focusedPane, isDesktop])
 
-  // Static height of the mobile bottom tab bar, fed to descendants (the
-  // mini-player docks above it; <main>'s padding-bottom reserves space for
-  // it) via a CSS var rather than measuring, since the bar's height never
-  // changes. Zero on desktop, where no tab bar renders.
-  const rootStyle = {
-    '--tabbar-h': isDesktop ? '0px' : 'calc(4rem + env(safe-area-inset-bottom, 0px))',
-  } as CSSProperties
-
-  const paneStyle = { paddingBottom: 'calc(var(--player-h, 0px) + var(--tabbar-h, 0px) + env(safe-area-inset-bottom, 0px))' }
-
-  return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-canvas" style={rootStyle}>
-      {isDesktop ? (
-        // .room/.floor per the mockup: 72px horizontal page margin + 1520px
-        // max-width centering, a 372px-wide index column with a 104px gap
-        // (collapsing to one column under 1180px, handled entirely by
-        // .floor's own media query). pb-0 zeroes .room's own 200px bottom
-        // padding — that value exists in the mockup to clear its fixed
-        // dock on a page that scrolls as a whole; this app scrolls each
-        // pane independently instead, and already reserves dock space via
-        // paneStyle below, so a second, static reservation at the room
-        // level would just waste layout height. items-stretch overrides
-        // .floor's own `align-items:start` (content-sized columns) so
-        // .stage/.index actually stretch to fill the available height —
-        // required for their independent overflow-y-auto scrolling.
-        // w-full: .room's own `margin:0 auto` centering assumes a normal
-        // block-flow parent (the mockup's real context). As a flex item
-        // here, an auto cross-axis margin overrides flexbox's default
-        // stretch sizing, collapsing .room to its content's intrinsic
-        // width instead of filling the viewport up to max-width:1520px —
-        // confirmed directly (without w-full, .room measured ~806px wide
-        // in a 1400px viewport). w-full restores the fill-then-cap-then-
-        // center behavior .room's own CSS assumes.
-        <div className="room w-full pb-0 flex flex-1 flex-col overflow-hidden">
+  // Desktop and mobile use genuinely different scroll models now, matching
+  // the mockup's own two separate shells rather than one shared shape with
+  // conditional pieces — confirmed empirically (real getComputedStyle() +
+  // scroll-event checks, not just reading the CSS) that the mockup's
+  // desktop has NO scroll containers at all: .stage/.index both compute
+  // overflow-y:visible, and the whole document scrolls as one unit, with
+  // .index{position:sticky;top:44px} doing the work of keeping the episode
+  // list anchored near the top. The mockup's mobile shell, by contrast, IS
+  // a bounded box with its own internal .m-scroll{overflow-y:auto} region
+  // (a "phone frame" in the mockup's own preview chrome) — so mobile's
+  // existing viewport-locked shell below is correct and unchanged.
+  if (isDesktop) {
+    return (
+      <div className="flex flex-col bg-canvas">
+        {/* w-full: .room's own `margin:0 auto` centering assumes a normal
+            block-flow parent (the mockup's real context). As a flex item
+            here, an auto cross-axis margin overrides flexbox's default
+            stretch sizing, collapsing .room to its content's intrinsic
+            width instead of filling the viewport up to max-width:1520px —
+            confirmed directly (without w-full, .room measured ~806px wide
+            in a 1400px viewport). w-full restores the fill-then-cap-then-
+            center behavior .room's own CSS assumes.
+            The dock-clearance padding lives here (not per-pane) since
+            there's only one scrolling region now — the document itself.
+            masthead lives INSIDE .room (matching the mockup's own DOM:
+            <div class="room"><header class="masthead">...<div class="floor">)
+            — .room supplies the 72px horizontal page margin via its own
+            padding, and .masthead has no horizontal padding of its own.
+            Rendering masthead as a sibling of .room instead (an earlier,
+            since-fixed version of this file did exactly that) starves it
+            of that margin entirely: confirmed directly, "My Podcast" sat
+            flush at x=0 and .admin-link's right edge sat flush at the
+            viewport's right edge with zero margin. */}
+        <div
+          className="room w-full"
+          style={{ paddingBottom: 'calc(var(--player-h, 0px) + env(safe-area-inset-bottom, 0px))' }}
+        >
           {masthead}
-          <div className="floor flex-1 items-stretch overflow-hidden">
-            <main ref={mainRef} tabIndex={-1} className="stage overflow-y-auto" style={paneStyle}>
+          {/* .floor keeps its own declared align-items:start (content-sized
+              columns) — no stretch override needed now that .stage/.index
+              aren't independent scroll regions that needed a locked height
+              to scroll within. */}
+          <div className="floor">
+            <main ref={mainRef} tabIndex={-1} className="stage">
               {detail}
             </main>
-            <aside className="index overflow-y-auto overflow-x-visible" style={paneStyle}>
+            <aside className="index">
               {sidebar}
             </aside>
           </div>
         </div>
-      ) : (
-        // .m-scroll already carries the mockup's own 22px horizontal
-        // padding (its content, including EpisodeListView's .m-list
-        // negative-margin bleed, insets from that) — overflow-x-visible
-        // for the same reason as desktop's .index above. .m-pane wraps
-        // whichever pane is showing uniformly, rather than each pane
-        // component wrapping itself.
-        <>
-          {masthead}
-          <main ref={mainRef} tabIndex={-1} className="m-scroll flex-1 overflow-y-auto overflow-x-visible" style={paneStyle}>
-            <div className="m-pane active">
-              {focusedPane === 'list' ? sidebar : focusedPane === 'settings' ? settings : detail}
-            </div>
-          </main>
-        </>
-      )}
+        {player}
+      </div>
+    )
+  }
+
+  // Static height of the mobile bottom tab bar, fed to descendants (the
+  // mini-player docks above it; <main>'s padding-bottom reserves space for
+  // it) via a CSS var rather than measuring, since the bar's height never
+  // changes.
+  const rootStyle = {
+    '--tabbar-h': 'calc(4rem + env(safe-area-inset-bottom, 0px))',
+  } as CSSProperties
+
+  return (
+    <div className="flex h-dvh flex-col overflow-hidden bg-canvas" style={rootStyle}>
+      {masthead}
+      {/* .m-scroll already carries the mockup's own 22px horizontal
+          padding (its content, including EpisodeListView's .m-list
+          negative-margin bleed, insets from that) — overflow-x-visible
+          for the same reason desktop's .index needed it before this
+          change (a non-visible overflow-y forces overflow-x to auto too,
+          per CSS Overflow §3, which would otherwise clip the bleed).
+          .m-pane wraps whichever pane is showing uniformly, rather than
+          each pane component wrapping itself. */}
+      <main
+        ref={mainRef}
+        tabIndex={-1}
+        className="m-scroll flex-1 overflow-y-auto overflow-x-visible"
+        style={{ paddingBottom: 'calc(var(--player-h, 0px) + var(--tabbar-h, 0px) + env(safe-area-inset-bottom, 0px))' }}
+      >
+        <div className="m-pane active">
+          {focusedPane === 'list' ? sidebar : focusedPane === 'settings' ? settings : detail}
+        </div>
+      </main>
 
       {player}
 
-      {!isDesktop && tabBar}
+      {tabBar}
     </div>
   )
 }
