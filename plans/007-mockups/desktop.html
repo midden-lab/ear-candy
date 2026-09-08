@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ear Candy — Quiet Room (Desktop reference mockup)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!--
+  Standalone, self-contained reference mockup — plans/007.
+  Faithfully adapted from the settled "Quiet Room Interactive" design
+  (https://claude.ai/code/artifact/45ce2080-cfd2-4bcc-91c0-5475ec994055),
+  using Ear Candy's real branding/content in place of the mockup's demo
+  data. This file has no build step and no external app dependency —
+  open it directly in a browser. It is NOT shippable code; it exists so
+  the actual design intent can be reviewed and confirmed before any real
+  implementation work starts (see plans/007-*.md).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;}
+  #app-root{
+    --canvas:#EEEFF0;
+    --surface:#FFFFFF;
+    --ink:#121316;
+    --ink-2:#5B5E64;
+    --ink-3:#8E9197;
+    --ink-4:#B4B7BC;
+    --hair:rgba(18,19,22,.075);
+    --wash:rgba(18,19,22,.035);
+    --ring:rgba(18,19,22,.11);
+    --ring-2:rgba(18,19,22,.13);
+    --accent:#9437FF;
+    --accent-contrast:#FFFFFF;
+    --art-shadow:0 1px 2px rgba(18,19,22,.05), 0 18px 44px -22px rgba(18,19,22,.22);
+    --row-shadow:0 1px 2px rgba(18,19,22,.04), 0 10px 26px -18px rgba(18,19,22,.28);
+    --dock-shadow:0 -1px 0 rgba(18,19,22,.055), 0 -30px 60px -30px rgba(18,19,22,.16);
+    --scrub-track:rgba(18,19,22,.09);
+    --sans:"Archivo","Helvetica Neue",Helvetica,Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --ease:cubic-bezier(.32,.72,.26,1);
+    display:block;
+    background:var(--canvas);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  #app-root[data-theme="dark"]{
+    --canvas:#121014;
+    --surface:#1B1920;
+    --ink:#F1EFF3;
+    --ink-2:#A9A6AF;
+    --ink-3:#75727A;
+    --ink-4:#4C4A51;
+    --hair:rgba(255,255,255,.09);
+    --wash:rgba(255,255,255,.045);
+    --ring:rgba(255,255,255,.10);
+    --ring-2:rgba(255,255,255,.13);
+    --accent:#B583FF;
+    --accent-contrast:#161018;
+    --art-shadow:0 1px 0 rgba(255,255,255,.045) inset, 0 18px 44px -22px rgba(0,0,0,.65);
+    --row-shadow:0 1px 0 rgba(255,255,255,.035) inset, 0 10px 26px -18px rgba(0,0,0,.6);
+    --dock-shadow:0 -1px 0 rgba(255,255,255,.06), 0 -30px 60px -30px rgba(0,0,0,.55);
+    --scrub-track:rgba(255,255,255,.12);
+  }
+  #app-root *{box-sizing:border-box;}
+  #app-root ::selection{background:rgba(148,55,255,.28);color:var(--ink);}
+  #app-root button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;}
+  #app-root a{color:inherit;text-decoration:none;}
+  #app-root input{font:inherit;color:inherit;}
+  #app-root :focus{outline:none;}
+  #app-root :focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:2px;}
+  #app-root svg{display:block;}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
+  .label{font-family:var(--mono);font-size:10.5px;font-weight:400;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);}
+
+  .toast{position:fixed;left:50%;bottom:36px;transform:translate(-50%,12px);background:var(--ink);color:var(--canvas);font-family:var(--mono);font-size:12px;letter-spacing:.02em;padding:11px 20px;border-radius:100px;opacity:0;pointer-events:none;transition:opacity .22s var(--ease), transform .22s var(--ease);z-index:500;white-space:nowrap;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+
+  .room{max-width:1520px;margin:0 auto;padding:0 72px 200px;}
+  .masthead{display:flex;align-items:flex-start;justify-content:space-between;gap:48px;padding:44px 0 72px;}
+  .wordmark{font-size:19px;font-weight:600;letter-spacing:-.022em;line-height:1.2;margin:0;}
+  .tagline{margin:5px 0 0;font-size:13.5px;font-weight:400;color:var(--ink-3);letter-spacing:-.004em;}
+  .mast-right{display:flex;align-items:center;gap:34px;padding-top:4px;}
+  .station{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--ink-4);text-transform:uppercase;}
+  .themeswitch{display:flex;align-items:baseline;gap:12px;}
+  .themeswitch button{font-size:13px;font-weight:400;color:var(--ink-4);letter-spacing:-.004em;transition:color .16s var(--ease);}
+  .themeswitch button:hover{color:var(--ink-2);}
+  .themeswitch button[aria-pressed="true"]{color:var(--ink);font-weight:500;}
+  .themeswitch .sep{color:var(--ink-4);font-size:12px;}
+  .admin-link{font-size:13px;color:var(--ink-4);transition:color .16s var(--ease);}
+  .admin-link:hover{color:var(--ink);}
+
+  .floor{display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:104px;align-items:start;}
+  .stage-head{display:grid;grid-template-columns:296px minmax(0,1fr);gap:56px;align-items:start;}
+  .art{position:relative;aspect-ratio:1/1;background:var(--surface);overflow:hidden;box-shadow:var(--art-shadow);flex:none;}
+  .art .rings{position:absolute;inset:0;background:repeating-radial-gradient(circle at 20% 84%, rgba(0,0,0,0) 0 20px, var(--ring) 20px 21px);}
+  .art .ring-accent{position:absolute;left:20%;top:84%;width:250px;height:250px;margin:-125px 0 0 -125px;border:1.5px solid var(--accent);border-radius:50%;}
+  .art .ring-accent.two{width:124px;height:124px;margin:-62px 0 0 -62px;border-color:rgba(148,55,255,.42);}
+  #app-root[data-theme="dark"] .art .ring-accent.two{border-color:rgba(181,131,255,.42);}
+  .art .origin{position:absolute;left:20%;top:84%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;background:var(--accent);border-radius:50%;}
+  .art .art-mark{position:absolute;top:20px;left:20px;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);}
+  .art .art-no{position:absolute;top:16px;right:20px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-4);}
+  .stage-top-row{display:flex;align-items:baseline;justify-content:space-between;gap:20px;}
+  .eyebrow{margin:0;}
+  .share-btn{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-4);letter-spacing:-.004em;padding:4px 2px;transition:color .16s var(--ease);flex:none;}
+  .share-btn:hover{color:var(--ink);}
+  .share-btn svg{flex:none;}
+  .ep-title{margin:20px 0 0;font-size:56px;font-weight:600;letter-spacing:-.038em;line-height:1.03;max-width:13ch;}
+  .ep-meta{margin:24px 0 0;font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;color:var(--ink-3);text-transform:uppercase;font-variant-numeric:tabular-nums;}
+  .ep-meta .dot{padding:0 9px;color:var(--ink-4);}
+  .controls{margin-top:44px;}
+  .play-primary{display:inline-flex;align-items:center;gap:16px;}
+  .play-disc{width:58px;height:58px;border-radius:50%;background:var(--accent);display:grid;place-items:center;transition:transform .2s var(--ease), box-shadow .2s var(--ease);box-shadow:0 6px 18px -8px rgba(148,55,255,.65);flex:none;}
+  .play-primary:hover .play-disc{transform:scale(1.045);box-shadow:0 10px 26px -8px rgba(148,55,255,.72);}
+  .play-primary:active .play-disc{transform:scale(.985);}
+  .play-word{font-size:15px;font-weight:500;letter-spacing:-.012em;text-align:left;}
+  .play-sub{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-top:3px;font-weight:400;}
+  .stage-body{margin-top:76px;display:grid;grid-template-columns:296px minmax(0,1fr);gap:56px;align-items:start;}
+  .body-label{padding-top:7px;}
+  .description{margin:0;font-size:19.5px;line-height:1.62;letter-spacing:-.012em;color:var(--ink-2);max-width:54ch;}
+  .guests{margin:34px 0 0;font-size:14px;color:var(--ink-3);letter-spacing:-.004em;}
+  .guests strong{color:var(--ink-2);font-weight:500;}
+
+  .index{position:sticky;top:44px;}
+  .index-toolbar{margin:16px 0 0;}
+  .ep-search{margin:14px 0 22px;}
+  .ep-search input{width:100%;font-family:var(--sans);font-size:14.5px;color:var(--ink);background:transparent;border:0;border-bottom:1px solid var(--hair);padding:9px 2px;letter-spacing:-.006em;transition:border-color .16s var(--ease);}
+  .ep-search input::placeholder{color:var(--ink-4);}
+  .ep-search input:focus-visible{outline:none;border-bottom-color:var(--accent);}
+  .toolbar-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px;}
+  .season-select{position:relative;display:inline-block;}
+  .season-trigger{display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:500;letter-spacing:-.012em;color:var(--ink);padding:4px 0;}
+  .season-trigger .caret{color:var(--ink-4);transition:transform .18s var(--ease);}
+  .season-trigger[aria-expanded="true"] .caret{transform:rotate(180deg);}
+  .season-popover{position:absolute;top:calc(100% + 10px);left:0;min-width:236px;background:var(--surface);box-shadow:var(--row-shadow);padding:6px;z-index:60;display:none;max-height:320px;overflow-y:auto;}
+  .season-popover.open{display:block;}
+  .season-option{display:flex;align-items:baseline;justify-content:space-between;gap:16px;width:100%;text-align:left;padding:10px 12px;font-size:14px;color:var(--ink-3);transition:background-color .14s var(--ease);}
+  .season-option:hover{background:var(--wash);}
+  .season-option[aria-selected="true"]{color:var(--ink);font-weight:500;}
+  .season-option .opt-count{font-size:10.5px;letter-spacing:.06em;color:var(--ink-4);}
+  .season-option[aria-selected="true"] .opt-count{color:var(--accent);}
+  .season-count{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--ink-4);text-transform:uppercase;}
+  .list{margin:22px -18px 0;}
+  .row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:baseline;gap:14px;width:100%;text-align:left;padding:15px 18px;transition:background-color .16s var(--ease);border-radius:2px;}
+  .row + .row{margin-top:1px;}
+  .row:hover{background:var(--wash);}
+  .row:hover .row-title{color:var(--ink);}
+  .row-no{font-family:var(--mono);font-size:11px;color:var(--ink-4);letter-spacing:.03em;font-variant-numeric:tabular-nums;}
+  .row-title{font-size:15px;font-weight:400;letter-spacing:-.014em;color:var(--ink-2);line-height:1.35;transition:color .16s var(--ease);}
+  .row-season-tag-inline{font-family:var(--mono);font-size:10px;color:var(--ink-4);margin-right:9px;letter-spacing:.03em;}
+  .row-time{font-family:var(--mono);font-size:11px;color:var(--ink-4);letter-spacing:.02em;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .row.is-viewed{background:var(--surface);box-shadow:var(--row-shadow);}
+  .row.is-viewed:hover{background:var(--surface);}
+  .row.is-viewed .row-title{color:var(--ink);font-weight:500;}
+  .row.is-viewed .row-no{color:var(--ink-3);}
+  .row.is-playing .row-time{color:var(--accent);}
+  .row.is-playing .row-no{color:var(--accent);}
+  .row.partial .row-time{color:var(--ink-3);}
+  .empty-note{padding:20px 18px;font-size:13.5px;color:var(--ink-3);}
+  .analytics{margin-top:44px;}
+  .analytics summary{list-style:none;cursor:pointer;font-size:12.5px;color:var(--ink-4);letter-spacing:-.004em;transition:color .16s var(--ease);display:inline-block;}
+  .analytics summary::-webkit-details-marker{display:none;}
+  .analytics summary:hover{color:var(--ink-2);}
+  .analytics p{margin:14px 0 0;font-size:12.5px;line-height:1.65;color:var(--ink-3);max-width:44ch;}
+
+  .dock{position:fixed;left:0;right:0;bottom:0;background:var(--surface);box-shadow:var(--dock-shadow);z-index:20;}
+  .scrub{position:relative;height:2px;background:var(--scrub-track);cursor:pointer;}
+  .scrub .fill{position:absolute;inset:0 auto 0 0;width:0%;background:var(--accent);}
+  .scrub .knob{position:absolute;top:50%;left:0%;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:50%;background:var(--accent);transform:scale(0);transition:transform .18s var(--ease);}
+  .scrub:hover .knob,.scrub:focus-visible .knob{transform:scale(1);}
+  .scrub:focus-visible{outline-offset:6px;}
+  .dock-inner{max-width:1520px;margin:0 auto;padding:18px 72px 20px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:40px;}
+  .now{display:flex;align-items:center;gap:16px;min-width:0;}
+  .chip{position:relative;width:44px;height:44px;flex:none;background:var(--canvas);overflow:hidden;}
+  .chip .rings{position:absolute;inset:0;background:repeating-radial-gradient(circle at 20% 84%, rgba(0,0,0,0) 0 5px, var(--ring-2) 5px 6px);}
+  .chip .origin{position:absolute;left:20%;top:84%;width:4px;height:4px;margin:-2px 0 0 -2px;background:var(--accent);border-radius:50%;}
+  .now-text{min-width:0;}
+  .now-title{font-size:14px;font-weight:500;letter-spacing:-.016em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .now-sub{font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);margin-top:4px;font-variant-numeric:tabular-nums;}
+  .transport{display:flex;align-items:center;gap:26px;}
+  .skip{color:var(--ink-3);display:grid;place-items:center;width:34px;height:34px;transition:color .16s var(--ease);}
+  .skip:hover{color:var(--ink);}
+  .pause-disc{width:44px;height:44px;border-radius:50%;background:var(--accent);display:grid;place-items:center;transition:transform .2s var(--ease);flex:none;}
+  .pause-disc:hover{transform:scale(1.05);}
+  .pause-disc:active{transform:scale(.98);}
+  .dock-right{display:flex;align-items:center;justify-content:flex-end;gap:30px;}
+  .times{font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;color:var(--ink-2);font-variant-numeric:tabular-nums;}
+  .times .total{color:var(--ink-4);}
+  .speed{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;color:var(--ink-3);padding:5px 2px;transition:color .16s var(--ease);}
+  .speed:hover{color:var(--ink);}
+  .status{max-width:1520px;margin:0 auto;padding:0 72px 14px;min-height:15px;font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4);text-align:center;opacity:0;transition:opacity .2s var(--ease);}
+  .status.show{opacity:1;}
+
+  @media (max-width:1180px){
+    .room{padding:0 40px 200px;}
+    .floor{grid-template-columns:minmax(0,1fr);gap:80px;}
+    .index{position:static;max-width:640px;}
+    .stage-head,.stage-body{grid-template-columns:240px minmax(0,1fr);gap:40px;}
+    .ep-title{font-size:44px;}
+    .dock-inner,.status{padding-left:40px;padding-right:40px;}
+  }
+  @media (max-width:820px){
+    .stage-head,.stage-body{grid-template-columns:minmax(0,1fr);}
+    .body-label{display:none;}
+  }
+
+  .share-backdrop{position:fixed;inset:0;background:rgba(18,19,22,.42);display:none;align-items:center;justify-content:center;z-index:300;padding:20px;}
+  #app-root[data-theme="dark"] .share-backdrop{background:rgba(0,0,0,.6);}
+  .share-backdrop.open{display:flex;}
+  .share-panel{background:var(--surface);width:100%;max-width:420px;padding:30px 30px 26px;box-shadow:0 30px 70px -20px rgba(18,19,22,.4);}
+  .share-title{font-size:17px;font-weight:600;letter-spacing:-.014em;margin:0 0 4px;}
+  .share-sub{font-size:13px;color:var(--ink-3);margin:0 0 22px;}
+  .share-url-row{display:flex;align-items:center;gap:10px;background:var(--canvas);padding:12px 14px;margin-bottom:20px;}
+  .share-url{flex:1;min-width:0;font-family:var(--mono);font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .share-copy{font-size:12.5px;font-weight:500;color:var(--accent);flex:none;}
+  .share-dests{display:flex;gap:22px;margin-bottom:22px;flex-wrap:wrap;}
+  .share-dests button{font-size:13.5px;color:var(--ink-2);transition:color .16s var(--ease);}
+  .share-dests button:hover{color:var(--ink);}
+  .share-close{font-size:13px;color:var(--ink-4);}
+  .share-close:hover{color:var(--ink-2);}
+</style>
+</head>
+<body>
+<div id="app-root" data-theme="dark">
+  <div class="toast" id="toast" role="status" aria-live="polite">&nbsp;</div>
+
+  <div class="room">
+    <header class="masthead">
+      <div>
+        <h1 class="wordmark">Test Podcast</h1>
+        <p class="tagline">A show about things</p>
+      </div>
+      <div class="mast-right">
+        <span class="station">KDUR 91.9 / 93.9 FM</span>
+        <div class="themeswitch" role="group" aria-label="Color theme" data-themeswitch>
+          <button type="button" data-theme-btn="light" aria-pressed="false">Light</button>
+          <span class="sep" aria-hidden="true">/</span>
+          <button type="button" data-theme-btn="dark" aria-pressed="true">Dark</button>
+        </div>
+        <a class="admin-link" href="#" data-admin-link>Admin</a>
+      </div>
+    </header>
+
+    <div class="floor">
+      <main class="stage" aria-label="Episode detail">
+        <div class="stage-head">
+          <div class="art" data-stage-art>
+            <div class="rings" aria-hidden="true"></div>
+            <div class="ring-accent" aria-hidden="true"></div>
+            <div class="ring-accent two" aria-hidden="true"></div>
+            <div class="origin" aria-hidden="true"></div>
+            <span class="art-mark">Test Podcast</span>
+            <span class="art-no" data-stage-no></span>
+          </div>
+          <div>
+            <div class="stage-top-row">
+              <p class="eyebrow label"><span data-stage-season></span> &nbsp;·&nbsp; Episode <span data-stage-no-2></span></p>
+              <button class="share-btn" type="button" data-share-open aria-label="Share this episode">
+                <svg width="14" height="14" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                  <path d="M7.5 1v8.2M4.3 4.2 7.5 1l3.2 3.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M2 8.5v3.8c0 .66.54 1.2 1.2 1.2h8.6c.66 0 1.2-.54 1.2-1.2V8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Share
+              </button>
+            </div>
+            <h2 class="ep-title" data-stage-title></h2>
+            <p class="ep-meta">
+              <span data-stage-date></span> <span class="dot">·</span> <span data-stage-duration></span> <span class="dot">·</span> <span data-stage-playstate></span>
+            </p>
+            <div class="controls">
+              <button class="play-primary" type="button" data-stage-play aria-label="Play episode">
+                <span class="play-disc" aria-hidden="true" data-stage-play-icon>
+                  <svg width="17" height="19" viewBox="0 0 17 19" fill="none" aria-hidden="true">
+                    <path d="M1 1.6v15.8a1 1 0 0 0 1.52.86l13.2-7.9a1 1 0 0 0 0-1.72L2.52.74A1 1 0 0 0 1 1.6Z" fill="#fff"/>
+                  </svg>
+                </span>
+                <span class="play-word" data-stage-play-word>Play<span class="play-sub" data-stage-play-sub></span></span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="stage-body">
+          <p class="body-label label">About</p>
+          <div>
+            <p class="description" data-stage-desc></p>
+            <p class="guests" data-stage-guests></p>
+          </div>
+        </div>
+      </main>
+
+      <aside class="index" aria-label="Episode index">
+        <p class="label">Episodes</p>
+        <div class="index-toolbar">
+          <div class="ep-search">
+            <input type="text" placeholder="Search episodes or guests" aria-label="Search episodes" data-search-input>
+          </div>
+          <div class="toolbar-row">
+            <div class="season-select">
+              <button type="button" class="season-trigger" aria-haspopup="listbox" aria-expanded="false" data-season-trigger>
+                <span data-season-trigger-label>Season 1</span>
+                <svg class="caret" width="9" height="6" viewBox="0 0 9 6" fill="none" aria-hidden="true"><path d="M1 1l3.5 3.5L8 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <div class="season-popover" role="listbox" aria-label="Season" data-season-popover></div>
+            </div>
+            <span class="season-count" data-list-status></span>
+          </div>
+        </div>
+        <div class="list" data-episode-list></div>
+        <details class="analytics">
+          <summary>Anonymous listening analytics</summary>
+          <p>We count plays and rough listen-through, with no accounts, no cookies for tracking, and no cross-site profiles. Nothing recorded here identifies you.</p>
+        </details>
+      </aside>
+    </div>
+  </div>
+
+  <div class="dock" aria-label="Player">
+    <div class="scrub" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" data-scrub>
+      <div class="fill" data-scrub-fill></div>
+      <div class="knob"></div>
+    </div>
+    <div class="dock-inner">
+      <div class="now">
+        <div class="chip" aria-hidden="true"><div class="rings"></div><div class="origin"></div></div>
+        <div class="now-text">
+          <div class="now-title" data-dock-title></div>
+          <div class="now-sub" data-dock-sub></div>
+        </div>
+      </div>
+      <div class="transport">
+        <button class="skip" type="button" aria-label="Back 15 seconds" data-skip="-15">
+          <svg width="21" height="21" viewBox="0 0 21 21" fill="none" aria-hidden="true">
+            <path d="M10.5 5.2A6.6 6.6 0 1 1 4.6 8.9" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
+            <path d="M7.6 2.5 4.2 5.6l3.4 2.6" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="10.6" y="15.4" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="6.6" fill="currentColor">15</text>
+          </svg>
+        </button>
+        <button class="pause-disc" type="button" aria-label="Play or pause" data-dock-play>
+          <svg data-dock-icon width="13" height="15" viewBox="0 0 13 15" aria-hidden="true">
+            <rect x="0" y="0" width="4.1" height="15" rx="1" fill="#fff"/><rect x="8.9" y="0" width="4.1" height="15" rx="1" fill="#fff"/>
+          </svg>
+        </button>
+        <button class="skip" type="button" aria-label="Forward 15 seconds" data-skip="15">
+          <svg width="21" height="21" viewBox="0 0 21 21" fill="none" aria-hidden="true">
+            <path d="M10.5 5.2A6.6 6.6 0 1 0 16.4 8.9" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
+            <path d="M13.4 2.5l3.4 3.1-3.4 2.6" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="10.4" y="15.4" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="6.6" fill="currentColor">15</text>
+          </svg>
+        </button>
+      </div>
+      <div class="dock-right">
+        <span class="times mono"><span data-dock-current>0:00</span> <span class="total" data-dock-total>/ 0:00</span></span>
+        <button class="speed" type="button" data-speed-btn aria-label="Playback speed">1.0&times;</button>
+      </div>
+    </div>
+    <p class="status mono" role="status" data-status>&nbsp;</p>
+  </div>
+
+  <div class="share-backdrop" data-share-backdrop>
+    <div class="share-panel" role="dialog" aria-modal="true" aria-label="Share episode">
+      <p class="share-title">Share this episode</p>
+      <p class="share-sub" data-share-sub></p>
+      <div class="share-url-row">
+        <span class="share-url mono" data-share-url></span>
+        <button class="share-copy" type="button" data-share-copy>Copy</button>
+      </div>
+      <div class="share-dests">
+        <button type="button" data-share-dest>Bluesky</button>
+        <button type="button" data-share-dest>Twitter / X</button>
+        <button type="button" data-share-dest>Facebook</button>
+      </div>
+      <button class="share-close" type="button" data-share-close>Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var root = document.getElementById("app-root");
+
+  function fmt(sec){ sec=Math.max(0,Math.round(sec)); var m=Math.floor(sec/60),s=sec%60; return m+":"+(s<10?"0":"")+s; }
+  function longTime(sec){ sec=Math.max(0,Math.round(sec)); var m=Math.floor(sec/60),s=sec%60; return m+" minute"+(m===1?"":"s")+" "+s+" second"+(s===1?"":"s"); }
+
+  /* Real Ear Candy episode data (Season 1, as currently published) plus a
+     second season so the season-dropdown-at-scale pattern is demonstrated. */
+  var DATA = {
+    1: { label:"Season 1", count:8, episodes:[
+      {id:8, no:"8", title:"Poly+Open Relationships", date:"2024-03-19", dur:0, guests:[], desc:"Exploring what ethical non-monogamy actually requires in practice."},
+      {id:7, no:"7", title:"Fantasies & Pornography", date:"2024-03-12", dur:0, guests:[], desc:"A judgment-free look at fantasy, arousal, and where porn fits in."},
+      {id:6, no:"6", title:"Sex Toys", date:"2024-03-05", dur:0, guests:[], desc:"A practical guide to shopping for the first time without getting overwhelmed."},
+      {id:5, no:"5", title:"Kinks", date:"2024-02-27", dur:0, guests:[], desc:"An entry point for the kink-curious, with real talk about negotiation and aftercare."},
+      {id:4, no:"4", title:"Period Sex", date:"2024-02-20", dur:0, guests:[], desc:"Debunking the squeamishness around period sex, one myth at a time."},
+      {id:3, no:"3", title:"Anal Play & Sex", date:"2024-02-13", dur:3634, guests:[], desc:"A judgment-free primer covering safety, communication, and pleasure."},
+      {id:2, no:"2", title:"Sexting", date:"2024-02-06", dur:3544, guests:[], desc:"Consent, screenshots, and staying safe while exploring sexting."},
+      {id:1, no:"1", title:"Barrier Contraception", date:"2024-01-30", dur:3595, guests:[], desc:"In this episode we discuss all the many types of barrier contraception—condoms, Lorals underwear, dental dams, and gloves. We start with a discussion of who is responsible for buying and providing protection (hint: everyone!). We also confront myths about condoms for penis owners and how to make using a condom feel amazing!"}
+    ]},
+    2: { label:"Season 2", count:3, episodes:[
+      {id:11, no:"1", title:"Consent as Foreplay", date:"2024-04-23", dur:0, guests:[], desc:"Why building consent into the moment makes sex better, not more clinical."},
+      {id:10, no:"2", title:"Q & A", date:"2024-04-16", dur:0, guests:[], desc:"Listener questions, answered back to back."},
+      {id:9, no:"3", title:"Masturbation", date:"2024-04-09", dur:0, guests:[], desc:"A frank, shame-free conversation about solo sex."}
+    ]}
+  };
+  var SEASON_NUMS = [1,2];
+  var state = { activeSeason:1, viewingId:1, playingId:null, isPlaying:false, currentTime:0, buffering:false, speedIdx:0, theme:"dark", shareOpen:false, searchQuery:"", seasonOpen:false };
+  var SPEEDS = [1,1.25,1.5,1.75,0.75];
+
+  function allEpisodes(){ var out=[]; SEASON_NUMS.forEach(function(k){ out=out.concat(DATA[k].episodes); }); return out; }
+  function findEp(id){ var all=allEpisodes(); for (var i=0;i<all.length;i++){ if (all[i].id===id) return all[i]; } return null; }
+  function seasonOf(id){ var found=null; SEASON_NUMS.forEach(function(n){ DATA[n].episodes.forEach(function(e){ if (e.id===id) found=n; }); }); return found; }
+  function seasonEps(){ return DATA[state.activeSeason].episodes; }
+
+  var toastTimer=null;
+  function showToast(msg){ var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.classList.remove("show"); },2200); }
+  var statusTimer=null;
+  function flashBuffering(){ state.buffering=true; render(); clearTimeout(statusTimer); statusTimer=setTimeout(function(){ state.buffering=false; render(); },650); }
+
+  function viewEpisode(id){ state.viewingId=id; render(); }
+  function playFromDetail(){
+    var viewed=state.viewingId;
+    if (state.playingId===viewed){ state.isPlaying=!state.isPlaying; }
+    else { state.playingId=viewed; state.currentTime=0; state.isPlaying=true; flashBuffering(); }
+    render();
+  }
+  function toggleDockPlay(){ state.isPlaying=!state.isPlaying; if (state.isPlaying) flashBuffering(); render(); }
+  function skip(delta){ var ep=findEp(state.playingId); if (!ep) return; state.currentTime=Math.min(ep.dur,Math.max(0,state.currentTime+delta)); render(); }
+  function selectSeason(num){ state.activeSeason=num; state.searchQuery=""; state.seasonOpen=false; render(); }
+  function toggleSeasonPopover(){ state.seasonOpen=!state.seasonOpen; render(); }
+  function closeSeasonPopover(){ if (!state.seasonOpen) return; state.seasonOpen=false; render(); }
+  function onSearchInput(v){ state.searchQuery=v; render(); }
+  function setTheme(t){ state.theme=t; root.setAttribute("data-theme",t); render(); }
+  function cycleSpeed(){ state.speedIdx=(state.speedIdx+1)%SPEEDS.length; render(); }
+  function openShare(){ state.shareOpen=true; render(); }
+  function closeShare(){ state.shareOpen=false; render(); }
+  function copyLink(){
+    var ep=findEp(state.viewingId);
+    var url="https://earcandy.example.com/?episode="+ep.id;
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(function(){ showToast("Link copied"); }).catch(function(){ showToast("Couldn't copy — copy it manually"); });
+    } else {
+      showToast("Couldn't copy — copy it manually");
+    }
+  }
+
+  function matchesQuery(ep,q){ if (ep.title.toLowerCase().indexOf(q)!==-1) return true; for (var i=0;i<ep.guests.length;i++){ if (ep.guests[i].toLowerCase().indexOf(q)!==-1) return true; } return false; }
+  function currentListInfo(){
+    var q=state.searchQuery.trim().toLowerCase();
+    if (!q) return { searching:false, episodes:seasonEps() };
+    var results=[];
+    SEASON_NUMS.forEach(function(n){ DATA[n].episodes.forEach(function(ep){ if (matchesQuery(ep,q)) results.push({ep:ep, seasonNum:n}); }); });
+    return { searching:true, results:results, q:state.searchQuery.trim() };
+  }
+
+  function seasonOptionsHtml(){
+    return SEASON_NUMS.map(function(n){
+      var sel=n===state.activeSeason;
+      return '<button type="button" role="option" class="season-option" aria-selected="'+(sel?"true":"false")+'" data-season-opt="'+n+'">'+
+        '<span>'+DATA[n].label+'</span><span class="opt-count mono">'+DATA[n].count+'</span></button>';
+    }).join("");
+  }
+  function rowHtml(ep, seasonTag){
+    var isViewed=ep.id===state.viewingId, isPlaying=ep.id===state.playingId;
+    var cls="row"+(isViewed?" is-viewed":"")+(isPlaying?" is-playing":"");
+    var timeLabel = isPlaying ? fmt(Math.max(0, ep.dur - state.currentTime)) + " left" : (ep.dur > 0 ? fmt(ep.dur) : "—");
+    var tagHtml = seasonTag ? '<span class="row-season-tag-inline">'+seasonTag+'</span>' : "";
+    return '<button class="'+cls+'" type="button" data-ep-row="'+ep.id+'" aria-current="'+(isViewed?'true':'false')+'">'+
+      '<span class="row-no">'+ep.no+'</span><span class="row-title">'+tagHtml+ep.title+'</span><span class="row-time">'+timeLabel+'</span></button>';
+  }
+
+  function render(){
+    var viewed=findEp(state.viewingId), playing=findEp(state.playingId), seasonData=DATA[state.activeSeason];
+
+    document.querySelector("[data-season-trigger-label]").textContent = seasonData.label;
+    document.querySelector("[data-season-popover]").innerHTML = seasonOptionsHtml();
+    document.querySelector("[data-season-trigger]").setAttribute("aria-expanded", state.seasonOpen?"true":"false");
+    document.querySelector("[data-season-popover]").classList.toggle("open", state.seasonOpen);
+
+    var si=document.querySelector("[data-search-input]");
+    if (si.value!==state.searchQuery) si.value=state.searchQuery;
+
+    var info=currentListInfo(), listHtml, statusText;
+    if (info.searching){
+      listHtml = info.results.length===0 ? '<p class="empty-note">No episodes match “'+info.q+'”.</p>' : info.results.map(function(r){ return rowHtml(r.ep, "S"+r.seasonNum); }).join("");
+      statusText = info.results.length + (info.results.length===1 ? " result" : " results");
+    } else {
+      listHtml = info.episodes.map(function(e){ return rowHtml(e, null); }).join("");
+      statusText = seasonData.count + " in " + seasonData.label;
+    }
+    document.querySelector("[data-episode-list]").innerHTML = listHtml;
+    document.querySelector("[data-list-status]").textContent = statusText;
+
+    var viewedSeasonLabel = DATA[seasonOf(viewed.id)].label;
+    document.querySelector("[data-stage-season]").textContent = viewedSeasonLabel;
+    document.querySelector("[data-stage-no]").textContent = viewed.no;
+    document.querySelector("[data-stage-no-2]").textContent = viewed.no;
+    document.querySelector("[data-stage-title]").textContent = viewed.title;
+    document.querySelector("[data-stage-date]").textContent = viewed.date;
+    document.querySelector("[data-stage-duration]").textContent = viewed.dur > 0 ? fmt(viewed.dur) : "—";
+    var playState = viewed.id===state.playingId ? (state.isPlaying?"Now playing":"Paused") : "Not yet played";
+    document.querySelector("[data-stage-playstate]").textContent = playState;
+    document.querySelector("[data-stage-desc]").textContent = viewed.desc;
+    document.querySelector("[data-stage-guests]").innerHTML = viewed.guests.length ? "With " + viewed.guests.map(function(g){return "<strong>"+g+"</strong>";}).join(", ") : "";
+
+    var stagePlaying = viewed.id===state.playingId && state.isPlaying;
+    document.querySelector("[data-stage-play]").setAttribute("aria-label", stagePlaying?"Pause episode":"Play episode");
+    document.querySelector("[data-stage-play-icon]").innerHTML = stagePlaying
+      ? '<svg width="13" height="15" viewBox="0 0 13 15" aria-hidden="true"><rect width="4.1" height="15" rx="1" fill="#fff"/><rect x="8.9" width="4.1" height="15" rx="1" fill="#fff"/></svg>'
+      : '<svg width="17" height="19" viewBox="0 0 17 19" fill="none" aria-hidden="true"><path d="M1 1.6v15.8a1 1 0 0 0 1.52.86l13.2-7.9a1 1 0 0 0 0-1.72L2.52.74A1 1 0 0 0 1 1.6Z" fill="#fff"/></svg>';
+    document.querySelector("[data-stage-play-word]").firstChild.textContent = stagePlaying?"Pause":"Play";
+    document.querySelector("[data-stage-play-sub]").textContent = viewed.dur > 0 ? Math.round(viewed.dur/60)+" min" : "";
+
+    if (playing){
+      var pct = Math.min(100,(state.currentTime/playing.dur*100));
+      document.querySelector("[data-scrub-fill]").style.width = pct+"%";
+      document.querySelector("[data-scrub] .knob").style.left = pct+"%";
+      var scrubEl=document.querySelector("[data-scrub]");
+      scrubEl.setAttribute("aria-valuemax", playing.dur);
+      scrubEl.setAttribute("aria-valuenow", Math.round(state.currentTime));
+      scrubEl.setAttribute("aria-valuetext", longTime(state.currentTime)+" of "+longTime(playing.dur));
+      document.querySelector("[data-dock-title]").textContent = playing.title;
+      document.querySelector("[data-dock-sub]").textContent = DATA[seasonOf(playing.id)].label + " · " + playing.no;
+      document.querySelector("[data-dock-current]").textContent = fmt(state.currentTime);
+      document.querySelector("[data-dock-total]").textContent = "/ " + fmt(playing.dur);
+      document.querySelector("[data-dock-play]").setAttribute("aria-label", state.isPlaying?"Pause":"Play");
+      document.querySelector("[data-dock-icon]").innerHTML = state.isPlaying
+        ? '<rect x="0" y="0" width="4.1" height="15" rx="1" fill="#fff"/><rect x="8.9" y="0" width="4.1" height="15" rx="1" fill="#fff"/>'
+        : '<path d="M1 1.6v11.8a1 1 0 0 0 1.52.86L12.5 8.6a1 1 0 0 0 0-1.72L2.52.74A1 1 0 0 0 1 1.6Z" fill="#fff"/>';
+      document.querySelector(".dock").style.display = "block";
+      document.querySelector(".room").style.paddingBottom = "200px";
+    } else {
+      document.querySelector(".dock").style.display = "none";
+      document.querySelector(".room").style.paddingBottom = "80px";
+    }
+    document.querySelectorAll("[data-speed-btn]").forEach(function(b){ b.textContent = SPEEDS[state.speedIdx].toFixed(2).replace(/0$/,"").replace(/\.$/,".0") + "×"; });
+
+    var statusEls=document.querySelectorAll("[data-status]");
+    statusEls.forEach(function(el){ el.textContent = state.buffering?"Buffering…":" "; el.classList.toggle("show", state.buffering); });
+
+    document.querySelectorAll("[data-theme-btn]").forEach(function(b){ b.setAttribute("aria-pressed", b.getAttribute("data-theme-btn")===state.theme?"true":"false"); });
+
+    document.querySelector("[data-share-backdrop]").classList.toggle("open", state.shareOpen);
+    document.querySelector("[data-share-sub]").textContent = viewed.title;
+    document.querySelector("[data-share-url]").textContent = "earcandy.example.com/?episode=" + viewed.id;
+  }
+
+  setInterval(function(){
+    if (!state.isPlaying) return;
+    var playing=findEp(state.playingId);
+    if (!playing) return;
+    state.currentTime += SPEEDS[state.speedIdx];
+    if (state.currentTime >= playing.dur){ state.currentTime=playing.dur; state.isPlaying=false; }
+    render();
+  }, 1000);
+
+  document.addEventListener("click", function(e){
+    var t=e.target;
+    if (!t.closest(".season-select")) closeSeasonPopover();
+
+    var tb=t.closest("[data-theme-btn]"); if (tb){ setTheme(tb.getAttribute("data-theme-btn")); return; }
+    var seasonTrig=t.closest("[data-season-trigger]"); if (seasonTrig){ toggleSeasonPopover(); return; }
+    var seasonOpt=t.closest("[data-season-opt]"); if (seasonOpt){ selectSeason(parseInt(seasonOpt.getAttribute("data-season-opt"),10)); return; }
+    var row=t.closest("[data-ep-row]"); if (row){ viewEpisode(parseInt(row.getAttribute("data-ep-row"),10)); return; }
+    if (t.closest("[data-stage-play]")){ playFromDetail(); return; }
+    if (t.closest("[data-dock-play]")){ toggleDockPlay(); return; }
+    var skipBtn=t.closest("[data-skip]"); if (skipBtn){ skip(parseInt(skipBtn.getAttribute("data-skip"),10)); return; }
+    if (t.closest("[data-speed-btn]")){ cycleSpeed(); return; }
+    if (t.closest("[data-share-open]")){ e.preventDefault(); openShare(); return; }
+    if (t.closest("[data-share-close]")){ closeShare(); return; }
+    if (t===t.closest("[data-share-backdrop]")){ closeShare(); return; }
+    if (t.closest("[data-share-copy]")){ copyLink(); return; }
+    if (t.closest("[data-share-dest]")){ showToast("Sharing isn’t wired up in this mockup"); return; }
+    if (t.closest("[data-admin-link]")){ e.preventDefault(); showToast("Admin panel — outside this mockup’s scope"); return; }
+  });
+  document.addEventListener("keydown", function(e){ if (e.key==="Escape"){ closeSeasonPopover(); if (state.shareOpen) closeShare(); } });
+  document.querySelector("[data-search-input]").addEventListener("input", function(){ onSearchInput(this.value); });
+  document.querySelector("[data-scrub]").addEventListener("click", function(e){
+    var rect=this.getBoundingClientRect(), ratio=Math.min(1,Math.max(0,(e.clientX-rect.left)/rect.width));
+    var playing=findEp(state.playingId); if (!playing) return;
+    state.currentTime=ratio*playing.dur; render();
+  });
+
+  root.setAttribute("data-theme", state.theme);
+  render();
+})();
+</script>
+</body>
+</html>

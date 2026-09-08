@@ -3,6 +3,7 @@ import { usePlayerStore } from '../store/playerStore'
 import AudioPlayerView from './AudioPlayerView'
 import { getEpisodeProgress, saveEpisodeProgress, clearEpisodeProgress } from '../utils/episodeProgress'
 import { trackPlayStart, trackListenProgress, trackPlayComplete } from '../utils/analytics'
+import type { Season } from '../types'
 
 const LISTEN_PROGRESS_MILESTONES = [25, 50, 75, 90] as const
 
@@ -24,6 +25,9 @@ interface AudioPlayerProps {
    *  by the host to the same action as MobileTabBar's "Playing" tab, since
    *  both mean "show me the episode that's playing." */
   onTapMiniBar?: () => void
+  /** Passed straight through to AudioPlayerView, for the dock/mini-player's
+   *  subtitle line. */
+  seasons?: Season[]
 }
 
 /**
@@ -34,7 +38,7 @@ interface AudioPlayerProps {
  * playback position by episode id via `utils/episodeProgress`) and applying
  * a one-time shared-link start time when present.
  */
-export default function AudioPlayer({ sharedStart, onTapMiniBar }: AudioPlayerProps) {
+export default function AudioPlayer({ sharedStart, onTapMiniBar, seasons }: AudioPlayerProps) {
   const {
     episode, playing, currentTime, duration, speed, loading, error, retryNonce, seekRequest,
     setPlaying, setCurrentTime, setDuration, setSpeed, setLoading, setError, retryPlayback,
@@ -145,6 +149,7 @@ export default function AudioPlayer({ sharedStart, onTapMiniBar }: AudioPlayerPr
   return (
     <AudioPlayerView
       episode={episode}
+      seasons={seasons}
       playing={playing}
       currentTime={currentTime}
       duration={duration}

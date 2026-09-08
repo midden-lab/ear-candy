@@ -1,14 +1,15 @@
 import { test, expect } from '../fixtures.js'
 
-// EpisodeItem's accessible name is "Ep {number} {title} {date} ...". Anchoring
-// on this (rather than a generic hasText match) uniquely identifies the list
-// item regardless of whether it's rendered inside <aside> (desktop) or
-// <main> (mobile list pane) — and regardless of the mini-player, whose own
-// button also visibly contains the episode title as text.
+// EpisodeItem's accessible name is "{number} {title} {time}" (matching the
+// mockup's exact 3-field row — plans/010). Anchoring on the leading number
+// (rather than a generic hasText match) uniquely identifies the list item
+// regardless of whether it's rendered inside <aside> (desktop) or <main>
+// (mobile list pane) — and regardless of the mini-player, whose own
+// aria-label ("Now playing: ...") never starts with a digit.
 const deepDiveItem = (page: import('@playwright/test').Page) =>
-  page.getByRole('button', { name: /^Ep \d+ Deep Dive/ })
+  page.getByRole('button', { name: /^\d+\s+Deep Dive/ })
 const panelDiscussionItem = (page: import('@playwright/test').Page) =>
-  page.getByRole('button', { name: /^Ep \d+ Panel Discussion/ })
+  page.getByRole('button', { name: /^\d+\s+Panel Discussion/ })
 
 test.describe('Mobile listener UI (< md)', () => {
   test.use({ viewport: { width: 390, height: 844 } })
@@ -76,7 +77,6 @@ test.describe('Mobile listener UI (< md)', () => {
     const playingTab = page.getByRole('button', { name: 'Playing', exact: true })
     await expect(playingTab).toHaveAttribute('aria-current', 'true')
 
-    await expect(page.getByRole('button', { name: 'Skip to start' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Back 15 seconds' })).toBeVisible()
     // Also accepts "Retry episode": the seeded episode's stub audio URL is a
     // real network resource a real browser can legitimately error on
@@ -87,14 +87,13 @@ test.describe('Mobile listener UI (< md)', () => {
       .or(page.getByRole('button', { name: 'Retry episode' }))
     await expect(centralControl).toBeVisible()
     await expect(page.getByRole('button', { name: 'Forward 15 seconds' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Skip to end' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Playback speed' })).toBeVisible()
     await expect(page.getByTestId('player-bar')).toContainText('Deep Dive')
   })
 
   test('Admin is reachable via the bottom tab bar Settings tab', async ({ seededPage: page }) => {
     await page.getByRole('button', { name: 'Settings' }).click()
-    await page.getByRole('button', { name: 'Admin dashboard' }).click()
+    await page.getByRole('button', { name: 'Admin', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
   })
 
@@ -168,8 +167,8 @@ test.describe('Desktop listener UI unaffected by the mobile refactor', () => {
     // mobile refactor" is actually about.
     const dock = page.getByTestId('player-bar')
     await expect(dock.getByRole('button', { name: 'Playback speed' })).toBeVisible()
-    await expect(dock.getByRole('button', { name: 'Skip to start' })).toBeVisible()
-    await expect(dock.getByRole('button', { name: 'Skip to end' })).toBeVisible()
+    await expect(dock.getByRole('button', { name: 'Back 15 seconds' })).toBeVisible()
+    await expect(dock.getByRole('button', { name: 'Forward 15 seconds' })).toBeVisible()
   })
 
   test('the mobile bottom tab bar is not rendered at desktop viewport', async ({ seededPage: page }) => {

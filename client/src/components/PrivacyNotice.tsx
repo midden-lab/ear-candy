@@ -1,3 +1,5 @@
+import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
+
 interface PrivacyNoticeProps {
   analyticsEnabled: boolean
 }
@@ -11,14 +13,14 @@ interface PrivacyNoticeProps {
  * nothing when analytics is administratively disabled.
  */
 export default function PrivacyNotice({ analyticsEnabled }: PrivacyNoticeProps) {
+  const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
+
   if (!analyticsEnabled) return null
 
   return (
-    <details className="shrink-0 border-t border-zinc-200 px-4 py-2.5 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-      <summary className="cursor-pointer select-none">
-        Anonymous listening analytics
-      </summary>
-      <p className="mt-2 leading-relaxed">
+    <details className={isDesktop ? 'analytics' : 'analytics m-analytics'}>
+      <summary>Anonymous listening analytics</summary>
+      <p>
         This site anonymously tracks page views and playback. This includes the episode,
         device/browser type, and a country resolved from your IP address, which is never stored.
         No data is shared with or sent to any third party.

@@ -1,8 +1,23 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi } from 'vitest'
+import { vi, afterEach } from 'vitest'
 import DetailPane from '../components/DetailPane'
 import type { Episode, Season } from '../types'
+
+const originalMatchMedia = window.matchMedia
+
+function mockMobile() {
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia
+}
 
 const seasons: Season[] = [
   { id: 1, number: 1, title: 'Season One', description: '', cover_art_path: null, hidden: false, created_at: '2024-01-01T00:00:00Z' },
@@ -43,25 +58,22 @@ it('shows season and episode label', () => {
   expect(screen.getByText('Season One · Episode 4')).toBeInTheDocument()
 })
 
-it('renders each guest as a blue pill badge', () => {
+it('renders guests as plain text ("With <strong>Name</strong>, ...") — matches the mockup exactly, no pill badges (plans/010)', () => {
   render(<DetailPane episode={mockEpisode} seasons={seasons} />)
-  const janeEl = screen.getByText('Jane Doe')
-  const johnEl = screen.getByText('John Smith')
-  expect(janeEl).toHaveClass('bg-blue-100', 'dark:bg-blue-900')
-  expect(johnEl).toHaveClass('bg-blue-100', 'dark:bg-blue-900')
+  expect(screen.getByText('Jane Doe').tagName).toBe('STRONG')
+  expect(screen.getByText('John Smith').tagName).toBe('STRONG')
+  expect(screen.getByText('Jane Doe').closest('p')).toHaveClass('guests')
 })
 
-it('renders each tag as a purple pill badge', () => {
+it('does not render tags anywhere — the mockup has no equivalent, dropped in the direct-port pass (plans/010)', () => {
   render(<DetailPane episode={mockEpisode} seasons={seasons} />)
-  const comedyEl = screen.getByText('comedy')
-  const dramaEl = screen.getByText('drama')
-  expect(comedyEl).toHaveClass('bg-purple-100', 'dark:bg-purple-900')
-  expect(dramaEl).toHaveClass('bg-purple-100', 'dark:bg-purple-900')
+  expect(screen.queryByText('comedy')).not.toBeInTheDocument()
+  expect(screen.queryByText('drama')).not.toBeInTheDocument()
 })
 
-it('shows "About this episode" label before description', () => {
+it('shows "About" label before description, matching the mockup\'s .body-label exactly (desktop)', () => {
   render(<DetailPane episode={mockEpisode} seasons={seasons} />)
-  expect(screen.getByText('About this episode')).toBeInTheDocument()
+  expect(screen.getByText('About')).toBeInTheDocument()
   expect(screen.getByText('An interesting description')).toBeInTheDocument()
 })
 
@@ -84,13 +96,18 @@ it('does not render a back button when onBack is not provided', () => {
   expect(screen.queryByText('Back to episodes')).not.toBeInTheDocument()
 })
 
-it('renders a back button and calls onBack when clicked, given onBack', async () => {
+it('renders a back button and calls onBack when clicked, given onBack (mobile only — .m-back has no desktop equivalent)', async () => {
+  mockMobile()
   const user = userEvent.setup()
   const onBack = vi.fn()
   render(<DetailPane episode={mockEpisode} seasons={seasons} onBack={onBack} />)
-  const backButton = screen.getByRole('button', { name: /back to episodes/i })
+  const backButton = screen.getByRole('button', { name: 'Back to episodes' })
   await user.click(backButton)
   expect(onBack).toHaveBeenCalledTimes(1)
+})
+
+afterEach(() => {
+  window.matchMedia = originalMatchMedia
 })
 
 describe('play/pause button', () => {
@@ -218,7 +235,11 @@ describe('share control', () => {
   })
 })
 
-describe('playback transport (scrub bar, skip, speed)', () => {
+describe('playback transport (scrub bar, skip, speed) — mobile only (plans/010 Step 4)', () => {
+  // Confirmed against the mockup's actual markup: the desktop .stage has
+  // ONLY the big Play button — scrub/skip/speed exist solely in the fixed
+  // dock there. Only the mobile .m-pane's .m-now-controls duplicates
+  // transport inline, so every test below mocks mobile explicitly.
   const transportProps = {
     episode: mockEpisode,
     seasons,
@@ -230,18 +251,27 @@ describe('playback transport (scrub bar, skip, speed)', () => {
     onSpeedChange: vi.fn(),
   }
 
+  it('never renders inline transport controls on desktop, regardless of props', () => {
+    render(<DetailPane {...transportProps} />)
+    expect(screen.queryByRole('slider', { name: 'Seek' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Back 15 seconds' })).not.toBeInTheDocument()
+  })
+
   it('does not render transport controls when isCurrentPlayerEpisode is false, even with all other props present', () => {
+    mockMobile()
     render(<DetailPane {...transportProps} isCurrentPlayerEpisode={false} />)
     expect(screen.queryByRole('slider', { name: 'Seek' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Back 15 seconds' })).not.toBeInTheDocument()
   })
 
   it('does not render transport controls when required playback props are missing, even if isCurrentPlayerEpisode is true', () => {
+    mockMobile()
     render(<DetailPane episode={mockEpisode} seasons={seasons} isCurrentPlayerEpisode={true} />)
     expect(screen.queryByRole('slider', { name: 'Seek' })).not.toBeInTheDocument()
   })
 
   it('renders the scrub bar, times, and skip/speed controls when this episode is the one playing', () => {
+    mockMobile()
     render(<DetailPane {...transportProps} />)
     expect(screen.getByRole('slider', { name: 'Seek' })).toBeInTheDocument()
     expect(screen.getByText('1:00')).toBeInTheDocument()
@@ -251,15 +281,17 @@ describe('playback transport (scrub bar, skip, speed)', () => {
   })
 
   it('does not render a redundant central play/pause button inside the transport row', () => {
+    mockMobile()
     render(<DetailPane {...transportProps} />)
-    // Only DetailPane's own big "Play episode"/"Pause episode" button should
-    // exist — TransportControls' own central button must be suppressed here
-    // (showPlayButton=false), or there'd be two ambiguous play controls.
+    // The mockup's own .m-np-transport never has one either — only the
+    // separate, distinctly-labeled "Play episode"/"Pause episode" button
+    // above it does.
     expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument()
   })
 
   it('calls onRequestSeek with a clamped target when skipping back 15 seconds', async () => {
+    mockMobile()
     const user = userEvent.setup()
     const onRequestSeek = vi.fn()
     render(<DetailPane {...transportProps} currentTime={10} onRequestSeek={onRequestSeek} />)
@@ -268,6 +300,7 @@ describe('playback transport (scrub bar, skip, speed)', () => {
   })
 
   it('calls onRequestSeek with a clamped target when skipping forward 15 seconds past the end', async () => {
+    mockMobile()
     const user = userEvent.setup()
     const onRequestSeek = vi.fn()
     render(<DetailPane {...transportProps} currentTime={3590} duration={3600} onRequestSeek={onRequestSeek} />)
@@ -276,6 +309,7 @@ describe('playback transport (scrub bar, skip, speed)', () => {
   })
 
   it('calls onSpeedChange with the next speed in the cycle when the speed control is clicked', async () => {
+    mockMobile()
     const user = userEvent.setup()
     const onSpeedChange = vi.fn()
     render(<DetailPane {...transportProps} speed={1} onSpeedChange={onSpeedChange} />)
@@ -283,10 +317,16 @@ describe('playback transport (scrub bar, skip, speed)', () => {
     expect(onSpeedChange).toHaveBeenCalledWith(1.5)
   })
 
-  it('calls onRequestSeek (not a bare setCurrentTime-style callback) when the scrub bar itself is moved', () => {
+  it('calls onRequestSeek (not a bare setCurrentTime-style callback) when the scrub bar itself is clicked', () => {
+    mockMobile()
     const onRequestSeek = vi.fn()
     render(<DetailPane {...transportProps} onRequestSeek={onRequestSeek} />)
-    fireEvent.change(screen.getByRole('slider', { name: 'Seek' }), { target: { value: '200' } })
-    expect(onRequestSeek).toHaveBeenCalledWith(200)
+    const slider = screen.getByRole('slider', { name: 'Seek' })
+    vi.spyOn(slider, 'getBoundingClientRect').mockReturnValue({
+      left: 0, right: 100, width: 100, top: 0, bottom: 3, height: 3, x: 0, y: 0, toJSON: () => {},
+    })
+    // Clicking at x=50 of a 100px-wide, 3600s-duration bar seeks to ~1800s.
+    slider.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 50 }))
+    expect(onRequestSeek).toHaveBeenCalledWith(1800)
   })
 })

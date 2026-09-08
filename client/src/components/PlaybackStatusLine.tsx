@@ -28,8 +28,8 @@ export default function PlaybackStatusLine({ status, size = 'sm', className }: P
   return (
     <p
       role="status"
-      className={`${SIZE_CLASSES[size]} transition-opacity duration-150 ${status ? 'opacity-100' : 'opacity-0'} ${
-        status?.tone === 'error' ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500'
+      className={`${SIZE_CLASSES[size]} font-mono uppercase tracking-widest transition-opacity duration-150 ease-quiet ${status ? 'opacity-100' : 'opacity-0'} ${
+        status?.tone === 'error' ? 'text-red-500 dark:text-red-400' : 'text-ink-3'
       } ${className ?? ''}`}
     >
       {status?.text ?? ' '}

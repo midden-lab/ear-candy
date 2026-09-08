@@ -23,13 +23,14 @@ const episode: Episode = {
   updated_at: '2024-01-01T00:00:00Z',
 }
 
-it('renders episode number, title, publish_date, duration, and guests', () => {
+it('renders episode number, title, and duration — matching the mockup\'s exact 3-field row (no date, no guests, no thumbnail)', () => {
   render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
-  expect(screen.getByText('Ep 3')).toBeInTheDocument()
+  expect(screen.getByText('3')).toBeInTheDocument()
   expect(screen.getByText('Pilot Episode')).toBeInTheDocument()
-  expect(screen.getByText('2024-01-15')).toBeInTheDocument()
   expect(screen.getByText('1:01:01')).toBeInTheDocument()
-  expect(screen.getByText(/Alice, Bob/i)).toBeInTheDocument()
+  expect(screen.queryByText('2024-01-15')).not.toBeInTheDocument()
+  expect(screen.queryByText(/Alice, Bob/i)).not.toBeInTheDocument()
+  expect(document.querySelector('img')).not.toBeInTheDocument()
 })
 
 it('calls onClick with episode when clicked', async () => {
@@ -40,27 +41,24 @@ it('calls onClick with episode when clicked', async () => {
   expect(onClick).toHaveBeenCalledWith(episode)
 })
 
-it('active state: surface background + shadow, no border, no solid accent fill', () => {
+it('active state: .row.is-viewed, aria-current', () => {
   render(<EpisodeItem episode={episode} isActive={true} onClick={() => {}} />)
   const btn = screen.getByRole('button')
   expect(btn).toHaveAttribute('aria-current', 'true')
-  expect(btn).toHaveClass('bg-surface')
-  expect(btn).toHaveClass('shadow-sm')
-  expect(btn.className).not.toMatch(/\bborder(-|\b)/)
-  expect(btn).not.toHaveClass('bg-[var(--accent)]')
+  expect(btn).toHaveClass('row', 'is-viewed')
 })
 
-it('inactive state: no aria-current, no active-state classes, no border', () => {
+it('inactive state: plain .row, no aria-current', () => {
   render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
   const btn = screen.getByRole('button')
   expect(btn).not.toHaveAttribute('aria-current')
-  expect(btn).not.toHaveClass('bg-surface')
-  expect(btn).not.toHaveClass('shadow-sm')
-  expect(btn.className).not.toMatch(/\bborder(-|\b)/)
+  expect(btn).toHaveClass('row')
+  expect(btn).not.toHaveClass('is-viewed')
 })
 
-it('shows EQ indicator when isPlaying is true', () => {
+it('shows EQ indicator and .is-playing when isPlaying is true', () => {
   render(<EpisodeItem episode={episode} isActive={true} isPlaying={true} onClick={() => {}} />)
+  expect(screen.getByRole('button')).toHaveClass('is-playing')
   expect(document.querySelector('.eq-bars')).toBeInTheDocument()
 })
 
@@ -80,90 +78,29 @@ it('formats duration under 1h as m:ss', () => {
   expect(screen.getByText('3:05')).toBeInTheDocument()
 })
 
-it('meta row does not wrap and truncates a long guest list to one line', () => {
-  const longGuests = { ...episode, guests: 'A Very Long Guest Name, Another Very Long Guest Name, A Third Guest' }
-  render(<EpisodeItem episode={longGuests} isActive={false} onClick={() => {}} />)
-  const guestsEl = screen.getByText(/A Very Long Guest Name/i)
-  expect(guestsEl).toHaveClass('truncate')
-  const row = guestsEl.parentElement
-  expect(row).not.toHaveClass('flex-wrap')
+it('renders the season tag inline before the title for cross-catalog search results', () => {
+  render(<EpisodeItem episode={episode} isActive={false} seasonTag="S9" onClick={() => {}} />)
+  expect(screen.getByText('S9')).toBeInTheDocument()
+  expect(screen.getByText('S9').parentElement).toHaveTextContent('S9Pilot Episode')
 })
 
-it('renders a lazy-loaded thumbnail when cover_art_thumb_path is set', () => {
-  const withArt = { ...episode, cover_art_thumb_path: 'https://example.com/thumb.webp' }
-  render(<EpisodeItem episode={withArt} isActive={false} onClick={() => {}} />)
-  const img = document.querySelector('img')
-  expect(img).toHaveAttribute('src', 'https://example.com/thumb.webp')
-  expect(img).toHaveAttribute('loading', 'lazy')
-})
-
-it('renders no img, just the placeholder slot, when there is no cover art', () => {
-  render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
-  expect(document.querySelector('img')).not.toBeInTheDocument()
-})
-
-it('shows "X left" instead of total duration when remainingSeconds is given', () => {
+it('shows "X left" instead of total duration when remainingSeconds is given, and marks the row .partial', () => {
   render(<EpisodeItem episode={episode} isActive={false} remainingSeconds={185} onClick={() => {}} />)
-  // The timestamp digits are wrapped in their own tabular-nums span (so the
-  // countdown doesn't make "left" jitter as digit widths vary), so the full
-  // "3:05 left" string is split across nodes — match by container instead.
-  expect(screen.getByText('3:05')).toBeInTheDocument()
-  expect(screen.getByText('3:05').closest('span')?.parentElement).toHaveTextContent('3:05 left')
+  expect(screen.getByText('3:05 left')).toBeInTheDocument()
   expect(screen.queryByText('1:01:01')).not.toBeInTheDocument()
+  expect(screen.getByRole('button')).toHaveClass('partial')
 })
 
-it('shows plain total duration when remainingSeconds is omitted', () => {
+it('shows plain total duration, and no .partial class, when remainingSeconds is omitted', () => {
   render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
   expect(screen.getByText('1:01:01')).toBeInTheDocument()
   expect(screen.queryByText(/left/)).not.toBeInTheDocument()
+  expect(screen.getByRole('button')).not.toHaveClass('partial')
 })
 
-describe('mobile layout (< md)', () => {
-  const originalMatchMedia = window.matchMedia
-
-  function mockMobile() {
-    window.matchMedia = ((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    })) as unknown as typeof window.matchMedia
-  }
-
-  afterEach(() => {
-    window.matchMedia = originalMatchMedia
-  })
-
-  it('does not render guests inline (they only appear in DetailPane)', () => {
-    mockMobile()
-    render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
-    expect(screen.queryByText(/Alice, Bob/i)).not.toBeInTheDocument()
-  })
-
-  it('still renders episode number, title, publish_date, and duration', () => {
-    mockMobile()
-    render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
-    expect(screen.getByText('Ep 3')).toBeInTheDocument()
-    expect(screen.getByText('Pilot Episode')).toBeInTheDocument()
-    expect(screen.getByText('2024-01-15')).toBeInTheDocument()
-    expect(screen.getByText('1:01:01')).toBeInTheDocument()
-  })
-
-  it('renders a played-progress underline under the cover when remainingSeconds indicates partial listening', () => {
-    mockMobile()
-    // duration 3661s, 185s remaining -> played most of it
-    render(<EpisodeItem episode={episode} isActive={false} remainingSeconds={185} onClick={() => {}} />)
-    const bar = document.querySelector('.bg-\\[var\\(--accent\\)\\]')
-    expect(bar).not.toBeNull()
-  })
-
-  it('does not render a progress underline when nothing has been played', () => {
-    mockMobile()
-    render(<EpisodeItem episode={episode} isActive={false} onClick={() => {}} />)
-    expect(document.querySelector('.absolute.inset-x-0.bottom-0')).not.toBeInTheDocument()
-  })
+it('does not mark the row .partial when it is the one currently playing (even with remainingSeconds set)', () => {
+  render(<EpisodeItem episode={episode} isActive={true} isPlaying remainingSeconds={185} onClick={() => {}} />)
+  const btn = screen.getByRole('button')
+  expect(btn).toHaveClass('is-playing')
+  expect(btn).not.toHaveClass('partial')
 })

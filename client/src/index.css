@@ -1,3 +1,16 @@
+/* Ported verbatim from the settled mockup (plans/010) — component-level
+   CSS (masthead, row, dock, mobile shell, share dialog, etc.), replacing
+   the hand-translated Tailwind approximations plans 005/007/008/009 built.
+   CSS requires @import to precede all other rules (including @tailwind),
+   so this loads first, which means Tailwind's utility classes (loaded
+   last) win the cascade over these classes when both set the same
+   property on the same element with equal specificity. That's used
+   deliberately in a few places (e.g. AppShell.tsx pairs `.floor` with an
+   `items-stretch` utility to override the mockup's own `align-items:
+   start`, since this app's independently-scrolling panes need to stretch
+   to fill height) rather than being an accident of import order. */
+@import './styles/quiet-room.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -51,6 +64,31 @@
   --ink-2: #5B5E64;
   --ink-3: #8E9197;
   --ink-4: #B4B7BC;
+
+  /* Quiet Room surface-language tokens (plans/009) — the rest of the
+     mockup's design system that plan 005 never ported over. Everywhere
+     these are used, the real app was previously falling back to generic
+     Tailwind zinc, shadow, and default-radius utilities instead. */
+  --hair: rgba(18, 19, 22, 0.075);
+  --wash: rgba(18, 19, 22, 0.035);
+  --ring: rgba(18, 19, 22, 0.11);
+  --ring-2: rgba(18, 19, 22, 0.13);
+  --scrub-track: rgba(18, 19, 22, 0.09);
+  --shadow-art: 0 1px 2px rgba(18, 19, 22, 0.05), 0 18px 44px -22px rgba(18, 19, 22, 0.22);
+  --shadow-row: 0 1px 2px rgba(18, 19, 22, 0.04), 0 10px 26px -18px rgba(18, 19, 22, 0.28);
+  --shadow-dock: 0 -1px 0 rgba(18, 19, 22, 0.055), 0 -30px 60px -30px rgba(18, 19, 22, 0.16);
+
+  /* Not theme-dependent — the mockup's one custom transition curve, applied
+     consistently across hover/transform transitions. */
+  --ease: cubic-bezier(0.32, 0.72, 0.26, 1);
+
+  /* Font-stack variables the ported component CSS (styles/quiet-room.css)
+     references directly — Tailwind's fontFamily.sans/mono config generates
+     utility classes (font-sans/font-mono) but not these custom properties,
+     so plan 005's token layer never actually defined them even though the
+     underlying @font-face rules were correct. */
+  --sans: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .dark {
@@ -60,6 +98,15 @@
   --ink-2: #A9A6AF;
   --ink-3: #75727A;
   --ink-4: #4C4A51;
+
+  --hair: rgba(255, 255, 255, 0.09);
+  --wash: rgba(255, 255, 255, 0.045);
+  --ring: rgba(255, 255, 255, 0.10);
+  --ring-2: rgba(255, 255, 255, 0.13);
+  --scrub-track: rgba(255, 255, 255, 0.12);
+  --shadow-art: 0 1px 0 rgba(255, 255, 255, 0.045) inset, 0 18px 44px -22px rgba(0, 0, 0, 0.65);
+  --shadow-row: 0 1px 0 rgba(255, 255, 255, 0.035) inset, 0 10px 26px -18px rgba(0, 0, 0, 0.6);
+  --shadow-dock: 0 -1px 0 rgba(255, 255, 255, 0.06), 0 -30px 60px -30px rgba(0, 0, 0, 0.55);
 }
 
 body {

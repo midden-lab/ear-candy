@@ -23,9 +23,9 @@ it('opens the dialog on trigger click, showing copy and Bluesky options', async 
   render(<ShareDialog episodeId={1} episodeTitle="Test Episode" />)
   await user.click(screen.getByRole('button'))
   expect(screen.getByRole('dialog')).toBeInTheDocument()
-  expect(screen.getByText('Share episode')).toBeInTheDocument()
+  expect(screen.getByText('Share this episode')).toBeInTheDocument()
   expect(screen.getByText('Copy')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Share to Bluesky' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Bluesky' })).toBeInTheDocument()
 })
 
 // Facebook and X are temporarily disabled in the component (pending user
@@ -122,7 +122,7 @@ it('builds a correct Bluesky share intent link', async () => {
   render(<ShareDialog episodeId={42} episodeTitle="Cool Episode" />)
   await user.click(screen.getByRole('button'))
   const shareUrl = `${window.location.origin}/?episode=42&ref=share`
-  expect(screen.getByRole('link', { name: 'Share to Bluesky' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'Bluesky' })).toHaveAttribute(
     'href',
     `https://bsky.app/intent/compose?text=${encodeURIComponent(`Listening to "Cool Episode"\n${shareUrl}`)}`
   )
@@ -132,7 +132,7 @@ it('focuses the close button on open, not the dialog container (issue #54)', asy
   const user = userEvent.setup()
   render(<ShareDialog episodeId={1} episodeTitle="Test Episode" />)
   await user.click(screen.getByRole('button'))
-  expect(screen.getByRole('button', { name: 'Close share dialog' })).toHaveFocus()
+  expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus()
 })
 
 it('closes on Escape and returns focus to the trigger button', async () => {
@@ -165,7 +165,7 @@ it('closes and returns focus after the explicit close button is clicked', async 
   render(<ShareDialog episodeId={1} episodeTitle="Test Episode" />)
   const trigger = screen.getByRole('button')
   await user.click(trigger)
-  await user.click(screen.getByRole('button', { name: 'Close share dialog' }))
+  await user.click(screen.getByRole('button', { name: 'Close' }))
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(trigger).toHaveFocus()
 })

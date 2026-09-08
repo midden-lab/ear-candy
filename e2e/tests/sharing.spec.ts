@@ -12,11 +12,13 @@ test.describe('Episode sharing', () => {
     // test is about the episode identity round-tripping through a real
     // link, not the timestamp (which real-audio-decode gotchas make
     // unreliable to assert on in CI anyway — see CLAUDE.md).
-    await page.getByTestId('player-bar').getByRole('button', { name: 'Share episode' }).click()
-    const shareUrlText = (await page.locator('#share-dialog-url').textContent())?.trim()
+    // Unscoped: ShareDialog's trigger has a single render site (DetailPane,
+    // plans/007) — it's no longer duplicated in the player bar.
+    await page.getByRole('button', { name: 'Share episode' }).click()
+    const shareUrlText = (await page.locator('.share-url').textContent())?.trim()
     expect(shareUrlText).toBeTruthy()
     expect(shareUrlText).toContain('?episode=')
-    await page.getByRole('button', { name: 'Close share dialog' }).click()
+    await page.getByRole('button', { name: 'Close', exact: true }).click()
 
     const shared = new URL(shareUrlText!)
     // A brand-new page navigation, exactly like a listener clicking a link
