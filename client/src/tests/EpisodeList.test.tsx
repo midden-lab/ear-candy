@@ -67,7 +67,6 @@ function Harness({ loading, episodes: episodesOverride, onEpisodeSelect, analyti
   const [viewingEpisodeId, setViewingEpisodeId] = useState<number | null>(null)
   return (
     <EpisodeList
-      podcastName="Test Show"
       seasons={seasons}
       episodes={episodesOverride ?? episodes}
       activeSeason={1}
@@ -131,11 +130,6 @@ it('EQ indicator follows the actually-playing episode, not the viewed one', asyn
   // ...but the EQ bars stay on the row that's actually playing (Second Episode).
   expect(secondEpBtn.querySelector('.eq-bars')).toBeInTheDocument()
   expect(firstEpBtn.querySelector('.eq-bars')).not.toBeInTheDocument()
-})
-
-it('renders the podcast name at the top', () => {
-  render(<Harness />)
-  expect(screen.getByText('Test Show')).toBeInTheDocument()
 })
 
 it('calls onEpisodeSelect when an episode is clicked', async () => {
@@ -225,19 +219,13 @@ describe('remaining time', () => {
   it('shows "X left" for the actively-playing episode, reflecting live currentTime', () => {
     usePlayerStore.setState({ episode: episodes[0], playing: true, currentTime: 300 })
     render(<Harness />)
-    // The digits are wrapped in their own tabular-nums span (so the
-    // countdown doesn't make "left" jitter as digit widths vary), so match
-    // via the digits' parent rather than the combined string.
-    expect(screen.getByText('25:00').closest('span')?.parentElement).toHaveTextContent('25:00 left')
+    expect(screen.getByText('25:00 left')).toBeInTheDocument()
   })
 
   it('shows "X left" for a non-playing episode using its saved localStorage progress', () => {
     localStorage.setItem('episode-progress', JSON.stringify({ 11: { time: 600, savedAt: Date.now() } }))
     render(<Harness />)
-    // "30:00" also coincidentally matches the OTHER episode's plain total
-    // duration, so disambiguate by finding the one whose parent says "left".
-    const remaining = screen.getAllByText('30:00').find(el => el.parentElement?.textContent === '30:00 left')
-    expect(remaining).toBeTruthy()
+    expect(screen.getByText('30:00 left')).toBeInTheDocument()
     localStorage.clear()
   })
 })

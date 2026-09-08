@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { getSettings, getSeasons, getEpisodes, getEpisode, logout } from './api'
 import { useTheme } from './hooks/useTheme'
+import { useBreakpoint, MD_BREAKPOINT_QUERY } from './hooks/useBreakpoint'
 import { usePlayerStore } from './store/playerStore'
 import { trackPageView } from './utils/analytics'
 import type { Settings, Season, Episode } from './types'
 import AppShell from './components/AppShell'
-import ThemeBadge from './components/ThemeBadge'
-import IconRail from './components/IconRail'
+import Masthead from './components/Masthead'
 import MobileTabBar from './components/MobileTabBar'
 import MobileSettingsView from './components/MobileSettingsView'
 import EpisodeList from './components/EpisodeList'
@@ -66,6 +66,7 @@ export default function App() {
   const pageViewSentRef = useRef(false)
 
   const { isDark, toggleDark } = useTheme(settings?.accent_color ?? '#5a3ef5')
+  const isDesktopShell = useBreakpoint(MD_BREAKPOINT_QUERY)
 
   useEffect(() => {
     void getSettings().then(setSettings).catch(console.error)
@@ -243,15 +244,23 @@ export default function App() {
     )
   }
 
-  const themeBadge = <ThemeBadge isDark={isDark} onToggle={toggleDark} />
+  const masthead = (
+    <Masthead
+      podcastName={settings.podcast_name}
+      tagline={settings.tagline}
+      showControls={isDesktopShell}
+      isDark={isDark}
+      onToggleTheme={toggleDark}
+      onAdminClick={() => void handleAdminClick()}
+    />
+  )
 
   return (
     <AppShell
       focusedPane={focusedPane}
-      rail={<IconRail onAdminClick={() => void handleAdminClick()} />}
+      masthead={masthead}
       sidebar={
         <EpisodeList
-          podcastName={settings.podcast_name}
           seasons={seasons}
           episodes={episodes}
           allEpisodes={allEpisodes}
@@ -270,6 +279,7 @@ export default function App() {
         <DetailPane
           episode={viewingEpisode}
           seasons={seasons}
+          podcastName={settings.podcast_name}
           isCurrentPlayerEpisode={playerEpisode?.id === viewingEpisode?.id}
           playing={playing}
           loading={playerLoading}
@@ -287,7 +297,8 @@ export default function App() {
       settings={
         <MobileSettingsView
           onAdminClick={() => void handleAdminClick()}
-          themeBadge={themeBadge}
+          isDark={isDark}
+          onToggleTheme={toggleDark}
         />
       }
       tabBar={
@@ -308,8 +319,7 @@ export default function App() {
           onSelectSettings={() => setFocusedPane('settings')}
         />
       }
-      player={<AudioPlayer sharedStart={sharedStart} onTapMiniBar={handleViewPlaying} />}
-      themeBadge={themeBadge}
+      player={<AudioPlayer sharedStart={sharedStart} onTapMiniBar={handleViewPlaying} seasons={seasons} />}
     />
   )
 }

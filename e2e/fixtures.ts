@@ -86,7 +86,7 @@ export const test = base.extend<Fixtures>({
     })
     await page.goto('/')
     // Open admin panel via the settings gear icon
-    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await page.getByRole('button', { name: 'Admin' }).click()
     await expect(page.getByText('Ear Candy Admin')).toBeVisible()
     await use(page)
   },

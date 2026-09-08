@@ -7,7 +7,6 @@ import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 import { searchAllEpisodes } from '../utils/search'
 
 export interface EpisodeListViewProps {
-  podcastName: string
   seasons: Season[]
   episodes: Episode[]
   /** Every visible episode across every season — powers cross-catalog
@@ -51,7 +50,7 @@ export interface EpisodeListViewProps {
  * has no dependency on how or where playback state lives.
  */
 export default function EpisodeListView({
-  podcastName, seasons, episodes, allEpisodes = [], searchQuery = '', onSearchChange = () => {}, activeSeason, analyticsEnabled = false, loading, activeEpisodeId, playingEpisodeId, playing, getRemainingSeconds, onSeasonSelect, onEpisodeClick,
+  seasons, episodes, allEpisodes = [], searchQuery = '', onSearchChange = () => {}, activeSeason, analyticsEnabled = false, loading, activeEpisodeId, playingEpisodeId, playing, getRemainingSeconds, onSeasonSelect, onEpisodeClick,
 }: EpisodeListViewProps) {
   const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
   const isSearching = searchQuery.trim() !== ''
@@ -61,39 +60,67 @@ export default function EpisodeListView({
     return acc
   }, {})
 
+  // Matches the mockup's own status-text logic exactly (confirmed against
+  // its render() function): "N results" while searching, else "N in
+  // <season title>" — always shown, the season selector stays visible
+  // during search too (the mockup never hides it), text-transform:uppercase
+  // on .season-count handles the visual casing.
+  const activeSeasonObj = seasons.find(s => s.id === activeSeason)
+  const statusText = isSearching
+    ? `${searchResults.length} ${searchResults.length === 1 ? 'result' : 'results'}`
+    : activeSeasonObj
+      ? `${episodes.length} in ${activeSeasonObj.title}`
+      : ''
+
+  // Mobile has no .index-toolbar wrapper at all in the mockup — .m-ep-search
+  // and .toolbar-row are direct children of the pane there, unlike
+  // desktop's .index-toolbar{margin:16px 0 0} grouping.
+  const searchInput = (
+    <input
+      type="text"
+      value={searchQuery}
+      onChange={e => onSearchChange(e.target.value)}
+      placeholder="Search episodes or guests"
+      aria-label="Search episodes"
+    />
+  )
+
+  const toolbarRow = (
+    <div className="toolbar-row">
+      {isDesktop
+        ? <SeasonTabs seasons={seasons} activeSeason={activeSeason} episodeCounts={episodeCounts} onSelect={onSeasonSelect} />
+        : <SeasonPicker seasons={seasons} activeSeason={activeSeason} episodeCounts={episodeCounts} onSelect={onSeasonSelect} />}
+      <span className={isDesktop ? 'season-count' : 'season-count m-count'}>{statusText}</span>
+    </div>
+  )
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
+      <p className="label">Episodes</p>
+
       {isDesktop ? (
-        <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{podcastName}</h2>
+        <div className="index-toolbar">
+          <div className="ep-search">{searchInput}</div>
+          {toolbarRow}
         </div>
       ) : (
-        <div className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{podcastName}</h2>
-        </div>
+        <>
+          <div className="m-ep-search">{searchInput}</div>
+          {toolbarRow}
+        </>
       )}
 
-      <div className="px-4 py-2 border-b border-zinc-200 dark:border-zinc-800">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => onSearchChange(e.target.value)}
-          placeholder="Search episodes or guests"
-          aria-label="Search episodes"
-          className="w-full min-h-11 rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-ink-3 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] dark:border-zinc-800"
-        />
-      </div>
-
-      {!isSearching && (
-        isDesktop
-          ? <SeasonTabs seasons={seasons} activeSeason={activeSeason} episodeCounts={episodeCounts} onSelect={onSeasonSelect} />
-          : <div className="px-4 py-2"><SeasonPicker seasons={seasons} activeSeason={activeSeason} episodeCounts={episodeCounts} onSelect={onSeasonSelect} /></div>
-      )}
-
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      {/* No overflow/flex utilities here — .list/.m-list declare none in
+          the mockup either. This was previously a second, redundant,
+          nested scroll region (inside aside.index on desktop, inside
+          .m-scroll on mobile) — dormant since content never needed to
+          scroll independently at this level, but wrong on both breakpoints
+          (plans/012). The real scroll region is the document itself on
+          desktop, or .m-scroll on mobile. */}
+      <div className={isDesktop ? 'list' : 'm-list'}>
         {isSearching ? (
           searchResults.length === 0 ? (
-            <p className="p-2 text-sm text-zinc-400 dark:text-zinc-500">No episodes match &ldquo;{searchQuery.trim()}&rdquo;.</p>
+            <p className="empty-note">No episodes match &ldquo;{searchQuery.trim()}&rdquo;.</p>
           ) : (
             searchResults.map(({ episode: ep, seasonId }) => {
               const season = seasons.find(s => s.id === seasonId)
@@ -111,9 +138,9 @@ export default function EpisodeListView({
             })
           )
         ) : loading ? (
-          <p className="p-2 text-sm text-zinc-400 dark:text-zinc-500">Loading…</p>
+          <p className="empty-note">Loading…</p>
         ) : episodes.length === 0 ? (
-          <p className="p-2 text-sm text-zinc-400 dark:text-zinc-500">No episodes in this season yet.</p>
+          <p className="empty-note">No episodes in this season yet.</p>
         ) : (
           episodes.map(ep => (
             <EpisodeItem

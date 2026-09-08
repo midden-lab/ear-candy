@@ -1,16 +1,18 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
-import type { Episode } from '../types'
-import ProgressBar from './ProgressBar'
-import EpisodeCoverArt from './EpisodeCoverArt'
-import ShareDialog from './ShareDialog'
+import { useEffect, useLayoutEffect, useRef, type Ref } from 'react'
+import type { Episode, Season } from '../types'
+import { RetryIcon } from './RetryIcon'
 import PlaybackStatusLine from './PlaybackStatusLine'
-import TransportControls, { RetryIcon } from './TransportControls'
 import { getPlaybackStatus } from '../utils/playbackStatus'
 import { formatTime, clampSeekTime, nextSpeed } from '../utils/playback'
 import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 
 export interface AudioPlayerViewProps {
   episode: Episode | null
+  /** Used only to build the dock/mini-player's subtitle line (season title
+   *  · episode number · guests, matching the mockup's `.now-sub` exactly).
+   *  Defaults to empty so callers that don't pass it see no behavior
+   *  change beyond an incomplete subtitle. */
+  seasons?: Season[]
   playing: boolean
   currentTime: number
   duration: number
@@ -86,13 +88,17 @@ export interface AudioPlayerViewProps {
  * where a listener actually goes to see more, reached via onTapMiniBar.
  */
 export default function AudioPlayerView({
-  episode, playing, currentTime, duration, speed, resumeTime, loading, error, retrySignal, seekRequest,
+  episode, seasons = [], playing, currentTime, duration, speed, resumeTime, loading, error, retrySignal, seekRequest,
   onTapMiniBar,
   onSeek, onTogglePlay, onSpeedChange, onTimeUpdate, onDurationChange, onEnded,
   onWaiting, onPlaybackResumed, onPlaybackError, onReset, onRetry, onHeightChange,
 }: AudioPlayerViewProps) {
   const audioRef = useRef<HTMLAudioElement>(null)
-  const barRef = useRef<HTMLDivElement>(null)
+  // HTMLElement, not HTMLDivElement: the mobile mini-bar's root is a
+  // <button> (matches the mockup's whole-row-clickable .m-miniplayer),
+  // while the desktop dock's is a <div> — only .offsetHeight is ever read
+  // off this ref, so the common HTMLElement type is all that's needed.
+  const barRef = useRef<HTMLElement>(null)
   const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
 
   useEffect(() => {
@@ -202,9 +208,15 @@ export default function AudioPlayerView({
 
   if (!episode) return null
 
-  const remaining = currentTime - duration
-
   const playbackStatus = getPlaybackStatus(episode, { loading, error })
+  const pct = duration ? Math.min(100, (currentTime / duration) * 100) : 0
+  const isLoading = !!loading && !error
+  // Matches the mockup's own .now-sub text exactly (confirmed against its
+  // render() function): season title · episode number · guests, joined by
+  // " · ", any missing piece simply omitted rather than leaving a dangling
+  // separator.
+  const season = seasons.find(s => s.id === episode.season_id)
+  const nowSub = [season?.title, episode.number, episode.guests].filter(Boolean).join(' · ')
 
   const audioEl = (
     <audio
@@ -225,112 +237,131 @@ export default function AudioPlayerView({
     />
   )
 
-  const transportProps = {
-    playing,
-    loading,
-    error,
-    onRetry,
-    onTogglePlay,
-    onSkipStart: () => skipTo(0),
-    onSkipEnd: () => skipTo(duration),
-    onBack15: () => skipTo(currentTime - 15),
-    onForward15: () => skipTo(currentTime + 15),
-    speed,
-    onCycleSpeed: cycleSpeed,
-  }
+  const playIcon = error ? (
+    <RetryIcon size={16} />
+  ) : playing ? (
+    <svg width="13" height="15" viewBox="0 0 13 15" aria-hidden="true">
+      <rect width="4.1" height="15" rx="1" fill="#fff" />
+      <rect x="8.9" width="4.1" height="15" rx="1" fill="#fff" />
+    </svg>
+  ) : (
+    <svg width="17" height="19" viewBox="0 0 17 19" fill="none" aria-hidden="true">
+      <path d="M1 1.6v15.8a1 1 0 0 0 1.52.86l13.2-7.9a1 1 0 0 0 0-1.72L2.52.74A1 1 0 0 0 1 1.6Z" fill="#fff" />
+    </svg>
+  )
 
   // Mobile: compact mini-bar. Tapping it (outside the Play/Pause button)
   // navigates to the host's own "Playing" destination via onTapMiniBar —
   // this component no longer owns any full-screen state of its own.
+  // Matches the mockup's .m-miniplayer exactly, including using the same
+  // decorative .chip graphic as the desktop dock rather than real cover
+  // art — the settled design confines actual photography to the detail
+  // view's hero .art only (plans/010, same principle as dropping row
+  // thumbnails).
   if (!isDesktop) {
     return (
-      <div
-        ref={barRef}
+      <button
+        ref={barRef as Ref<HTMLButtonElement>}
         data-testid="player-bar"
-        className="fixed left-0 right-0 border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-        // Docks above MobileTabBar (fixed at the very bottom, which already
-        // reserves its own safe-area padding) instead of sitting flush
-        // against the screen edge itself.
-        style={{ bottom: 'var(--tabbar-h, 0px)' }}
+        onClick={() => onTapMiniBar?.()}
+        className="m-miniplayer w-full text-left"
+        style={{ position: 'fixed', left: 0, right: 0, bottom: 'var(--tabbar-h, 0px)' }}
+        aria-label={`Now playing: ${episode.title}. Tap to view.`}
       >
         {audioEl}
-        <button
-          onClick={() => onTapMiniBar?.()}
-          className="flex w-full items-center gap-3 px-4 py-2 text-left"
-          aria-label={`Now playing: ${episode.title}. Tap to view.`}
+        <div className="m-mini-progress" aria-hidden="true">
+          <div className="fill" style={{ width: `${pct}%` }} />
+        </div>
+        <div className="chip" aria-hidden="true"><div className="rings" /><div className="origin" /></div>
+        <div className="now-text">
+          <div className="now-title">{episode.title}</div>
+          <div className="now-sub">{nowSub}</div>
+        </div>
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={e => { e.stopPropagation(); if (error) onRetry?.(); else onTogglePlay() }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.stopPropagation(); e.preventDefault()
+              if (error) onRetry?.(); else onTogglePlay()
+            }
+          }}
+          className={`m-mini-play text-[var(--accent-contrast)] ${isLoading ? 'opacity-60' : ''}`}
+          aria-label={error ? 'Retry playback' : (playing ? 'Pause' : 'Play')}
+          aria-busy={isLoading || undefined}
         >
-          <EpisodeCoverArt
-            thumbPath={episode.cover_art_thumb_path}
-            detailPath={null}
-            alt={episode.title}
-            variant="thumb"
-            className="h-10 w-10 shrink-0 rounded object-cover ring-1 ring-zinc-200 dark:ring-zinc-800"
-          />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{episode.title}</div>
-            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-              <div
-                className="h-full bg-[var(--accent)]"
-                style={{ width: duration ? `${Math.min(100, (currentTime / duration) * 100)}%` : '0%' }}
-              />
-            </div>
-          </div>
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={e => { e.stopPropagation(); if (error) onRetry?.(); else onTogglePlay() }}
-            onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.stopPropagation(); e.preventDefault()
-                if (error) onRetry?.(); else onTogglePlay()
-              }
-            }}
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-contrast)] ${loading && !error ? 'opacity-60' : ''}`}
-            aria-label={error ? 'Retry playback' : (playing ? 'Pause' : 'Play')}
-            aria-busy={(loading && !error) || undefined}
-          >
-            {error ? (
-              <RetryIcon size={18} />
-            ) : playing ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            )}
-          </span>
-        </button>
-      </div>
+          {playIcon}
+        </span>
+      </button>
     )
   }
 
   // Desktop: full player bar (also the default when isDesktop is unknown,
   // e.g. in tests that don't mock matchMedia).
   return (
-    <div ref={barRef} data-testid="player-bar" className="fixed bottom-0 left-0 right-0 border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 px-6 py-3">
+    <div ref={barRef as Ref<HTMLDivElement>} data-testid="player-bar" className="dock" aria-label="Player">
       {audioEl}
-      <div className="mx-auto flex max-w-3xl items-center gap-3">
-        <EpisodeCoverArt
-          thumbPath={episode.cover_art_thumb_path}
-          detailPath={episode.cover_art_path}
-          alt={episode.title}
-          variant="thumb"
-          className="h-10 w-10 shrink-0 rounded object-cover ring-1 ring-zinc-200 dark:ring-zinc-800"
-        />
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{episode.title}</div>
-          <PlaybackStatusLine status={playbackStatus} size="xs" />
-          <ProgressBar currentTime={currentTime} duration={duration} onSeek={handleSeek} />
-          <div className="flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
-            <span>{formatTime(currentTime)}</span>
-            <span>{formatTime(remaining, true)}</span>
-          </div>
-          <TransportControls {...transportProps} />
-        </div>
-        <ShareDialog episodeId={episode.id} episodeTitle={episode.title} currentTime={currentTime} className="shrink-0 self-center" />
+      <div
+        className="scrub"
+        role="slider"
+        tabIndex={0}
+        aria-label="Seek"
+        aria-valuemin={0}
+        aria-valuemax={duration}
+        aria-valuenow={currentTime}
+        onClick={e => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          handleSeek(clampSeekTime(((e.clientX - rect.left) / rect.width) * duration, duration))
+        }}
+      >
+        <div className="fill" style={{ width: `${pct}%` }} />
+        <div className="knob" style={{ left: `${pct}%` }} />
       </div>
+
+      <div className="dock-inner">
+        <div className="now">
+          <div className="chip" aria-hidden="true"><div className="rings" /><div className="origin" /></div>
+          <div className="now-text">
+            <div className="now-title">{episode.title}</div>
+            <div className="now-sub">{nowSub}</div>
+          </div>
+        </div>
+
+        <div className="transport">
+          <button className="skip" onClick={() => skipTo(currentTime - 15)} aria-label="Back 15 seconds">
+            <svg width="21" height="21" viewBox="0 0 21 21" fill="none" aria-hidden="true">
+              <path d="M10.5 5.2A6.6 6.6 0 1 1 4.6 8.9" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+              <path d="M7.6 2.5 4.2 5.6l3.4 2.6" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          <button
+            className={`pause-disc text-[var(--accent-contrast)] ${isLoading ? 'opacity-60' : ''}`}
+            onClick={error ? onRetry : onTogglePlay}
+            aria-label={error ? 'Retry playback' : (playing ? 'Pause' : 'Play')}
+            aria-busy={isLoading || undefined}
+          >
+            {playIcon}
+          </button>
+
+          <button className="skip" onClick={() => skipTo(currentTime + 15)} aria-label="Forward 15 seconds">
+            <svg width="21" height="21" viewBox="0 0 21 21" fill="none" aria-hidden="true">
+              <path d="M10.5 5.2A6.6 6.6 0 1 0 16.4 8.9" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+              <path d="M13.4 2.5l3.4 3.1-3.4 2.6" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="dock-right">
+          <span className="times mono">
+            <span>{formatTime(currentTime)}</span> <span className="total">/ {formatTime(duration)}</span>
+          </span>
+          <button className="speed" onClick={cycleSpeed} aria-label="Playback speed">{speed}×</button>
+        </div>
+      </div>
+
+      <PlaybackStatusLine status={playbackStatus} size="xs" className="status" />
     </div>
   )
 }

@@ -12,6 +12,8 @@ interface SeasonTabsProps {
   onSelect: (seasonId: number) => void
 }
 
+const FOCUSABLE_SELECTOR = 'button, a[href], input, [tabindex]:not([tabindex="-1"])'
+
 /**
  * Desktop season selector: a fixed-width trigger opening a listbox popover,
  * rather than a flat horizontally-scrolling row of buttons — a flat row
@@ -23,6 +25,13 @@ interface SeasonTabsProps {
 export default function SeasonTabs({ seasons, activeSeason, episodeCounts = {}, onSelect }: SeasonTabsProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useRef<HTMLUListElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+
+  function closePopover() {
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
 
   useEffect(() => {
     if (!open) return
@@ -31,15 +40,42 @@ export default function SeasonTabs({ seasons, activeSeason, episodeCounts = {}, 
         setOpen(false)
       }
     }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
-    }
     document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [open])
+
+  // Move focus into the popover on open, trap Tab/Shift+Tab within it, and
+  // close on Escape — same hand-rolled shape as ShareDialog's real modal
+  // focus trap, scoped here to a corner popover rather than a centered
+  // dialog. Without this, Tab from the trigger leaked straight into the
+  // episode list behind the (still visually open) popover.
+  useEffect(() => {
+    if (!open) return
+    const popover = popoverRef.current
+    const firstOption = popover?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+    firstOption?.focus()
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        closePopover()
+        return
+      }
+      if (e.key !== 'Tab' || !popover) return
+      const focusable = Array.from(popover.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
   }, [open])
 
   if (seasons.length === 0) return null
@@ -47,27 +83,24 @@ export default function SeasonTabs({ seasons, activeSeason, episodeCounts = {}, 
   const active = seasons.find(s => s.id === activeSeason)
 
   return (
-    <div ref={containerRef} className="relative px-4 py-2 border-b border-zinc-200 dark:border-zinc-800">
+    <div ref={containerRef} className="season-select">
       <button
+        ref={triggerRef}
         onClick={() => setOpen(o => !o)}
-        className="flex min-h-11 w-56 items-center justify-between gap-2 rounded-md border border-zinc-200 bg-surface px-3 py-1.5 text-sm font-medium text-ink dark:border-zinc-800"
+        className="season-trigger"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className="truncate">{active?.title ?? 'Season'}</span>
-        <svg
-          width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true"
-          className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
-        >
-          <path d="M6 9l6 6 6-6" />
+        <span>{active?.title ?? 'Season'}</span>
+        {/* .caret's rotation is driven entirely by CSS off aria-expanded
+            (.season-trigger[aria-expanded="true"] .caret), no conditional
+            class needed. */}
+        <svg className="caret" width="9" height="6" viewBox="0 0 9 6" fill="none" aria-hidden="true">
+          <path d="M1 1l3.5 3.5L8 1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
       {open && (
-        <ul
-          role="listbox"
-          aria-label="Select season"
-          className="absolute left-0 top-full z-40 mt-2 max-h-80 w-56 overflow-y-auto rounded-lg bg-surface p-1 shadow-xl"
-        >
+        <ul ref={popoverRef} role="listbox" aria-label="Select season" className="season-popover">
           {seasons.map(season => {
             const isSelected = season.id === activeSeason
             return (
@@ -75,15 +108,11 @@ export default function SeasonTabs({ seasons, activeSeason, episodeCounts = {}, 
                 <button
                   role="option"
                   aria-selected={isSelected}
-                  onClick={() => { onSelect(season.id); setOpen(false) }}
-                  className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 text-left text-sm ${
-                    isSelected ? 'font-semibold text-[var(--accent)]' : 'text-ink-2 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                  }`}
+                  onClick={() => { onSelect(season.id); closePopover() }}
+                  className="season-option"
                 >
-                  <span className="truncate">{season.title}</span>
-                  <span className={`shrink-0 text-xs ${isSelected ? 'text-[var(--accent)]' : 'text-ink-3'}`}>
-                    {episodeCounts[season.id] ?? 0}
-                  </span>
+                  <span>{season.title}</span>
+                  <span className="opt-count mono">{episodeCounts[season.id] ?? 0}</span>
                 </button>
               </li>
             )

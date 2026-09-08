@@ -9,46 +9,44 @@ test.describe('Listener UI', () => {
     await expect(page.getByRole('button', { name: 'Season 1' })).toBeVisible()
   })
 
-  test('episode list shows number, title, duration, guests', async ({ seededPage: page }) => {
-    const item = page.locator('button', { hasText: 'Deep Dive' })
+  test('episode list row shows number, title, and duration — matching the mockup\'s exact 3-field row (no guests, no thumbnail)', async ({ seededPage: page }) => {
+    const item = page.locator('button.row', { hasText: 'Deep Dive' })
     await expect(item).toBeVisible()
-    await expect(item).toContainText('Ep 1')
-    await expect(item).toContainText('30:00')        // 1800s
-    await expect(item).toContainText('Alice Chen')
+    await expect(item.locator('.row-no')).toHaveText('1')
+    await expect(item).toContainText('30:00') // 1800s
+    await expect(item).not.toContainText('Alice Chen')
+    await expect(item.locator('img')).toHaveCount(0)
   })
 
-  test('clicking an episode gives it a surface/shadow highlight, not a border or a solid fill', async ({ seededPage: page }) => {
-    const item = page.locator('button', { hasText: 'Deep Dive' })
+  test('clicking an episode gives it a shadow highlight (.row.is-viewed), not a border or a solid accent fill', async ({ seededPage: page }) => {
+    const item = page.locator('button.row', { hasText: 'Deep Dive' })
     await item.click()
     await expect(item).toHaveAttribute('aria-current', 'true')
-    await expect(item).toHaveClass(/bg-surface/)
-    await expect(item).toHaveClass(/shadow-sm/)
+    await expect(item).toHaveClass(/\bis-viewed\b/)
     await expect(item).not.toHaveClass(/border-l-2/)
     await expect(item).not.toHaveClass(/bg-\[var\(--accent\)\]/)
   })
 
   test('detail pane shows season/episode label', async ({ seededPage: page }) => {
-    await page.locator('button', { hasText: 'Deep Dive' }).click()
+    await page.locator('button.row', { hasText: 'Deep Dive' }).click()
     await expect(page.getByText('Season 1 · Episode 1')).toBeVisible()
   })
 
-  test('detail pane shows guest as blue pill', async ({ seededPage: page }) => {
-    await page.locator('button', { hasText: 'Deep Dive' }).click()
-    const pill = page.locator('main').getByText('Alice Chen')
-    await expect(pill).toBeVisible()
-    await expect(pill).toHaveClass(/bg-blue-900/)
+  test('detail pane shows guests as plain text ("With <strong>Name</strong>"), not a pill', async ({ seededPage: page }) => {
+    await page.locator('button.row', { hasText: 'Deep Dive' }).click()
+    const guest = page.locator('main').getByText('Alice Chen')
+    await expect(guest).toBeVisible()
+    await expect(guest).toHaveJSProperty('tagName', 'STRONG')
   })
 
-  test('detail pane shows tag as purple pill', async ({ seededPage: page }) => {
-    await page.locator('button', { hasText: 'Deep Dive' }).click()
-    const pill = page.locator('main').getByText('interview')
-    await expect(pill).toBeVisible()
-    await expect(pill).toHaveClass(/bg-purple-900/)
+  test('detail pane does not render tags anywhere — dropped in the direct mockup port (plans/010)', async ({ seededPage: page }) => {
+    await page.locator('button.row', { hasText: 'Deep Dive' }).click()
+    await expect(page.locator('main').getByText('interview')).toHaveCount(0)
   })
 
-  test('detail pane shows About this episode label', async ({ seededPage: page }) => {
-    await page.locator('button', { hasText: 'Deep Dive' }).click()
-    await expect(page.getByText('About this episode')).toBeVisible()
+  test('detail pane shows "About" label before description, matching the mockup exactly', async ({ seededPage: page }) => {
+    await page.locator('button.row', { hasText: 'Deep Dive' }).click()
+    await expect(page.getByText('About', { exact: true })).toBeVisible()
     await expect(page.getByText('A deep dive into software engineering.')).toBeVisible()
   })
 })
