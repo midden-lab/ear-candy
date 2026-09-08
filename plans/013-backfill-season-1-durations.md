@@ -1,10 +1,10 @@
 ---
 id: backfill-season-1-durations
 title: "Backfill missing episode durations for Season 1 (production data repair)"
-status: in-progress
+status: complete
 priority: 1
 created: 2026-09-08
-steps_completed: 7
+steps_completed: 8
 steps_total: 8
 tags: [data-repair, production, backfill]
 ---
@@ -199,3 +199,5 @@ This operates on the live production database outside the normal deploy pipeline
 
 - Deliberately scoped to Season 1 only, not all 66 affected episodes across the site, so the first real production run of this enhanced script is small enough to review every single row's dry-run output by hand (Step 4) rather than skimming 66 lines and missing something.
 - Keeping duration detection client-side (per explicit decision) means the 8-second-timeout root cause itself is still live — any *new* large upload-type episode created going forward can still hit the same bug. That's out of scope here but worth a follow-up plan of its own if it's worth fixing rather than living with (e.g., admins learning to double-check the "Duration: ..." confirmation text in the form before saving, given the timeout gap won't fix itself).
+
+**Step 8 resolution (2026-09-08, same session):** decision was to continue immediately rather than defer. Repeated the identical drill for Seasons 2-4 in one pass: a fresh pre-flight backup covering the then-current state (Season 1 already fixed, Seasons 2-4 not yet touched), a dry-run of all three seasons reviewed together (9 + 14 + 21 = 44 episodes, all durations tightly clustered in the same ~57-61 minute range as Season 1's, zero skips, zero anomalies), then applied all three. Site-wide `duration_seconds = 0` count confirmed at exactly 0 afterward. Same cleanup (script removed from droplet, both backup generations — `pre-backfill-season1-*` and `pre-backfill-seasons234-*` — left in place on the droplet and pulled locally). All 71 production episodes now have correct durations.
