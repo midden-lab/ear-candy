@@ -9,18 +9,25 @@
 // is stuck at duration_seconds = 0 until this backfill runs.
 //
 // Usage:
-//   node backfill-durations.mjs              # dry run, prints what it would change
-//   node backfill-durations.mjs --apply      # actually writes the changes
+//   node backfill-durations.mjs                       # dry run, all seasons
+//   node backfill-durations.mjs --apply                # apply, all seasons
+//   node backfill-durations.mjs --season-id=69          # dry run, one season only
+//   node backfill-durations.mjs --season-id=69 --apply  # apply, one season only
+//
+// --season-id is optional and additive to the existing WHERE clause — a
+// season_id filter narrows the same query, it doesn't change what counts
+// as "missing duration". Omitting it preserves the original all-seasons
+// behavior exactly (plans/013).
 //
 // Env vars (defaults match the layout inside the production container):
 //   DB_PATH      default: data/db.sqlite
 //   UPLOADS_DIR  default: data/uploads
 //
-// STATUS: already run against production on 2026-07-13 (--apply). Fixed
-// episodes #96-#100 (all upload-type episodes with duration_seconds = 0 at
-// the time). Safe to re-run if the gap ever resurfaces — it's idempotent,
-// only touching rows still at duration_seconds = 0/NULL — but no further
-// action is expected under normal operation.
+// STATUS: already run against production on 2026-07-13 (--apply, no
+// --season-id yet). Fixed episodes #96-#100 (all upload-type episodes with
+// duration_seconds = 0 at the time). Safe to re-run if the gap ever
+// resurfaces — it's idempotent, only touching rows still at
+// duration_seconds = 0/NULL.
 
 import Database from 'better-sqlite3'
 import { parseFile } from 'music-metadata'
@@ -30,14 +37,21 @@ import fs from 'node:fs'
 const DB_PATH = process.env.DB_PATH || 'data/db.sqlite'
 const UPLOADS_DIR = process.env.UPLOADS_DIR || 'data/uploads'
 const APPLY = process.argv.includes('--apply')
+const SEASON_ID_ARG = process.argv.find(a => a.startsWith('--season-id='))
+const SEASON_ID = SEASON_ID_ARG ? Number(SEASON_ID_ARG.split('=')[1]) : undefined
+if (SEASON_ID_ARG && (!Number.isInteger(SEASON_ID) || SEASON_ID <= 0)) {
+  console.error(`Invalid --season-id value: "${SEASON_ID_ARG}"`)
+  process.exit(1)
+}
 
 const db = new Database(DB_PATH, { readonly: !APPLY })
 
-const rows = db.prepare(
-  `SELECT id, title, audio_path FROM episodes WHERE audio_type = 'upload' AND (duration_seconds IS NULL OR duration_seconds = 0)`
-).all()
+const query = SEASON_ID
+  ? `SELECT id, title, audio_path FROM episodes WHERE audio_type = 'upload' AND (duration_seconds IS NULL OR duration_seconds = 0) AND season_id = ?`
+  : `SELECT id, title, audio_path FROM episodes WHERE audio_type = 'upload' AND (duration_seconds IS NULL OR duration_seconds = 0)`
+const rows = SEASON_ID ? db.prepare(query).all(SEASON_ID) : db.prepare(query).all()
 
-console.log(`${APPLY ? 'APPLY mode' : 'DRY RUN'} — DB: ${DB_PATH}, uploads: ${UPLOADS_DIR}`)
+console.log(`${APPLY ? 'APPLY mode' : 'DRY RUN'} — DB: ${DB_PATH}, uploads: ${UPLOADS_DIR}${SEASON_ID ? `, season_id: ${SEASON_ID}` : ''}`)
 console.log(`Found ${rows.length} upload-type episode(s) with missing duration.\n`)
 
 let updated = 0
