@@ -80,3 +80,25 @@ it('renders nothing when there are no seasons', () => {
   const { container } = render(<SeasonPicker seasons={[]} activeSeason={null} onSelect={() => {}} />)
   expect(container).toBeEmptyDOMElement()
 })
+
+it('traps Tab within the dialog — Tab from the last option wraps to the close button', async () => {
+  const user = userEvent.setup()
+  render(<SeasonPicker seasons={seasons} activeSeason={1} onSelect={() => {}} />)
+  await user.click(screen.getByRole('button', { name: /Season One/ }))
+  const closeButton = screen.getByRole('button', { name: 'Close' })
+  const last = screen.getByRole('option', { name: /Season Two/ })
+  last.focus()
+  await user.tab()
+  expect(closeButton).toHaveFocus()
+})
+
+it('traps Shift+Tab within the dialog — from the close button wraps to the last option', async () => {
+  const user = userEvent.setup()
+  render(<SeasonPicker seasons={seasons} activeSeason={1} onSelect={() => {}} />)
+  await user.click(screen.getByRole('button', { name: /Season One/ }))
+  const closeButton = screen.getByRole('button', { name: 'Close' })
+  const last = screen.getByRole('option', { name: /Season Two/ })
+  closeButton.focus()
+  await user.tab({ shift: true })
+  expect(last).toHaveFocus()
+})

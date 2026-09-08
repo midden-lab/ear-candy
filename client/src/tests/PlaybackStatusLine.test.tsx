@@ -32,7 +32,7 @@ describe('PlaybackStatusLine', () => {
   it('uses neutral styling for tone: neutral', () => {
     render(<PlaybackStatusLine status={{ tone: 'neutral', text: 'Buffering…' }} />)
     const el = screen.getByRole('status')
-    expect(el).toHaveClass('text-zinc-400')
+    expect(el).toHaveClass('text-ink-3')
     expect(el).not.toHaveClass('text-red-500')
   })
 

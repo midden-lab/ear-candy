@@ -1,32 +1,38 @@
-import type { ReactNode } from 'react'
+import ThemeSwitch from './ThemeSwitch'
+
+// Hardcoded per plans/007's Decisions section — see Masthead.tsx's matching
+// constant and comment for why this isn't sourced from Settings (yet).
+const STATION = 'KDUR 91.9 / 93.9 FM'
 
 interface MobileSettingsViewProps {
   onAdminClick: () => void
-  themeBadge: ReactNode
+  isDark: boolean
+  onToggleTheme: () => void
 }
 
 /**
  * Mobile Settings screen, reached via MobileTabBar's Settings tab —
  * replaces the old hidden "⋮" kebab menu's Admin + theme items with an
- * always-reachable, labeled screen.
+ * always-reachable, labeled screen. Reuses the exact same .themeswitch/
+ * .station/.admin-link markup as the desktop masthead — the mockup's own
+ * mobile settings pane does the same (plans/010), rather than the earlier
+ * circular ThemeBadge icon this replaced.
  */
-export default function MobileSettingsView({ onAdminClick, themeBadge }: MobileSettingsViewProps) {
+export default function MobileSettingsView({ onAdminClick, isDark, onToggleTheme }: MobileSettingsViewProps) {
   return (
     <div className="p-4">
-      <h1 className="mb-4 text-lg font-bold text-zinc-900 dark:text-zinc-100">Settings</h1>
-      <div className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex items-center justify-between px-4 py-3.5">
-          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Appearance</span>
-          {themeBadge}
-        </div>
-        <button
-          onClick={onAdminClick}
-          className="flex w-full min-h-11 items-center justify-between px-4 py-3.5 text-left active:bg-zinc-100 dark:active:bg-zinc-800"
-        >
-          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Admin dashboard</span>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400 dark:text-zinc-600" aria-hidden="true">
-            <path d="M9 18l6-6-6-6" />
-          </svg>
+      <h1 className="mb-4 text-lg font-bold tracking-tight text-ink">Settings</h1>
+      <div className="m-settings-row flex items-center justify-between">
+        <p className="m-settings-label">Appearance</p>
+        <ThemeSwitch isDark={isDark} onToggle={onToggleTheme} />
+      </div>
+      <div className="m-settings-row flex items-center justify-between">
+        <p className="m-settings-label">Station</p>
+        <span className="station">{STATION}</span>
+      </div>
+      <div className="m-settings-row">
+        <button onClick={onAdminClick} className="admin-link flex min-h-11 w-full items-center">
+          Admin
         </button>
       </div>
     </div>

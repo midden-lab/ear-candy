@@ -1,10 +1,10 @@
 ---
 id: quiet-room-completion
 title: "Quiet Room completion — masthead, pane order, IconRail, share-control fixes"
-status: pending
+status: in-progress
 priority: 1
 created: 2026-09-06
-steps_completed: 0
+steps_completed: 8
 steps_total: 9
 tags: [design-system, ux, frontend, redesign, shell, accessibility]
 ---

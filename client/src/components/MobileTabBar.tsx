@@ -13,19 +13,13 @@ interface MobileTabBarProps {
 }
 
 function TabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  // The active-state text color and underline (::after) are both driven
+  // entirely by CSS off aria-current (.m-tabbar button[aria-current="true"]
+  // / ...::after) — no separate indicator element or conditional class
+  // needed, matching the mockup's own markup exactly.
   return (
-    <button
-      onClick={onClick}
-      className="relative flex flex-1 flex-col items-center gap-0.5 py-2"
-      aria-current={active ? 'true' : undefined}
-    >
-      <span className={`text-xs font-medium ${active ? 'text-[var(--accent)]' : 'text-zinc-500 dark:text-zinc-400'}`}>
-        {label}
-      </span>
-      <span
-        aria-hidden="true"
-        className={`absolute bottom-0 h-0.5 w-6 rounded-full bg-[var(--accent)] transition-opacity ${active ? 'opacity-100' : 'opacity-0'}`}
-      />
+    <button onClick={onClick} aria-current={active ? 'true' : undefined}>
+      {label}
     </button>
   )
 }
@@ -46,15 +40,17 @@ function TabButton({ label, active, onClick }: { label: string; active: boolean;
  */
 export default function MobileTabBar({ activeTab, onSelectPlaying, onSelectEpisodes, onSelectSettings }: MobileTabBarProps) {
   return (
-    <nav
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-    >
-      <div className="flex items-stretch justify-around px-2 py-1">
-        <TabButton label="Playing" active={activeTab === 'playing'} onClick={onSelectPlaying} />
-        <TabButton label="Episodes" active={activeTab === 'episodes'} onClick={onSelectEpisodes} />
-        <TabButton label="Settings" active={activeTab === 'settings'} onClick={onSelectSettings} />
-      </div>
+    // .m-tabbar has no background of its own in the mockup — there, it's a
+    // plain flex child stacked at the bottom of a bounded phone-frame box,
+    // so the frame's own canvas background shows through. Here it's a
+    // position:fixed overlay atop real scrolling content instead (this app
+    // has no bounded frame to stack within), so bg-surface/95 + backdrop-
+    // blur stays a necessary, disclosed deviation — without it, scrolled
+    // rows would show through the transparent bar.
+    <nav className="m-tabbar fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur">
+      <TabButton label="Playing" active={activeTab === 'playing'} onClick={onSelectPlaying} />
+      <TabButton label="Episodes" active={activeTab === 'episodes'} onClick={onSelectEpisodes} />
+      <TabButton label="Settings" active={activeTab === 'settings'} onClick={onSelectSettings} />
     </nav>
   )
 }

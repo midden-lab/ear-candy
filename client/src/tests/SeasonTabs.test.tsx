@@ -79,3 +79,50 @@ it('renders nothing when there are no seasons', () => {
   const { container } = render(<SeasonTabs seasons={[]} activeSeason={null} onSelect={() => {}} />)
   expect(container).toBeEmptyDOMElement()
 })
+
+it('moves focus into the popover on open', async () => {
+  const user = userEvent.setup()
+  render(<SeasonTabs seasons={seasons} activeSeason={1} onSelect={() => {}} />)
+  await user.click(screen.getByRole('button', { name: /Season One/ }))
+  expect(screen.getByRole('option', { name: /Season One/ })).toHaveFocus()
+})
+
+it('restores focus to the trigger when the popover closes via Escape', async () => {
+  const user = userEvent.setup()
+  render(<SeasonTabs seasons={seasons} activeSeason={1} onSelect={() => {}} />)
+  const trigger = screen.getByRole('button', { name: /Season One/ })
+  await user.click(trigger)
+  await user.keyboard('{Escape}')
+  expect(trigger).toHaveFocus()
+})
+
+it('restores focus to the trigger when a season is selected', async () => {
+  const user = userEvent.setup()
+  render(<SeasonTabs seasons={seasons} activeSeason={1} onSelect={() => {}} />)
+  const trigger = screen.getByRole('button', { name: /Season One/ })
+  await user.click(trigger)
+  await user.click(screen.getByRole('option', { name: /Season Two/ }))
+  expect(trigger).toHaveFocus()
+})
+
+it('traps Tab within the popover — Tab from the last option wraps to the first', async () => {
+  const user = userEvent.setup()
+  render(<SeasonTabs seasons={seasons} activeSeason={1} onSelect={() => {}} />)
+  await user.click(screen.getByRole('button', { name: /Season One/ }))
+  const first = screen.getByRole('option', { name: /Season One/ })
+  const last = screen.getByRole('option', { name: /Season Two/ })
+  last.focus()
+  await user.tab()
+  expect(first).toHaveFocus()
+})
+
+it('traps Shift+Tab within the popover — from the first option wraps to the last', async () => {
+  const user = userEvent.setup()
+  render(<SeasonTabs seasons={seasons} activeSeason={1} onSelect={() => {}} />)
+  await user.click(screen.getByRole('button', { name: /Season One/ }))
+  const first = screen.getByRole('option', { name: /Season One/ })
+  const last = screen.getByRole('option', { name: /Season Two/ })
+  first.focus()
+  await user.tab({ shift: true })
+  expect(last).toHaveFocus()
+})

@@ -4,7 +4,7 @@ import { test as base } from '@playwright/test'
 base.describe('Admin login', () => {
   base.test('wrong password shows error message', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await page.getByRole('button', { name: 'Admin' }).click()
     await page.getByLabel('Password').fill('wrongpassword')
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByRole('alert')).toContainText('Invalid password')
@@ -13,7 +13,7 @@ base.describe('Admin login', () => {
   base.test('correct password navigates to admin panel', async ({ page }) => {
     const pw = process.env.TEST_ADMIN_PASSWORD ?? 'changeme'
     await page.goto('/')
-    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await page.getByRole('button', { name: 'Admin' }).click()
     await page.getByLabel('Password').fill(pw)
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByText('Ear Candy Admin')).toBeVisible()
@@ -68,11 +68,20 @@ test.describe('Admin panel — episode management', () => {
       await cancelButton.click()
     }
 
-    // Delete the last season (and its episodes via cascade)
-    // Scope to the season header div to avoid matching episode Delete buttons
+    // Delete the last season (and its episodes via cascade). waitFor (which
+    // polls) rather than isVisible().catch() (an instant, non-retrying
+    // check) — found via real debugging that a test which does a hard
+    // page.goto()/reload right before this hook runs (the cover-art test,
+    // which reloads to verify the image on the public listener page) can
+    // still have its season-list fetch in flight at this exact moment;
+    // isVisible() would then return false immediately and skip the delete
+    // entirely, leaking the season into every subsequent test in the file
+    // (exactly CLAUDE.md gotcha #30's cascading-failure class, just from a
+    // fetch race instead of a stuck form panel).
     const seasons = page.getByTestId('season-card')
     const lastSeason = seasons.last()
-    if (await lastSeason.isVisible().catch(() => false)) {
+    const appeared = await lastSeason.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false)
+    if (appeared) {
       // The season header is the first child div (bg-zinc-900) containing Edit/Delete
       await lastSeason.locator('div').first().getByRole('button', { name: 'Delete' }).click()
     }
@@ -115,7 +124,7 @@ test.describe('Admin panel — episode management', () => {
   // every time despite passing reliably on every local run. Not worth an
   // e2e test given the logic is already solidly covered elsewhere.
 
-  test('create an episode with cover art — thumbnail shows in the list, full image in the detail pane', async ({ adminPage: page }) => {
+  test('create an episode with cover art — full image shows in the detail pane (list rows never show cover art, matching the mockup, plans/010)', async ({ adminPage: page }) => {
     const lastSeason = page.getByTestId('season-card').last()
     await lastSeason.getByRole('button', { name: 'New Episode' }).click()
     await page.getByLabel('Title').fill('Episode With Art')
@@ -130,9 +139,11 @@ test.describe('Admin panel — episode management', () => {
 
     // Switch to the public listener view to verify the art actually renders there.
     await page.goto('/')
-    const item = page.locator('button', { hasText: 'Episode With Art' })
+    const item = page.locator('button.row', { hasText: 'Episode With Art' })
     await expect(item).toBeVisible()
-    await expect(item.locator('img')).toHaveAttribute('src', /\/images\/.*-thumb\.webp$/)
+    // List rows never show cover art (matching the mockup exactly) — the
+    // uploaded image only ever appears in the detail pane's hero .art.
+    await expect(item.locator('img')).toHaveCount(0)
 
     await item.click()
     const detailImg = page.locator('main img').first()
@@ -140,7 +151,7 @@ test.describe('Admin panel — episode management', () => {
 
     // Return to the admin panel so the shared afterEach can find and clean
     // up the season/episode created above.
-    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await page.getByRole('button', { name: 'Admin' }).click()
     await expect(page.getByText('Ear Candy Admin')).toBeVisible()
   })
 
@@ -219,8 +230,8 @@ test.describe('Admin panel — settings', () => {
 test.describe('Admin panel — logout', () => {
   test('Sign out returns to the listener UI', async ({ adminPage: page }) => {
     await page.getByRole('button', { name: 'Sign out' }).click()
-    // Listener shell is visible (AppShell has a <nav> and a <main>)
-    await expect(page.locator('nav').first()).toBeVisible()
+    // Listener shell is visible again (masthead's Admin control + <main>)
+    await expect(page.getByRole('button', { name: 'Admin' })).toBeVisible()
     await expect(page.locator('main').first()).toBeVisible()
     // Admin header is gone
     await expect(page.getByText('Ear Candy Admin')).not.toBeVisible()
@@ -232,7 +243,7 @@ test.describe('Admin panel — logout', () => {
   base.test('signing out and reopening admin prompts for the password again', async ({ page }) => {
     const pw = process.env.TEST_ADMIN_PASSWORD ?? 'changeme'
     await page.goto('/')
-    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await page.getByRole('button', { name: 'Admin' }).click()
     await page.getByLabel('Password').fill(pw)
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByText('Ear Candy Admin')).toBeVisible()
@@ -240,7 +251,7 @@ test.describe('Admin panel — logout', () => {
     await page.getByRole('button', { name: 'Sign out' }).click()
     await expect(page.getByText('Ear Candy Admin')).not.toBeVisible()
 
-    await page.getByRole('button', { name: 'Admin settings' }).click()
+    await page.getByRole('button', { name: 'Admin' }).click()
     await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
     await expect(page.getByText('Ear Candy Admin')).not.toBeVisible()
   })
