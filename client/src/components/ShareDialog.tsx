@@ -4,7 +4,6 @@ import { buildShareUrl, buildBlueskyIntentUrl } from '../utils/shareUrl'
 // Facebook/X are temporarily disabled below pending user research — see
 // the commented-out share-icon block further down. Re-import these when
 // re-enabling: buildTweetIntentUrl, buildFacebookIntentUrl
-import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 
 export interface ShareDialogProps {
   episodeId: number
@@ -13,7 +12,6 @@ export interface ShareDialogProps {
    *  actively loaded in the player. Omit entirely for a beginning-only
    *  share, which then renders with no timestamp option at all. */
   currentTime?: number
-  className?: string
 }
 
 // Matches the "not worth remembering" threshold already used for saved
@@ -39,7 +37,7 @@ const FOCUSABLE_SELECTOR = 'button, a[href], input, [tabindex]:not([tabindex="-1
  * the bottom of the viewport. A portal + fixed/centered layout can never
  * repeat that failure mode regardless of where the trigger sits.
  */
-export default function ShareDialog({ episodeId, episodeTitle, currentTime, className }: ShareDialogProps) {
+export default function ShareDialog({ episodeId, episodeTitle, currentTime }: ShareDialogProps) {
   const [open, setOpen] = useState(false)
   const [includeTimestamp, setIncludeTimestamp] = useState(true)
   const [copied, setCopied] = useState(false)
@@ -47,7 +45,6 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const lastFocusedRef = useRef<HTMLElement | null>(null)
-  const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
 
   const offersTimestamp = (currentTime ?? 0) >= MIN_TIMESTAMP_SECONDS
   const shareTime = offersTimestamp && includeTimestamp ? currentTime : undefined
@@ -119,36 +116,24 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
     closeDialog()
   }
 
-  // Explicit h-11/w-11 (44px) rather than relying on padding around the
-  // icon to happen to reach that footprint — guarantees the tap target
-  // meets common touch-target guidance even on a touch-capable desktop/
-  // tablet hybrid, without visually enlarging the icon glyph itself.
-  const iconBtnClass = 'flex h-11 w-11 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors'
-  const socialBtnClass = 'flex h-11 w-11 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
-
   return (
-    <div className={`inline-block ${className ?? ''}`}>
+    <>
       <button
         ref={triggerRef}
         onClick={openDialog}
         aria-haspopup="dialog"
         aria-label={offersTimestamp ? 'Share this moment' : 'Share episode'}
-        className={iconBtnClass}
+        className="share-btn"
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <circle cx="18" cy="5" r="3" />
-          <circle cx="6" cy="12" r="3" />
-          <circle cx="18" cy="19" r="3" />
-          <line x1="8.6" y1="10.6" x2="15.4" y2="6.4" />
-          <line x1="8.6" y1="13.4" x2="15.4" y2="17.6" />
+        <svg width="14" height="14" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+          <path d="M7.5 1v8.2M4.3 4.2 7.5 1l3.2 3.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M2 8.5v3.8c0 .66.54 1.2 1.2 1.2h8.6c.66 0 1.2-.54 1.2-1.2V8.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
+        Share
       </button>
 
       {open && createPortal(
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-sm md:p-4"
-          onClick={closeDialog}
-        >
+        <div className="share-backdrop" onClick={closeDialog}>
           <div
             ref={panelRef}
             role="dialog"
@@ -156,52 +141,17 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
             aria-labelledby="share-dialog-title"
             tabIndex={-1}
             onClick={e => e.stopPropagation()}
-            className={
-              isDesktop
-                ? 'w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900'
-                : 'fixed bottom-0 left-0 right-0 w-full rounded-t-2xl border-t border-zinc-200 bg-white p-4 shadow-xl transition-transform duration-300 motion-reduce:transition-none dark:border-zinc-800 dark:bg-zinc-900'
-            }
-            style={!isDesktop ? { paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
+            className="share-panel"
           >
-            {!isDesktop && (
-              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-300 dark:bg-zinc-700" aria-hidden="true" />
-            )}
+            <p id="share-dialog-title" className="share-title">Share this episode</p>
+            <p className="share-sub">{episodeTitle}</p>
 
-            <div className="mb-4 flex items-center justify-between">
-              <h2 id="share-dialog-title" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                Share episode
-              </h2>
-              <button
-                ref={closeButtonRef}
-                onClick={closeDialog}
-                aria-label="Close share dialog"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
+            <div className="share-url-row">
+              <span className="share-url mono">{shareUrl}</span>
+              <button onClick={() => void handleCopy()} aria-label="Copy link" className="share-copy">
+                {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
-
-            <label htmlFor="share-dialog-url" className="sr-only">Shareable link</label>
-            <div
-              id="share-dialog-url"
-              className="mb-3 truncate rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-zinc-300"
-            >
-              {shareUrl}
-            </div>
-
-            <button
-              onClick={() => void handleCopy()}
-              aria-label="Copy link"
-              className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 font-medium text-[var(--accent-contrast)] transition-opacity hover:opacity-90"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="M10 13a5 5 0 0 0 7.07 0l1.93-1.93a5 5 0 0 0-7.07-7.07L10.5 5.5" />
-                <path d="M14 11a5 5 0 0 0-7.07 0l-1.93 1.93a5 5 0 0 0 7.07 7.07L13.5 18.5" />
-              </svg>
-              <span aria-hidden="true">{copied ? 'Copied' : 'Copy'}</span>
-            </button>
             {/* Separate from the button's own (stable) aria-label — an
                 aria-live region whose text lives on the very element that
                 was just clicked/focused is a known spotty case for
@@ -209,7 +159,7 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
             <span role="status" aria-live="polite" className="sr-only">{copied ? 'Copied to clipboard' : ''}</span>
 
             {offersTimestamp && (
-              <label className="mb-4 flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <label className="mb-4 flex items-center gap-2 text-sm tracking-tight text-ink-2">
                 <input
                   type="checkbox"
                   checked={includeTimestamp}
@@ -220,19 +170,16 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
               </label>
             )}
 
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-500">Share to</p>
-            <div className="flex gap-3">
+            <div className="share-dests">
+              {/* Plain text, no icon — matches the mockup's .share-dests
+                  buttons exactly (bare text, no circular fill). */}
               <a
                 href={buildBlueskyIntentUrl(shareUrl, episodeTitle)}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleSocialClick}
-                aria-label="Share to Bluesky"
-                className={socialBtnClass}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M12 8.5C10.6 5.7 8.2 3.6 6 3c-2 0-3 1.1-3 2.9 0 3.9 2 8.1 4.5 9.6-2 .3-3.5 1.7-2.4 3.5 1 1.7 4 1.5 6.3-1.5.4-.5.7-1 .9-1.5.2.5.5 1 .9 1.5 2.3 3 5.3 3.2 6.3 1.5 1.1-1.8-.4-3.2-2.4-3.5C19 14 21 9.8 21 5.9 21 4.1 20 3 18 3c-2.2.6-4.6 2.7-6 5.5Z" />
-                </svg>
+                Bluesky
               </a>
               {/*
                 Facebook and X are temporarily hidden/disabled pending user
@@ -244,31 +191,25 @@ export default function ShareDialog({ episodeId, episodeTitle, currentTime, clas
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleSocialClick}
-                aria-label="Share to Facebook"
-                className={socialBtnClass}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.4h-1.2c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" />
-                </svg>
+                Facebook
               </a>
               <a
                 href={buildTweetIntentUrl(shareUrl, episodeTitle)}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleSocialClick}
-                aria-label="Share to X"
-                className={socialBtnClass}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M18.9 2H22l-7.6 8.7L23.3 22h-6.9l-5.4-7-6.2 7H1.7l8.1-9.3L1 2h7l4.9 6.4L18.9 2Zm-1.2 18h1.9L7.4 4H5.4l12.3 16Z" />
-                </svg>
+                Twitter / X
               </a>
               */}
             </div>
+
+            <button ref={closeButtonRef} onClick={closeDialog} className="share-close">Close</button>
           </div>
         </div>,
         document.body
       )}
-    </div>
+    </>
   )
 }

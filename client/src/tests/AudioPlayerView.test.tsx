@@ -108,20 +108,12 @@ it('shows pause button when playing is true', () => {
   expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
 })
 
-it('desktop mini-bar shows a lazy-loaded thumbnail when cover art is set', () => {
+it('desktop dock never renders real cover art — uses the same decorative .chip graphic regardless (matches the mockup exactly, plans/010)', () => {
   renderView({
     episode: { ...mockEpisode, cover_art_path: 'https://example.com/detail.webp', cover_art_thumb_path: 'https://example.com/thumb.webp' },
   })
-  const img = screen.getByRole('img')
-  expect(img).toHaveAttribute('src', 'https://example.com/thumb.webp')
-  expect(img).toHaveAttribute('loading', 'lazy')
-  // Mini-bar only ever needs the small thumbnail — never the larger detail asset.
-  expect(img).not.toHaveAttribute('srcset')
-})
-
-it('desktop mini-bar renders no image when there is no cover art', () => {
-  renderView({ episode: mockEpisode })
   expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  expect(document.querySelector('.chip')).toBeInTheDocument()
 })
 
 it('clicking play calls onTogglePlay, flipping the controlled playing state', () => {
@@ -130,17 +122,17 @@ it('clicking play calls onTogglePlay, flipping the controlled playing state', ()
   expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument()
 })
 
-it('renders all transport buttons', () => {
+it('renders all transport buttons — no skip-to-start/end, matching the mockup (only ±15s and speed exist anywhere in it)', () => {
   renderView({ episode: mockEpisode })
-  expect(screen.getByRole('button', { name: 'Skip to start' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Back 15 seconds' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Forward 15 seconds' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Skip to end' })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Skip to start' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Skip to end' })).not.toBeInTheDocument()
 })
 
-it('renders a share button on the desktop bar', () => {
+it('does not render a share button on the desktop bar (relocated to DetailPane, plans/007)', () => {
   renderView({ episode: mockEpisode })
-  expect(screen.getByRole('button', { name: /share/i })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /share/i })).not.toBeInTheDocument()
 })
 
 it('renders speed toggle showing current speed', () => {
@@ -159,10 +151,10 @@ it('clicking speed toggle cycles 1→1.5→2→1 via onSpeedChange', () => {
   expect(btn).toHaveTextContent('1×')
 })
 
-it('displays elapsed and remaining timestamps', () => {
+it('displays elapsed / total timestamps, matching the mockup\'s "current / total" format exactly (not elapsed/remaining)', () => {
   renderView({ episode: mockEpisode, currentTime: 65, duration: 120 })
   expect(screen.getByText('1:05')).toBeInTheDocument()
-  expect(screen.getByText('-0:55')).toBeInTheDocument()
+  expect(screen.getByText('/ 2:00')).toBeInTheDocument()
 })
 
 it('reports its rendered height via onHeightChange', () => {
@@ -448,12 +440,12 @@ describe('mobile (< md)', () => {
     expect(screen.queryByRole('button', { name: /share/i })).not.toBeInTheDocument()
   })
 
-  it('title truncates correctly next to the play button (min-w-0 regression guard)', () => {
+  it('title truncation guard: .now-title/.now-text carry the truncation properties directly (no Tailwind truncate/min-w-0 needed — ported from the mockup\'s own CSS)', () => {
     mockMobile()
     renderView({ episode: mockEpisode })
     const title = screen.getByText('Test Episode')
-    expect(title).toHaveClass('truncate')
-    expect(title.parentElement).toHaveClass('min-w-0')
+    expect(title).toHaveClass('now-title')
+    expect(title.parentElement).toHaveClass('now-text')
   })
 
   it('does not render full transport controls on mobile at all — there is no expanded state anymore', async () => {
@@ -483,14 +475,13 @@ describe('mobile (< md)', () => {
     expect(onTapMiniBar).not.toHaveBeenCalled()
   })
 
-  it('mini-bar shows a lazy-loaded thumbnail when cover art is set', () => {
+  it('mini-bar never renders real cover art — uses the same decorative .chip graphic regardless (matches the mockup exactly, plans/010)', () => {
     mockMobile()
     renderView({
       episode: { ...mockEpisode, cover_art_path: 'https://example.com/detail.webp', cover_art_thumb_path: 'https://example.com/thumb.webp' },
     })
-    const img = screen.getByRole('img')
-    expect(img).toHaveAttribute('src', 'https://example.com/thumb.webp')
-    expect(img).toHaveAttribute('loading', 'lazy')
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(document.querySelector('.chip')).toBeInTheDocument()
   })
 })
 

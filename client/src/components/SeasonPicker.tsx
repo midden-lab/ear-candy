@@ -19,16 +19,40 @@ interface SeasonPickerProps {
  * (same pattern as ShareDialog) so it's never clipped by whatever
  * scrollable container the trigger itself lives inside.
  */
+const FOCUSABLE_SELECTOR = 'button, a[href], input, [tabindex]:not([tabindex="-1"])'
+
 export default function SeasonPicker({ seasons, activeSeason, episodeCounts = {}, onSelect }: SeasonPickerProps) {
   const [open, setOpen] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
+  // Focus the close button on open, trap Tab/Shift+Tab within the panel,
+  // and close on Escape — same shape as ShareDialog's real modal focus
+  // trap. Without the trap, Tab from the close button leaked straight into
+  // the (visually hidden, but still in the DOM) page behind this overlay.
   useEffect(() => {
     if (!open) return
+    const panel = panelRef.current
     closeButtonRef.current?.focus()
+
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') {
+        setOpen(false)
+        return
+      }
+      if (e.key !== 'Tab' || !panel) return
+      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
@@ -54,41 +78,39 @@ export default function SeasonPicker({ seasons, activeSeason, episodeCounts = {}
 
   return (
     <>
-      <button
-        ref={triggerRef}
-        onClick={() => setOpen(true)}
-        className="flex min-h-11 items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-900 active:bg-zinc-200 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:active:bg-zinc-800"
-        aria-haspopup="dialog"
-      >
-        {active?.title ?? 'Season'}
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
-          <path d="M6 9l6 6 6-6" />
+      {/* Same .season-trigger/.caret classes as SeasonTabs' desktop trigger
+          — the mockup shares this exact markup across both shells. */}
+      <button ref={triggerRef} onClick={() => setOpen(true)} className="season-trigger" aria-haspopup="dialog">
+        <span>{active?.title ?? 'Season'}</span>
+        <svg className="caret" width="9" height="6" viewBox="0 0 9 6" fill="none" aria-hidden="true">
+          <path d="M1 1l3.5 3.5L8 1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
       {open && createPortal(
         <div
+          ref={panelRef}
           role="dialog"
           aria-modal="true"
           aria-label="Choose a season"
-          className="fixed inset-0 z-[60] flex flex-col bg-canvas"
-          style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+          className="m-season-picker"
+          // .m-season-picker's own padding (26px/22px/34px) is duplicated
+          // into the calc() below rather than overridden by it — a plain
+          // inline paddingTop/Bottom would otherwise replace the class's
+          // values outright instead of adding safe-area clearance on top.
+          style={{
+            paddingTop: 'calc(26px + env(safe-area-inset-top, 0px))',
+            paddingBottom: 'calc(34px + env(safe-area-inset-bottom, 0px))',
+          }}
         >
-          <div className="flex items-center px-2 py-2">
-            <button
-              ref={closeButtonRef}
-              onClick={closeAndRestoreFocus}
-              aria-label="Close"
-              className="flex h-11 w-11 items-center justify-center rounded-full text-ink-3"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
-            <h2 className="ml-1 text-sm font-semibold text-ink">Seasons</h2>
-          </div>
+          <button ref={closeButtonRef} onClick={closeAndRestoreFocus} aria-label="Close" className="m-season-picker-close">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M2 8h12M8 2v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" transform="rotate(45 8 8)" />
+            </svg>
+          </button>
+          <h3 className="m-season-picker-title">Seasons</h3>
 
-          <ul role="listbox" aria-label="Select season" className="flex-1 overflow-y-auto px-2 pb-4">
+          <ul role="listbox" aria-label="Select season" className="m-season-picker-list">
             {seasons.map(season => {
               const isSelected = season.id === activeSeason
               return (
@@ -97,14 +119,10 @@ export default function SeasonPicker({ seasons, activeSeason, episodeCounts = {}
                     role="option"
                     aria-selected={isSelected}
                     onClick={() => { onSelect(season.id); closeAndRestoreFocus() }}
-                    className={`flex min-h-[52px] w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-base ${
-                      isSelected ? 'font-semibold text-[var(--accent)]' : 'text-ink-2'
-                    }`}
+                    className="season-option"
                   >
-                    <span className="truncate">{season.title}</span>
-                    <span className={`shrink-0 text-sm ${isSelected ? 'text-[var(--accent)]' : 'text-ink-3'}`}>
-                      {episodeCounts[season.id] ?? 0}
-                    </span>
+                    <span>{season.title}</span>
+                    <span className="opt-count mono">{episodeCounts[season.id] ?? 0}</span>
                   </button>
                 </li>
               )

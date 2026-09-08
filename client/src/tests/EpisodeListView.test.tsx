@@ -54,7 +54,6 @@ const episodes: Episode[] = [
 it('renders season tabs and episode items', () => {
   render(
     <EpisodeListView
-      podcastName="Test Show"
       seasons={seasons}
       episodes={episodes}
       activeSeason={1}
@@ -72,7 +71,6 @@ it('calls onEpisodeClick with the clicked episode', async () => {
   const onEpisodeClick = vi.fn()
   render(
     <EpisodeListView
-      podcastName="Test Show"
       seasons={seasons}
       episodes={episodes}
       activeSeason={1}
@@ -87,7 +85,6 @@ it('calls onEpisodeClick with the clicked episode', async () => {
 it('marks the episode matching activeEpisodeId as active (aria-current)', () => {
   render(
     <EpisodeListView
-      podcastName="Test Show"
       seasons={seasons}
       episodes={episodes}
       activeSeason={1}
@@ -106,7 +103,6 @@ it('marks the episode matching activeEpisodeId as active (aria-current)', () => 
 it('shows the EQ indicator only for the playing episode when playing is true', () => {
   render(
     <EpisodeListView
-      podcastName="Test Show"
       seasons={seasons}
       episodes={episodes}
       activeSeason={1}
@@ -124,7 +120,6 @@ it('shows the EQ indicator only for the playing episode when playing is true', (
 it('EQ indicator follows playingEpisodeId independently of activeEpisodeId (viewed vs. playing can differ)', () => {
   render(
     <EpisodeListView
-      podcastName="Test Show"
       seasons={seasons}
       episodes={episodes}
       activeSeason={1}
@@ -146,7 +141,6 @@ it('EQ indicator follows playingEpisodeId independently of activeEpisodeId (view
 it('does not show the EQ indicator when playing is false', () => {
   render(
     <EpisodeListView
-      podcastName="Test Show"
       seasons={seasons}
       episodes={episodes}
       activeSeason={1}
@@ -162,7 +156,6 @@ it('does not show the EQ indicator when playing is false', () => {
 it('passes each episode through getRemainingSeconds and renders the result per row', () => {
   render(
     <EpisodeListView
-      podcastName="Test Show"
       seasons={seasons}
       episodes={episodes}
       activeSeason={1}
@@ -171,13 +164,12 @@ it('passes each episode through getRemainingSeconds and renders the result per r
       onEpisodeClick={() => {}}
     />
   )
-  expect(screen.getByText('1:05').closest('span')?.parentElement).toHaveTextContent('1:05 left')
+  expect(screen.getByText('1:05 left')).toBeInTheDocument()
 })
 
 it('renders the PrivacyNotice disclosure when analyticsEnabled is true', () => {
   render(
     <EpisodeListView
-      podcastName="Test Show"
       seasons={seasons}
       episodes={episodes}
       activeSeason={1}
@@ -192,7 +184,6 @@ it('renders the PrivacyNotice disclosure when analyticsEnabled is true', () => {
 it('omits the PrivacyNotice disclosure when analyticsEnabled is omitted (defaults to false)', () => {
   render(
     <EpisodeListView
-      podcastName="Test Show"
       seasons={seasons}
       episodes={episodes}
       activeSeason={1}
@@ -203,24 +194,9 @@ it('omits the PrivacyNotice disclosure when analyticsEnabled is omitted (default
   expect(screen.queryByText('Anonymous listening analytics')).not.toBeInTheDocument()
 })
 
-it('renders the podcast name at the top', () => {
-  render(
-    <EpisodeListView
-      podcastName="My Great Show"
-      seasons={seasons}
-      episodes={episodes}
-      activeSeason={1}
-      onSeasonSelect={() => {}}
-      onEpisodeClick={() => {}}
-    />
-  )
-  expect(screen.getByText('My Great Show')).toBeInTheDocument()
-})
-
 it('shows a loading indicator instead of episodes when loading', () => {
   render(
     <EpisodeListView
-      podcastName="Test Show"
       seasons={seasons}
       episodes={episodes}
       activeSeason={1}
@@ -236,7 +212,6 @@ it('shows a loading indicator instead of episodes when loading', () => {
 it('shows an empty state when the season has no episodes', () => {
   render(
     <EpisodeListView
-      podcastName="Test Show"
       seasons={seasons}
       episodes={[]}
       activeSeason={1}
@@ -271,7 +246,6 @@ describe('mobile layout (< md)', () => {
     mockMobile()
     render(
       <EpisodeListView
-        podcastName="Test Show"
         seasons={seasons}
         episodes={episodes}
         activeSeason={1}
@@ -282,11 +256,10 @@ describe('mobile layout (< md)', () => {
     expect(screen.getByRole('button', { name: 'Season One' })).toHaveAttribute('aria-haspopup', 'dialog')
   })
 
-  it('still renders the podcast name and episode items on mobile', () => {
+  it('still renders episode items on mobile', () => {
     mockMobile()
     render(
       <EpisodeListView
-        podcastName="Test Show"
         seasons={seasons}
         episodes={episodes}
         activeSeason={1}
@@ -294,7 +267,6 @@ describe('mobile layout (< md)', () => {
         onEpisodeClick={() => {}}
       />
     )
-    expect(screen.getByText('Test Show')).toBeInTheDocument()
     expect(screen.getByText('First Episode')).toBeInTheDocument()
   })
 })
@@ -314,7 +286,6 @@ describe('cross-catalog search', () => {
   it('filters the visible list to search matches across every season, not just the active one', () => {
     render(
       <EpisodeListView
-        podcastName="Test Show"
         seasons={[seasons[0], seasonTwo]}
         episodes={episodes}
         allEpisodes={allEpisodes}
@@ -333,7 +304,6 @@ describe('cross-catalog search', () => {
   it('tags a cross-season search result with its origin season', () => {
     render(
       <EpisodeListView
-        podcastName="Test Show"
         seasons={[seasons[0], seasonTwo]}
         episodes={episodes}
         allEpisodes={allEpisodes}
@@ -350,7 +320,6 @@ describe('cross-catalog search', () => {
   it('matches on guest name across seasons too', () => {
     render(
       <EpisodeListView
-        podcastName="Test Show"
         seasons={[seasons[0], seasonTwo]}
         episodes={episodes}
         allEpisodes={allEpisodes}
@@ -367,7 +336,6 @@ describe('cross-catalog search', () => {
   it('shows a no-results message when nothing matches the search', () => {
     render(
       <EpisodeListView
-        podcastName="Test Show"
         seasons={[seasons[0], seasonTwo]}
         episodes={episodes}
         allEpisodes={allEpisodes}
@@ -384,7 +352,6 @@ describe('cross-catalog search', () => {
   it('reverts to season-scoped browsing when the search query is cleared', () => {
     const { rerender } = render(
       <EpisodeListView
-        podcastName="Test Show"
         seasons={[seasons[0], seasonTwo]}
         episodes={episodes}
         allEpisodes={allEpisodes}
@@ -399,7 +366,6 @@ describe('cross-catalog search', () => {
 
     rerender(
       <EpisodeListView
-        podcastName="Test Show"
         seasons={[seasons[0], seasonTwo]}
         episodes={episodes}
         allEpisodes={allEpisodes}
@@ -414,10 +380,9 @@ describe('cross-catalog search', () => {
     expect(screen.queryByText('A Very Different Topic')).not.toBeInTheDocument()
   })
 
-  it('hides the season selector while a search is active', () => {
+  it('keeps the season selector visible during search (matches the mockup — it never hides it), and switches the status text to a result count', () => {
     render(
       <EpisodeListView
-        podcastName="Test Show"
         seasons={[seasons[0], seasonTwo]}
         episodes={episodes}
         allEpisodes={allEpisodes}
@@ -428,7 +393,8 @@ describe('cross-catalog search', () => {
         onEpisodeClick={() => {}}
       />
     )
-    expect(screen.queryByRole('button', { name: 'Season One' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Season One' })).toBeInTheDocument()
+    expect(screen.getByText('1 result')).toBeInTheDocument()
   })
 
   it('calls onSearchChange as the user types into the search box', async () => {
@@ -436,7 +402,6 @@ describe('cross-catalog search', () => {
     const onSearchChange = vi.fn()
     render(
       <EpisodeListView
-        podcastName="Test Show"
         seasons={seasons}
         episodes={episodes}
         allEpisodes={allEpisodes}

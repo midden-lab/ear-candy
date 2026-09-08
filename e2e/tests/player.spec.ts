@@ -55,27 +55,24 @@ test.describe('Audio Player', () => {
     await expect(speedBtn).toHaveText('1×')
   })
 
-  test('all skip and seek buttons are visible', async ({ seededPage: page }) => {
+  test('skip and speed buttons are visible — no skip-to-start/end, matching the mockup exactly (only ±15s and speed exist anywhere in it)', async ({ seededPage: page }) => {
     await page.locator('button', { hasText: 'Deep Dive' }).click()
     await page.getByRole('button', { name: 'Play' }).click()
     // Scoped to the dock — see note above.
     const dock = page.getByTestId('player-bar')
-    await expect(dock.getByRole('button', { name: 'Skip to start' })).toBeVisible()
     await expect(dock.getByRole('button', { name: 'Back 15 seconds' })).toBeVisible()
     await expect(dock.getByRole('button', { name: 'Forward 15 seconds' })).toBeVisible()
-    await expect(dock.getByRole('button', { name: 'Skip to end' })).toBeVisible()
+    await expect(dock.getByRole('button', { name: 'Skip to start' })).toHaveCount(0)
+    await expect(dock.getByRole('button', { name: 'Skip to end' })).toHaveCount(0)
   })
 
-  test('elapsed and remaining timestamps are visible', async ({ seededPage: page }) => {
+  test('elapsed / total timestamps are visible, matching the mockup\'s "current / total" format', async ({ seededPage: page }) => {
     await page.locator('button', { hasText: 'Deep Dive' }).click()
     await page.getByRole('button', { name: 'Play' }).click()
     // The stub audio URL (example.com) never loads metadata, so duration stays 0.
-    // Both timestamps show 0:00 — this verifies the spans are rendered and formatted,
-    // not that playback time is tracked (that requires real audio).
-    const playerBar = page.getByTestId('player-bar')
-    const elapsed = playerBar.locator('span').first()
-    const remaining = playerBar.locator('span').last()
-    await expect(elapsed).toHaveText('0:00')
-    await expect(remaining).toHaveText('0:00')
+    // Both timestamps show 0:00 — this verifies the times are rendered and
+    // formatted, not that playback time is tracked (that requires real audio).
+    const dock = page.getByTestId('player-bar')
+    await expect(dock.locator('.times')).toHaveText('0:00 / 0:00')
   })
 })
