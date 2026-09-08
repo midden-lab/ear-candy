@@ -1,10 +1,10 @@
 ---
 id: backfill-season-1-durations
 title: "Backfill missing episode durations for Season 1 (production data repair)"
-status: pending
+status: in-progress
 priority: 1
 created: 2026-09-08
-steps_completed: 0
+steps_completed: 7
 steps_total: 8
 tags: [data-repair, production, backfill]
 ---
