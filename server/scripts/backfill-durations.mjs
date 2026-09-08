@@ -30,11 +30,16 @@
 //   (Season 1's remaining 22 zero-duration episodes, from a single Aug
 //   11-12 admin session whose uploads — large, ~57-58MB files — silently
 //   timed out the client-side duration probe at save time; see plans/013's
-//   Context for the full root-cause investigation). ~44 more episodes
-//   across Seasons 2-4 have the same issue and are intentionally not yet
-//   backfilled — re-run with the appropriate --season-id when ready.
+//   Context for the full root-cause investigation).
+// - 2026-09-08 (--apply --season-id=71/72/73, same session as above): fixed
+//   the remaining 44 episodes across Seasons 2-4 (#123-166) — same root
+//   cause. Site-wide duration_seconds = 0 count confirmed at 0 afterward.
 // Safe to re-run if the gap ever resurfaces — it's idempotent, only
-// touching rows still at duration_seconds = 0/NULL.
+// touching rows still at duration_seconds = 0/NULL. The underlying
+// client-side timeout bug itself (EpisodeFormPanel.tsx's probeAudioDuration,
+// 8s) is NOT fixed by this script — any new large upload-type episode can
+// still hit it; re-run this script per-season as needed until that's
+// addressed separately (detection stays client-side per explicit decision).
 //
 // Operational note: running `npm install <pkg> --no-save` directly in
 // /app (as the one-off-script procedure below describes) can silently
