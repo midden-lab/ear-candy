@@ -15,15 +15,18 @@ interface MastheadProps {
   showControls?: boolean
   isDark?: boolean
   onToggleTheme?: () => void
-  onAdminClick?: () => void
 }
 
 /**
  * Full-width header spanning the whole shell: wordmark + tagline on the
- * left, and (desktop only) a station callout, a Light/Dark text toggle,
- * and a plain-text Admin control on the right. Replaces IconRail's gear
- * icon and AppShell's floating ThemeBadge on desktop — no icons, per the
- * design system's icon-free-outside-transport principle.
+ * left, and (desktop only) a station callout and a Light/Dark text toggle
+ * on the right. Replaces IconRail's gear icon and AppShell's floating
+ * ThemeBadge on desktop — no icons, per the design system's
+ * icon-free-outside-transport principle. The Admin control used to live
+ * here too; it now lives next to the "Anonymous listening analytics"
+ * disclosure (PrivacyNotice, in the episode list) on both breakpoints, so
+ * it doesn't disappear on mobile's Settings tab or depend on which shell is
+ * rendering the masthead.
  */
 export default function Masthead({
   podcastName,
@@ -31,7 +34,6 @@ export default function Masthead({
   showControls = false,
   isDark = false,
   onToggleTheme,
-  onAdminClick,
 }: MastheadProps) {
   // showControls doubles as "is this the desktop shell" — App.tsx already
   // passes isDesktopShell through unchanged — so it also picks which of the
@@ -56,7 +58,6 @@ export default function Masthead({
       <div className="mast-right">
         <span className="station">{STATION}</span>
         <ThemeSwitch isDark={isDark} onToggle={onToggleTheme} />
-        <button type="button" onClick={onAdminClick} className="admin-link">Admin</button>
       </div>
     </header>
   )

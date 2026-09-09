@@ -4,14 +4,16 @@ import { useBreakpoint, MD_BREAKPOINT_QUERY } from '../hooks/useBreakpoint'
 interface AppShellProps {
   /** Full-width header rendered above everything else, on both desktop and
    *  mobile. Callers build the right variant (with or without the desktop
-   *  Light/Dark + Admin controls) themselves — AppShell stays
+   *  station/Light-Dark controls) themselves — AppShell stays
    *  breakpoint-agnostic for this prop like all its others. */
   masthead: ReactNode
   sidebar: ReactNode
   detail: ReactNode
   /** Mobile Settings screen content, shown when focusedPane is 'settings'.
-   *  Ignored on desktop (reached via the masthead's Admin control there
-   *  instead). */
+   *  Ignored on desktop, which shows the same Station/Light-Dark controls
+   *  directly in the masthead instead of a separate settings screen. Admin
+   *  is not here — it lives next to the analytics disclosure inside
+   *  `sidebar` on both breakpoints. */
   settings?: ReactNode
   player?: ReactNode
   /** MobileTabBar (or equivalent), fixed at the very bottom on mobile.
