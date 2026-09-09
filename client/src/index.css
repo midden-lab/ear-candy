@@ -62,8 +62,8 @@
   --surface: #FFFFFF;
   --ink: #121316;
   --ink-2: #5B5E64;
-  --ink-3: #8E9197;
-  --ink-4: #B4B7BC;
+  --ink-3: #67696E;
+  --ink-4: #868990;
 
   /* Quiet Room surface-language tokens (plans/009) — the rest of the
      mockup's design system that plan 005 never ported over. Everywhere
@@ -96,8 +96,8 @@
   --surface: #1B1920;
   --ink: #F1EFF3;
   --ink-2: #A9A6AF;
-  --ink-3: #75727A;
-  --ink-4: #4C4A51;
+  --ink-3: #8D8A93;
+  --ink-4: #6A676F;
 
   --hair: rgba(255, 255, 255, 0.09);
   --wash: rgba(255, 255, 255, 0.045);

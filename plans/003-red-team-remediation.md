@@ -1,10 +1,10 @@
 ---
 id: red-team-remediation
 title: "Red Team Remediation — Batch 1 (Docs, Dependencies, Privacy & Auth Hardening)"
-status: in-progress
+status: complete
 priority: 1
 created: 2026-08-29
-steps_completed: 4
+steps_completed: 9
 steps_total: 9
 tags: [security, hardening, red-team, privacy, auth]
 ---
