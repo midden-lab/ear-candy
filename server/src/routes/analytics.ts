@@ -3,6 +3,7 @@ import type { AnalyticsEventType } from '../types.js'
 import { isKnownCrawler } from '../utils/crawler.js'
 import { resolveCountry } from '../utils/geoip.js'
 import { parseUserAgent } from '../utils/userAgent.js'
+import { isExcludedIp } from '../utils/ipMatch.js'
 
 const ALLOWED_EVENT_TYPES = new Set<string>(['page_view', 'play_start', 'listen_progress', 'play_complete'])
 const ALLOWED_POSITION_PCTS = new Set([25, 50, 75, 90])
@@ -73,8 +74,13 @@ export const analyticsRoute: FastifyPluginAsync = async (app) => {
     // let a caller distinguish "your episode_id was valid" from "it
     // wasn't," or this endpoint becomes a way to enumerate hidden/
     // nonexistent episode ids.
-    const settingsRow = app.db.prepare('SELECT analytics_enabled FROM settings').get() as { analytics_enabled: number } | undefined
+    const settingsRow = app.db.prepare('SELECT analytics_enabled, excluded_analytics_ips FROM settings').get() as
+      { analytics_enabled: number; excluded_analytics_ips: string | null } | undefined
     if (!settingsRow?.analytics_enabled) {
+      return reply.status(204).send()
+    }
+
+    if (isExcludedIp(req.ip, settingsRow.excluded_analytics_ips)) {
       return reply.status(204).send()
     }
 

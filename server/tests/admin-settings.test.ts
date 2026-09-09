@@ -23,6 +23,27 @@ describe('Admin Settings routes', () => {
     delete process.env.ADMIN_PASSWORD_HASH
   })
 
+  describe('GET /api/admin/settings', () => {
+    it('returns 401 without auth cookie', async () => {
+      const app = await makeApp()
+      const res = await app.inject({ method: 'GET', url: '/api/admin/settings' })
+      expect(res.statusCode).toBe(401)
+    })
+
+    it('returns the full settings row, including excluded_analytics_ips, for an authenticated admin', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      app.db.prepare('UPDATE settings SET excluded_analytics_ips = ?').run('203.0.113.5')
+
+      const res = await app.inject({ method: 'GET', url: '/api/admin/settings', headers: { cookie } })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.excluded_analytics_ips).toBe('203.0.113.5')
+      expect(body.podcast_name).toBe('Ear Candy')
+    })
+  })
+
   describe('PUT /api/admin/settings', () => {
     it('returns 401 without auth cookie', async () => {
       const app = await makeApp()
@@ -225,6 +246,63 @@ describe('Admin Settings routes', () => {
       expect(body.analytics_enabled).toBeFalsy()
       expect(body.track_returning_listeners).toBeFalsy()
     })
+
+    it('defaults excluded_analytics_ips to null when omitted', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'No Excluded IPs Given',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          accent_color: '#123456'
+        }
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json().excluded_analytics_ips).toBeNull()
+    })
+
+    it('persists excluded_analytics_ips and rejects one over the length cap', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const ok = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'Excluded IPs Set',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          accent_color: '#123456',
+          excluded_analytics_ips: '203.0.113.5, 198.51.100.9',
+        }
+      })
+      expect(ok.statusCode).toBe(200)
+      expect(ok.json().excluded_analytics_ips).toBe('203.0.113.5, 198.51.100.9')
+
+      const tooLong = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: {
+          podcast_name: 'Excluded IPs Too Long',
+          tagline: '',
+          description: '',
+          cover_art_path: null,
+          accent_color: '#123456',
+          excluded_analytics_ips: '1'.repeat(501),
+        }
+      })
+      expect(tooLong.statusCode).toBe(400)
+    })
   })
 
   describe('PATCH /api/admin/settings', () => {
@@ -400,6 +478,66 @@ describe('Admin Settings routes', () => {
       expect(body.analytics_enabled).toBeFalsy()
       // Untouched field keeps its default.
       expect(body.track_returning_listeners).toBeTruthy()
+    })
+
+    it('patches excluded_analytics_ips and rejects one over the length cap', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const ok = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: { excluded_analytics_ips: '203.0.113.5, 198.51.100.9' }
+      })
+      expect(ok.statusCode).toBe(200)
+      expect(ok.json().excluded_analytics_ips).toBe('203.0.113.5, 198.51.100.9')
+
+      const tooLong = await app.inject({
+        method: 'PATCH',
+        url: '/api/admin/settings',
+        headers: { cookie },
+        payload: { excluded_analytics_ips: '1'.repeat(501) }
+      })
+      expect(tooLong.statusCode).toBe(400)
+    })
+  })
+
+  describe('GET /api/admin/my-ip', () => {
+    it('returns 401 without auth cookie', async () => {
+      const app = await makeApp()
+      const res = await app.inject({ method: 'GET', url: '/api/admin/my-ip' })
+      expect(res.statusCode).toBe(401)
+    })
+
+    it('returns the normalized request IP for an authenticated admin', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/admin/my-ip',
+        headers: { cookie },
+        remoteAddress: '203.0.113.5',
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json()).toEqual({ ip: '203.0.113.5' })
+    })
+
+    it('normalizes an IPv4-mapped-IPv6 request address before returning it', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/admin/my-ip',
+        headers: { cookie },
+        remoteAddress: '::ffff:203.0.113.5',
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json()).toEqual({ ip: '203.0.113.5' })
     })
   })
 })

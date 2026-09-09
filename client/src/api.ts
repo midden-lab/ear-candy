@@ -12,7 +12,14 @@ async function adminRequest<T>(url: string, method: string, body?: unknown): Pro
   return res.json() as Promise<T>
 }
 
+// The public getSettings() (below, via request()) deliberately omits
+// fields an unauthenticated caller shouldn't see (session_epoch,
+// excluded_analytics_ips) — the admin Settings page must read its own
+// current values from this authenticated route instead, or a saved
+// excluded_analytics_ips value silently never reappears after a reload.
+export const getAdminSettings = () => adminRequest<Settings>('/api/admin/settings', 'GET')
 export const updateSettings = (data: Partial<Settings>) => adminRequest<Settings>('/api/admin/settings', 'PATCH', data)
+export const getMyIp = () => adminRequest<{ ip: string }>('/api/admin/my-ip', 'GET')
 
 export const createSeason = (data: Partial<Season>) => adminRequest<Season>('/api/admin/seasons', 'POST', data)
 export const updateSeason = (id: number, data: Partial<Season>) => adminRequest<Season>(`/api/admin/seasons/${id}`, 'PATCH', data)

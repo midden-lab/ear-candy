@@ -215,6 +215,78 @@ describe('POST /api/analytics/event', () => {
     expect(countEvents(app)).toBe(0)
   })
 
+  describe('excluded IPs', () => {
+    it('does not write anything for a request from an excluded IP, but still returns 204', async () => {
+      const app = buildTestApp()
+      app.db.prepare('UPDATE settings SET excluded_analytics_ips = ?').run('203.0.113.5, 198.51.100.9')
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/analytics/event',
+        headers: { 'user-agent': REAL_UA },
+        payload: { event_type: 'page_view', session_id: 'sess-1' },
+        remoteAddress: '203.0.113.5',
+      })
+      expect(res.statusCode).toBe(204)
+      expect(countEvents(app)).toBe(0)
+    })
+
+    it('still writes for a non-excluded IP when the exclusion list is set', async () => {
+      const app = buildTestApp()
+      app.db.prepare('UPDATE settings SET excluded_analytics_ips = ?').run('203.0.113.5')
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/analytics/event',
+        headers: { 'user-agent': REAL_UA },
+        payload: { event_type: 'page_view', session_id: 'sess-1' },
+        remoteAddress: '198.51.100.9',
+      })
+      expect(res.statusCode).toBe(204)
+      expect(countEvents(app)).toBe(1)
+    })
+
+    it('excludes play_start events too, not just page_view', async () => {
+      const app = buildTestApp()
+      const { episodeId } = seedEpisode(app)
+      app.db.prepare('UPDATE settings SET excluded_analytics_ips = ?').run('203.0.113.5')
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/analytics/event',
+        headers: { 'user-agent': REAL_UA },
+        payload: { event_type: 'play_start', session_id: 'sess-1', episode_id: episodeId },
+        remoteAddress: '203.0.113.5',
+      })
+      expect(res.statusCode).toBe(204)
+      expect(countEvents(app)).toBe(0)
+    })
+
+    it('matches an IPv4-mapped-IPv6 request address against a plain IPv4 entry in the stored list', async () => {
+      const app = buildTestApp()
+      app.db.prepare('UPDATE settings SET excluded_analytics_ips = ?').run('203.0.113.5')
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/analytics/event',
+        headers: { 'user-agent': REAL_UA },
+        payload: { event_type: 'page_view', session_id: 'sess-1' },
+        remoteAddress: '::ffff:203.0.113.5',
+      })
+      expect(res.statusCode).toBe(204)
+      expect(countEvents(app)).toBe(0)
+    })
+
+    it('is a no-op when excluded_analytics_ips is NULL (the default)', async () => {
+      const app = buildTestApp()
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/analytics/event',
+        headers: { 'user-agent': REAL_UA },
+        payload: { event_type: 'page_view', session_id: 'sess-1' },
+        remoteAddress: '203.0.113.5',
+      })
+      expect(res.statusCode).toBe(204)
+      expect(countEvents(app)).toBe(1)
+    })
+  })
+
   it('debounces duplicate (session_id, event_type, episode_id) submissions within the dedup window', async () => {
     const app = buildTestApp()
     const { episodeId } = seedEpisode(app)

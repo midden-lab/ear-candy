@@ -250,8 +250,45 @@ describe('runMigrations', () => {
     expect(row.session_epoch).toBe(0)
   })
 
+  it('creates excluded_analytics_ips on a fresh database, defaulted to null', () => {
+    const db = new Database(':memory:')
+    runMigrations(db)
+    expect(columns(db, 'settings')).toContain('excluded_analytics_ips')
+    const row = db.prepare('SELECT excluded_analytics_ips FROM settings').get() as { excluded_analytics_ips: string | null }
+    expect(row.excluded_analytics_ips).toBeNull()
+  })
+
+  it('adds excluded_analytics_ips to a pre-existing settings table that predates the column', () => {
+    // Simulate a production DB at schema version 6 — settings exists, but
+    // lacks excluded_analytics_ips.
+    const db = new Database(':memory:')
+    db.prepare(`
+      CREATE TABLE settings (
+        podcast_name               TEXT NOT NULL DEFAULT 'Ear Candy',
+        tagline                    TEXT NOT NULL DEFAULT '',
+        description                TEXT NOT NULL DEFAULT '',
+        cover_art_path             TEXT,
+        favicon_path                TEXT,
+        browser_tab_title          TEXT,
+        accent_color                TEXT NOT NULL DEFAULT '#5a3ef5',
+        analytics_enabled           INTEGER NOT NULL DEFAULT 1,
+        track_returning_listeners   INTEGER NOT NULL DEFAULT 1,
+        session_epoch                INTEGER NOT NULL DEFAULT 0
+      )
+    `).run()
+    db.prepare('INSERT INTO settings (podcast_name) VALUES (?)').run('Pre-Exclusion Pod')
+    expect(columns(db, 'settings')).not.toContain('excluded_analytics_ips')
+
+    runMigrations(db)
+
+    expect(columns(db, 'settings')).toContain('excluded_analytics_ips')
+    const row = db.prepare('SELECT podcast_name, excluded_analytics_ips FROM settings').get() as { podcast_name: string; excluded_analytics_ips: string | null }
+    expect(row.podcast_name).toBe('Pre-Exclusion Pod')
+    expect(row.excluded_analytics_ips).toBeNull()
+  })
+
   describe('schema_migrations tracking', () => {
-    it('records all six migrations as applied on a fresh database', () => {
+    it('records all seven migrations as applied on a fresh database', () => {
       const db = new Database(':memory:')
       runMigrations(db)
       const rows = db.prepare('SELECT version, description FROM schema_migrations ORDER BY version').all()
@@ -262,6 +299,7 @@ describe('runMigrations', () => {
         { version: 4, description: 'settings.analytics_enabled' },
         { version: 5, description: 'settings.track_returning_listeners' },
         { version: 6, description: 'settings.session_epoch' },
+        { version: 7, description: 'settings.excluded_analytics_ips' },
       ])
     })
 
@@ -275,7 +313,7 @@ describe('runMigrations', () => {
 
       expect(() => runMigrations(db)).not.toThrow()
       const rows = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all()
-      expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }])
+      expect(rows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }, { version: 7 }])
     })
 
     it('running migrations again with everything already applied is a no-op', () => {
