@@ -27,6 +27,7 @@ vi.mock('../api', () => ({
     accent_color: '#ff0000',
     analytics_enabled: true,
     track_returning_listeners: true,
+    excluded_analytics_ips: null,
   }),
   getSeasons: vi.fn().mockResolvedValue([]),
   getEpisodes: vi.fn().mockResolvedValue([]),
@@ -92,6 +93,7 @@ it('renders player view after settings load', async () => {
     accent_color: '#ff0000',
     analytics_enabled: true,
     track_returning_listeners: true,
+    excluded_analytics_ips: null,
   })
   render(<App />)
   await waitFor(() =>
@@ -110,6 +112,7 @@ it('fires trackPageView exactly once per app mount, even under StrictMode double
     accent_color: '#ff0000',
     analytics_enabled: true,
     track_returning_listeners: true,
+    excluded_analytics_ips: null,
   })
   render(<StrictMode><App /></StrictMode>)
   // Wait on the effect's own observable side effect directly, not on an
@@ -138,6 +141,7 @@ it('navigates to admin login when admin button is clicked', async () => {
     accent_color: '#ff0000',
     analytics_enabled: true,
     track_returning_listeners: true,
+    excluded_analytics_ips: null,
   })
   render(<App />)
   await waitFor(() =>
@@ -173,6 +177,7 @@ describe('admin sign out', () => {
       accent_color: '#ff0000',
       analytics_enabled: true,
       track_returning_listeners: true,
+      excluded_analytics_ips: null,
     })
     render(<App />)
 
@@ -196,6 +201,7 @@ describe('admin sign out', () => {
       accent_color: '#ff0000',
       analytics_enabled: true,
       track_returning_listeners: true,
+      excluded_analytics_ips: null,
     })
     render(<App />)
 
@@ -218,6 +224,7 @@ it('applies accent color from settings to CSS variable', async () => {
     accent_color: '#ff0000',
     analytics_enabled: true,
     track_returning_listeners: true,
+    excluded_analytics_ips: null,
   })
   render(<App />)
   // No 'theme' localStorage preference is set anywhere in this test file, so
@@ -245,6 +252,7 @@ describe('document title and favicon', () => {
       accent_color: '#ff0000',
       analytics_enabled: true,
       track_returning_listeners: true,
+      excluded_analytics_ips: null,
     })
     render(<App />)
     await waitFor(() => expect(document.title).toBe('Acme Media Co'))
@@ -261,6 +269,7 @@ describe('document title and favicon', () => {
       accent_color: '#ff0000',
       analytics_enabled: true,
       track_returning_listeners: true,
+      excluded_analytics_ips: null,
     })
     render(<App />)
     await waitFor(() => expect(document.title).toBe('Acme Media Co'))
@@ -277,6 +286,7 @@ describe('document title and favicon', () => {
       accent_color: '#ff0000',
       analytics_enabled: true,
       track_returning_listeners: true,
+      excluded_analytics_ips: null,
     })
     render(<App />)
     await waitFor(() => {
@@ -301,6 +311,7 @@ describe('document title and favicon', () => {
       accent_color: '#ff0000',
       analytics_enabled: true,
       track_returning_listeners: true,
+      excluded_analytics_ips: null,
     })
     render(<App />)
     await waitFor(() =>
@@ -475,6 +486,7 @@ describe('mobile tab bar navigation (< md)', () => {
       accent_color: '#ff0000',
       analytics_enabled: true,
       track_returning_listeners: true,
+      excluded_analytics_ips: null,
     })
     vi.mocked(getSeasons).mockResolvedValue([])
     vi.mocked(getEpisodes).mockResolvedValue([])

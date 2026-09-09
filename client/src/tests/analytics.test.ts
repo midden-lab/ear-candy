@@ -21,6 +21,7 @@ const BASE_SETTINGS: Settings = {
   accent_color: '#000000',
   analytics_enabled: true,
   track_returning_listeners: true,
+  excluded_analytics_ips: null,
 }
 
 function mockSettings(overrides: Partial<Settings> = {}) {

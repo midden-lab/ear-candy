@@ -4,7 +4,7 @@ import AdminSettings from '../pages/admin/AdminSettings'
 import * as api from '../api'
 
 vi.mock('../api', () => ({
-  getSettings: vi.fn().mockResolvedValue({
+  getAdminSettings: vi.fn().mockResolvedValue({
     podcast_name: 'My Pod',
     tagline: 'A tagline',
     description: 'A description',
@@ -14,6 +14,7 @@ vi.mock('../api', () => ({
     accent_color: '#5a3ef5',
     analytics_enabled: true,
     track_returning_listeners: true,
+    excluded_analytics_ips: null,
   }),
   updateSettings: vi.fn().mockResolvedValue({
     podcast_name: 'My Pod',
@@ -25,8 +26,10 @@ vi.mock('../api', () => ({
     accent_color: '#5a3ef5',
     analytics_enabled: true,
     track_returning_listeners: true,
+    excluded_analytics_ips: null,
   }),
   uploadFavicon: vi.fn(),
+  getMyIp: vi.fn(),
   // stub rest
   getSeasons: vi.fn(),
   getEpisodes: vi.fn(),
@@ -43,7 +46,7 @@ vi.mock('../api', () => ({
 describe('AdminSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(api.getSettings).mockResolvedValue({
+    vi.mocked(api.getAdminSettings).mockResolvedValue({
       podcast_name: 'My Pod',
       tagline: 'A tagline',
       description: 'A description',
@@ -53,6 +56,7 @@ describe('AdminSettings', () => {
       accent_color: '#5a3ef5',
       analytics_enabled: true,
       track_returning_listeners: true,
+      excluded_analytics_ips: null,
     })
     vi.mocked(api.updateSettings).mockResolvedValue({
       podcast_name: 'My Pod',
@@ -64,6 +68,7 @@ describe('AdminSettings', () => {
       accent_color: '#5a3ef5',
       analytics_enabled: true,
       track_returning_listeners: true,
+      excluded_analytics_ips: null,
     })
   })
 
@@ -101,6 +106,7 @@ describe('AdminSettings', () => {
         favicon_path: null,
         analytics_enabled: true,
         track_returning_listeners: true,
+        excluded_analytics_ips: null,
       })
     })
   })
@@ -165,7 +171,7 @@ describe('AdminSettings', () => {
     })
 
     it('pre-fills the preview from the loaded settings favicon_path', async () => {
-      vi.mocked(api.getSettings).mockResolvedValue({
+      vi.mocked(api.getAdminSettings).mockResolvedValue({
         podcast_name: 'My Pod',
         tagline: 'A tagline',
         description: 'A description',
@@ -175,6 +181,7 @@ describe('AdminSettings', () => {
         accent_color: '#5a3ef5',
         analytics_enabled: true,
         track_returning_listeners: true,
+        excluded_analytics_ips: null,
       })
       render(<AdminSettings />)
       await waitFor(() => {
@@ -185,7 +192,7 @@ describe('AdminSettings', () => {
 
   describe('browser tab title', () => {
     it('pre-fills from the loaded settings browser_tab_title', async () => {
-      vi.mocked(api.getSettings).mockResolvedValue({
+      vi.mocked(api.getAdminSettings).mockResolvedValue({
         podcast_name: 'My Pod',
         tagline: 'A tagline',
         description: 'A description',
@@ -195,6 +202,7 @@ describe('AdminSettings', () => {
         accent_color: '#5a3ef5',
         analytics_enabled: true,
         track_returning_listeners: true,
+        excluded_analytics_ips: null,
       })
       render(<AdminSettings />)
       await waitFor(() => {
@@ -222,7 +230,7 @@ describe('AdminSettings', () => {
     })
 
     it('sends null, not an empty string, when the field is cleared', async () => {
-      vi.mocked(api.getSettings).mockResolvedValue({
+      vi.mocked(api.getAdminSettings).mockResolvedValue({
         podcast_name: 'My Pod',
         tagline: 'A tagline',
         description: 'A description',
@@ -232,6 +240,7 @@ describe('AdminSettings', () => {
         accent_color: '#5a3ef5',
         analytics_enabled: true,
         track_returning_listeners: true,
+        excluded_analytics_ips: null,
       })
       render(<AdminSettings />)
       await waitFor(() => expect(screen.getByDisplayValue('Old Title')).toBeInTheDocument())
@@ -254,7 +263,7 @@ describe('AdminSettings', () => {
     })
 
     it('renders both checkboxes unchecked when loaded settings have them off', async () => {
-      vi.mocked(api.getSettings).mockResolvedValue({
+      vi.mocked(api.getAdminSettings).mockResolvedValue({
         podcast_name: 'My Pod',
         tagline: 'A tagline',
         description: 'A description',
@@ -264,6 +273,7 @@ describe('AdminSettings', () => {
         accent_color: '#5a3ef5',
         analytics_enabled: false,
         track_returning_listeners: false,
+        excluded_analytics_ips: null,
       })
       render(<AdminSettings />)
       await waitFor(() => expect(screen.getByDisplayValue('My Pod')).toBeInTheDocument())
@@ -293,6 +303,98 @@ describe('AdminSettings', () => {
       await waitFor(() => {
         expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ track_returning_listeners: false }))
       })
+    })
+  })
+
+  describe('excluded IPs', () => {
+    it('pre-fills the field from existing settings', async () => {
+      vi.mocked(api.getAdminSettings).mockResolvedValueOnce({
+        podcast_name: 'My Pod',
+        tagline: 'A tagline',
+        description: 'A description',
+        cover_art_path: null,
+        favicon_path: null,
+        browser_tab_title: null,
+        accent_color: '#5a3ef5',
+        analytics_enabled: true,
+        track_returning_listeners: true,
+        excluded_analytics_ips: '203.0.113.5',
+      })
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('203.0.113.5')).toBeInTheDocument())
+    })
+
+    it('"Add my current IP" appends the detected IP, comma-separated, without duplicating an existing entry', async () => {
+      vi.mocked(api.getAdminSettings).mockResolvedValueOnce({
+        podcast_name: 'My Pod',
+        tagline: 'A tagline',
+        description: 'A description',
+        cover_art_path: null,
+        favicon_path: null,
+        browser_tab_title: null,
+        accent_color: '#5a3ef5',
+        analytics_enabled: true,
+        track_returning_listeners: true,
+        excluded_analytics_ips: '203.0.113.5',
+      })
+      vi.mocked(api.getMyIp).mockResolvedValue({ ip: '198.51.100.9' })
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('203.0.113.5')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add my current IP' }))
+      await waitFor(() => expect(screen.getByDisplayValue('203.0.113.5, 198.51.100.9')).toBeInTheDocument())
+
+      // Clicking again with the same detected IP does not duplicate it.
+      fireEvent.click(screen.getByRole('button', { name: 'Add my current IP' }))
+      await waitFor(() => expect(api.getMyIp).toHaveBeenCalledTimes(2))
+      expect(screen.getByDisplayValue('203.0.113.5, 198.51.100.9')).toBeInTheDocument()
+    })
+
+    it('saves excluded_analytics_ips: null when the field is emptied', async () => {
+      vi.mocked(api.getAdminSettings).mockResolvedValueOnce({
+        podcast_name: 'My Pod',
+        tagline: 'A tagline',
+        description: 'A description',
+        cover_art_path: null,
+        favicon_path: null,
+        browser_tab_title: null,
+        accent_color: '#5a3ef5',
+        analytics_enabled: true,
+        track_returning_listeners: true,
+        excluded_analytics_ips: '203.0.113.5',
+      })
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('203.0.113.5')).toBeInTheDocument())
+
+      fireEvent.change(screen.getByLabelText('Excluded IPs'), { target: { value: '' } })
+      fireEvent.submit(screen.getByRole('button', { name: /save/i }).closest('form')!)
+
+      await waitFor(() => {
+        expect(api.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ excluded_analytics_ips: null }))
+      })
+    })
+
+    it('shows an error and preserves the existing value when detecting the current IP fails', async () => {
+      vi.mocked(api.getAdminSettings).mockResolvedValueOnce({
+        podcast_name: 'My Pod',
+        tagline: 'A tagline',
+        description: 'A description',
+        cover_art_path: null,
+        favicon_path: null,
+        browser_tab_title: null,
+        accent_color: '#5a3ef5',
+        analytics_enabled: true,
+        track_returning_listeners: true,
+        excluded_analytics_ips: '203.0.113.5',
+      })
+      vi.mocked(api.getMyIp).mockRejectedValueOnce(new Error('HTTP 401'))
+      render(<AdminSettings />)
+      await waitFor(() => expect(screen.getByDisplayValue('203.0.113.5')).toBeInTheDocument())
+
+      fireEvent.click(screen.getByRole('button', { name: 'Add my current IP' }))
+
+      await waitFor(() => expect(screen.getByText('HTTP 401')).toBeInTheDocument())
+      expect(screen.getByDisplayValue('203.0.113.5')).toBeInTheDocument()
     })
   })
 })

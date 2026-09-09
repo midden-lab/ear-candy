@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getSettings, updateSettings, uploadFavicon } from '../../api'
+import { getAdminSettings, updateSettings, uploadFavicon, getMyIp } from '../../api'
 
 export default function AdminSettings() {
   const [podcastName, setPodcastName] = useState('')
@@ -12,11 +12,13 @@ export default function AdminSettings() {
   const [faviconUploadError, setFaviconUploadError] = useState('')
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true)
   const [trackReturningListeners, setTrackReturningListeners] = useState(true)
+  const [excludedIps, setExcludedIps] = useState('')
+  const [myIpError, setMyIpError] = useState('')
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    getSettings().then(s => {
+    getAdminSettings().then(s => {
       setPodcastName(s.podcast_name)
       setBrowserTabTitle(s.browser_tab_title ?? '')
       setTagline(s.tagline)
@@ -25,8 +27,22 @@ export default function AdminSettings() {
       setFaviconPath(s.favicon_path)
       setAnalyticsEnabled(s.analytics_enabled)
       setTrackReturningListeners(s.track_returning_listeners)
+      setExcludedIps(s.excluded_analytics_ips ?? '')
     })
   }, [])
+
+  async function handleAddMyIp() {
+    setMyIpError('')
+    try {
+      const { ip } = await getMyIp()
+      const current = excludedIps.split(',').map(s => s.trim()).filter(Boolean)
+      if (!current.includes(ip)) {
+        setExcludedIps([...current, ip].join(', '))
+      }
+    } catch (err) {
+      setMyIpError(err instanceof Error ? err.message : 'Could not detect your IP')
+    }
+  }
 
   async function handleFaviconChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -62,6 +78,7 @@ export default function AdminSettings() {
         favicon_path: faviconPath,
         analytics_enabled: analyticsEnabled,
         track_returning_listeners: trackReturningListeners,
+        excluded_analytics_ips: excludedIps.trim() === '' ? null : excludedIps.trim(),
       })
       setSaved(true)
     } finally {
@@ -150,6 +167,23 @@ export default function AdminSettings() {
             </label>
             <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 ml-6">
               Uses a persistent, random, non-identifying id stored in the listener&apos;s own browser to distinguish new visits from returning ones in the dashboard. When off, a fresh id is used per visit instead.
+            </p>
+          </div>
+          <div>
+            <label htmlFor="excluded_analytics_ips" className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">Excluded IPs</label>
+            <div className="flex gap-2">
+              <input id="excluded_analytics_ips" type="text" value={excludedIps}
+                onChange={e => setExcludedIps(e.target.value)}
+                placeholder="e.g. 203.0.113.5, 198.51.100.9"
+                className="flex-1 rounded bg-zinc-100 dark:bg-zinc-800 px-3 py-2 text-zinc-900 dark:text-zinc-100" />
+              <button type="button" onClick={() => void handleAddMyIp()}
+                className="shrink-0 rounded bg-zinc-200 dark:bg-zinc-700 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-600">
+                Add my current IP
+              </button>
+            </div>
+            {myIpError && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{myIpError}</p>}
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
+              Comma-separated IP addresses excluded from all analytics events (page views and playback) — useful for keeping your own visits out of the dashboard.
             </p>
           </div>
         </div>
