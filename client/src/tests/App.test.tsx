@@ -484,10 +484,20 @@ describe('mobile tab bar navigation (< md)', () => {
     window.matchMedia = originalMatchMedia
   })
 
-  it('Settings tab reaches Admin login (replacing the old kebab menu)', async () => {
+  it('the Episodes tab (not Settings) reaches Admin login', async () => {
     const user = userEvent.setup()
     render(<App />)
+
+    // 'list' (Episodes) is the default focused pane, so Admin is reachable
+    // immediately without switching tabs.
+    expect(await screen.findByRole('button', { name: 'Admin' })).toBeInTheDocument()
+
+    // Settings no longer has an Admin control — it moved to sit next to the
+    // analytics disclosure in the episode list.
     await user.click(await screen.findByRole('button', { name: 'Settings' }))
+    expect(screen.queryByRole('button', { name: 'Admin' })).not.toBeInTheDocument()
+
+    await user.click(await screen.findByRole('button', { name: 'Episodes' }))
     await user.click(await screen.findByRole('button', { name: 'Admin' }))
     expect(await screen.findByRole('heading', { name: 'Admin Login' })).toBeInTheDocument()
   })

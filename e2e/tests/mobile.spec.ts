@@ -91,8 +91,16 @@ test.describe('Mobile listener UI (< md)', () => {
     await expect(page.getByTestId('player-bar')).toContainText('Deep Dive')
   })
 
-  test('Admin is reachable via the bottom tab bar Settings tab', async ({ seededPage: page }) => {
+  test('Admin is reachable via the episode list, not the Settings tab', async ({ seededPage: page }) => {
+    // 'list' (Episodes) is the default focused pane — Admin sits next to the
+    // analytics disclosure there and is visible without switching tabs.
+    await expect(page.getByRole('button', { name: 'Admin', exact: true })).toBeVisible()
+
+    // Settings no longer has an Admin control.
     await page.getByRole('button', { name: 'Settings' }).click()
+    await expect(page.getByRole('button', { name: 'Admin', exact: true })).not.toBeVisible()
+
+    await page.getByRole('button', { name: 'Episodes', exact: true }).click()
     await page.getByRole('button', { name: 'Admin', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
   })
