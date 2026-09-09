@@ -1,10 +1,10 @@
 ---
 id: quiet-room-design-system-completion
 title: "Quiet Room design-system completion — full token layer, letter-spacing, radius, shadow"
-status: in-progress
+status: complete
 priority: 1
 created: 2026-09-06
-steps_completed: 9
+steps_completed: 10
 steps_total: 10
 tags: [design-system, ux, frontend, visual-fidelity, tokens]
 ---
