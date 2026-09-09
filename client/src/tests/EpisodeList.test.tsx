@@ -151,6 +151,24 @@ it('threads analyticsEnabled through to the PrivacyNotice disclosure', () => {
   expect(screen.getByText('Anonymous listening analytics')).toBeInTheDocument()
 })
 
+it('threads onAdminClick through to the Admin control', async () => {
+  const user = userEvent.setup()
+  const onAdminClick = vi.fn()
+  render(
+    <EpisodeList
+      seasons={seasons}
+      episodes={episodes}
+      activeSeason={1}
+      onAdminClick={onAdminClick}
+      viewingEpisodeId={null}
+      onSeasonSelect={() => {}}
+      onEpisodeView={() => {}}
+    />
+  )
+  await user.click(screen.getByRole('button', { name: 'Admin' }))
+  expect(onAdminClick).toHaveBeenCalledTimes(1)
+})
+
 it('shows an empty state when the season has no episodes', () => {
   render(<Harness episodes={[]} />)
   expect(screen.getByText('No episodes in this season yet.')).toBeInTheDocument()

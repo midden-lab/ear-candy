@@ -181,7 +181,7 @@ it('renders the PrivacyNotice disclosure when analyticsEnabled is true', () => {
   expect(screen.getByText('Anonymous listening analytics')).toBeInTheDocument()
 })
 
-it('omits the PrivacyNotice disclosure when analyticsEnabled is omitted (defaults to false)', () => {
+it('omits the PrivacyNotice disclosure when analyticsEnabled is omitted (defaults to false), but still renders Admin', () => {
   render(
     <EpisodeListView
       seasons={seasons}
@@ -192,6 +192,24 @@ it('omits the PrivacyNotice disclosure when analyticsEnabled is omitted (default
     />
   )
   expect(screen.queryByText('Anonymous listening analytics')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Admin' })).toBeInTheDocument()
+})
+
+it('threads onAdminClick through to the Admin control', async () => {
+  const user = userEvent.setup()
+  const onAdminClick = vi.fn()
+  render(
+    <EpisodeListView
+      seasons={seasons}
+      episodes={episodes}
+      activeSeason={1}
+      onAdminClick={onAdminClick}
+      onSeasonSelect={() => {}}
+      onEpisodeClick={() => {}}
+    />
+  )
+  await user.click(screen.getByRole('button', { name: 'Admin' }))
+  expect(onAdminClick).toHaveBeenCalledTimes(1)
 })
 
 it('shows a loading indicator instead of episodes when loading', () => {

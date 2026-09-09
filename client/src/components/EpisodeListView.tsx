@@ -25,6 +25,11 @@ export interface EpisodeListViewProps {
    *  when false. Defaults to false so callers that don't pass it (existing
    *  tests) see no behavior change. */
   analyticsEnabled?: boolean
+  /** Fired when the Admin control (rendered alongside PrivacyNotice) is
+   *  clicked. Defaults to a no-op so callers that don't pass it (existing
+   *  tests) see no behavior change, matching this file's existing
+   *  convention for additive props. */
+  onAdminClick?: () => void
   loading?: boolean
   /** id of the episode currently shown in the detail pane (drives row
    *  highlight/aria-current) — independent of which episode is actually
@@ -50,7 +55,7 @@ export interface EpisodeListViewProps {
  * has no dependency on how or where playback state lives.
  */
 export default function EpisodeListView({
-  seasons, episodes, allEpisodes = [], searchQuery = '', onSearchChange = () => {}, activeSeason, analyticsEnabled = false, loading, activeEpisodeId, playingEpisodeId, playing, getRemainingSeconds, onSeasonSelect, onEpisodeClick,
+  seasons, episodes, allEpisodes = [], searchQuery = '', onSearchChange = () => {}, activeSeason, analyticsEnabled = false, onAdminClick = () => {}, loading, activeEpisodeId, playingEpisodeId, playing, getRemainingSeconds, onSeasonSelect, onEpisodeClick,
 }: EpisodeListViewProps) {
   const isDesktop = useBreakpoint(MD_BREAKPOINT_QUERY)
   const isSearching = searchQuery.trim() !== ''
@@ -154,7 +159,7 @@ export default function EpisodeListView({
           ))
         )}
       </div>
-      <PrivacyNotice analyticsEnabled={analyticsEnabled} />
+      <PrivacyNotice analyticsEnabled={analyticsEnabled} onAdminClick={onAdminClick} />
     </div>
   )
 }
