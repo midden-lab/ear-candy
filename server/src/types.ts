@@ -8,6 +8,7 @@ export interface Settings {
   accent_color: string
   analytics_enabled: boolean
   track_returning_listeners: boolean
+  excluded_analytics_ips: string | null
 }
 
 export type AnalyticsEventType = 'page_view' | 'play_start' | 'listen_progress' | 'play_complete'

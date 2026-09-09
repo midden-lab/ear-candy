@@ -59,6 +59,12 @@ const MIGRATIONS: Migration[] = [
     alreadyApplied: db => columnExists(db, 'settings', 'session_epoch'),
     up: db => { db.prepare('ALTER TABLE settings ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0').run() },
   },
+  {
+    version: 7,
+    description: 'settings.excluded_analytics_ips',
+    alreadyApplied: db => columnExists(db, 'settings', 'excluded_analytics_ips'),
+    up: db => { db.prepare('ALTER TABLE settings ADD COLUMN excluded_analytics_ips TEXT').run() },
+  },
 ]
 
 /**

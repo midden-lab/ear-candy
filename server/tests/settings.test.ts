@@ -51,4 +51,12 @@ describe('GET /api/settings', () => {
     expect(res.statusCode).toBe(200)
     expect(res.json()).not.toHaveProperty('session_epoch')
   })
+
+  it('never exposes the admin-configured excluded_analytics_ips list to this public, unauthenticated endpoint', async () => {
+    const app = buildTestApp()
+    app.db.prepare('UPDATE settings SET excluded_analytics_ips = ?').run('203.0.113.5, 198.51.100.9')
+    const res = await app.inject({ method: 'GET', url: '/api/settings' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).not.toHaveProperty('excluded_analytics_ips')
+  })
 })
