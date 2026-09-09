@@ -1,10 +1,10 @@
 ---
 id: quiet-room-visual-fidelity
 title: "Quiet Room visual fidelity — typography scale, spacing, DetailPane layout, control chrome"
-status: in-progress
+status: complete
 priority: 1
 created: 2026-09-06
-steps_completed: 6
+steps_completed: 7
 steps_total: 7
 tags: [design-system, ux, frontend, visual-fidelity]
 ---
