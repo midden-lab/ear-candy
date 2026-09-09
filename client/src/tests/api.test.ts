@@ -12,6 +12,7 @@ const mockSettings: Settings = {
   accent_color: '#ff6600',
   analytics_enabled: true,
   track_returning_listeners: true,
+  excluded_analytics_ips: null,
 }
 
 const mockSeason: Season = {
