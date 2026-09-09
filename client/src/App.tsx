@@ -251,7 +251,6 @@ export default function App() {
       showControls={isDesktopShell}
       isDark={isDark}
       onToggleTheme={toggleDark}
-      onAdminClick={() => void handleAdminClick()}
     />
   )
 
@@ -268,6 +267,7 @@ export default function App() {
           onSearchChange={setSearchQuery}
           activeSeason={activeSeason}
           analyticsEnabled={settings.analytics_enabled}
+          onAdminClick={() => void handleAdminClick()}
           loading={episodesLoading}
           viewingEpisodeId={viewingEpisode?.id ?? null}
           onSeasonSelect={handleSeasonSelect}
@@ -296,7 +296,6 @@ export default function App() {
       }
       settings={
         <MobileSettingsView
-          onAdminClick={() => void handleAdminClick()}
           isDark={isDark}
           onToggleTheme={toggleDark}
         />

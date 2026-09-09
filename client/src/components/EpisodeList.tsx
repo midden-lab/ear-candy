@@ -19,6 +19,10 @@ interface EpisodeListProps {
   /** Whether first-party analytics is administratively enabled — threaded
    *  through to PrivacyNotice via EpisodeListView. */
   analyticsEnabled?: boolean
+  /** Fired when the Admin control (rendered alongside PrivacyNotice) is
+   *  clicked. Defaults to a no-op so callers that don't pass it (existing
+   *  tests) see no behavior change. */
+  onAdminClick?: () => void
   loading?: boolean
   /** id of the episode currently shown in the detail pane — independent of
    *  what's actually loaded in the player, since browsing must never
@@ -38,7 +42,7 @@ interface EpisodeListProps {
  * EpisodeListView, which takes no dependency on this app's state management.
  */
 export default function EpisodeList({
-  seasons, episodes, allEpisodes = [], searchQuery = '', onSearchChange = () => {}, activeSeason, analyticsEnabled, loading, viewingEpisodeId, onSeasonSelect, onEpisodeSelect, onEpisodeView,
+  seasons, episodes, allEpisodes = [], searchQuery = '', onSearchChange = () => {}, activeSeason, analyticsEnabled, onAdminClick, loading, viewingEpisodeId, onSeasonSelect, onEpisodeSelect, onEpisodeView,
 }: EpisodeListProps) {
   const playingEpisode = usePlayerStore(state => state.episode)
   const playing = usePlayerStore(state => state.playing)
@@ -84,6 +88,7 @@ export default function EpisodeList({
       onSearchChange={onSearchChange}
       activeSeason={activeSeason}
       analyticsEnabled={analyticsEnabled}
+      onAdminClick={onAdminClick}
       loading={loading}
       activeEpisodeId={viewingEpisodeId}
       playingEpisodeId={playingEpisode?.id ?? null}
