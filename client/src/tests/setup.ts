@@ -1,4 +1,11 @@
-import '@testing-library/jest-dom'
+// The plain '@testing-library/jest-dom' entry point's matcher-type
+// augmentation stopped resolving under Vitest 5's new expect/Assertion
+// internals — jest-dom 7.x added a dedicated './vitest' export
+// (types/vitest.d.ts) specifically for this, with its own explicit
+// `vitest: ">= 0.32"` peer range. Discovered directly: `tsc` failed across
+// every test file using a jest-dom matcher (toBeInTheDocument,
+// toHaveFocus, etc.) until switching to this import.
+import '@testing-library/jest-dom/vitest'
 
 // Node.js v22+ exposes a native localStorage backed by --localstorage-file.
 // When vitest runs without a valid file path the native localStorage object

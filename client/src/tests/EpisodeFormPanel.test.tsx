@@ -63,7 +63,12 @@ beforeEach(() => {
   mockUpdateEpisode.mockResolvedValue({ id: 10 })
 
   fakeAudioInstances = []
-  vi.stubGlobal('Audio', vi.fn(() => {
+  // A vi.fn()-wrapped arrow function is never constructible (arrow
+  // functions never are, in real JS) — Vitest 3's mock wrapper didn't
+  // enforce this, but Vitest 5's does, so `new Audio()` (probeAudioDuration)
+  // now throws "is not a constructor" unless the wrapped implementation is
+  // a regular function expression instead.
+  vi.stubGlobal('Audio', vi.fn(function () {
     const instance = new FakeAudio()
     fakeAudioInstances.push(instance)
     return instance
