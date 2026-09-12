@@ -146,7 +146,9 @@ const referrer = params.get('ref') === 'share' ? 'share-link' : (document.referr
 
 ### Step 5: Stop persisting raw client IPs in request logs
 
-**Status (2026-08-30):** not yet implemented. Steps 6-9 were completed and merged to `dev` out of order, at explicit user direction (`/goal execute the plan and implement 6-9`), deliberately skipping this step for now. `steps_completed` in the frontmatter is intentionally left at 4 (not bumped to 9) since this step is the genuine next sequential gap — resuming here via `plan-executor` is correct. When Step 5 is eventually implemented, the plan is then fully complete (all of 1-9 done) even though the frontmatter will only ever have counted through a contiguous run — set `status: complete` directly at that point rather than expecting the counter to reach 9 through further steps.
+**Status (2026-09-12): implemented**, via `plans/017-open-source-audit-blockers.md` (Steps 1-2) — `disableRequestLogging: true` added to `buildApp()`, with test coverage confirming both halves (no automatic request-log line for a plain request; the deliberate `admin_login`/`admin_logout` lines are unaffected). This plan (1-9) is now genuinely fully complete, not just marked so.
+
+Historical note, kept for context: as of 2026-08-30 this step was not yet implemented. Steps 6-9 were completed and merged to `dev` out of order, at explicit user direction (`/goal execute the plan and implement 6-9`), deliberately skipping this step at the time. The frontmatter's `steps_completed: 9`/`status: complete` predated this step's actual implementation by about two weeks — a discrepancy caught during a later open-source-readiness audit, not by this plan's own tracking.
 
 **Files:** `server/src/app.ts`
 **Requires review:** true — this is a logging-behavior change with a real privacy implication; the two viable approaches (disable automatic request logging vs. redact specific fields) trade off differently and deserve a deliberate choice, not a silent one.

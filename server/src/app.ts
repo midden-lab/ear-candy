@@ -1,4 +1,4 @@
-import Fastify from 'fastify'
+import Fastify, { type FastifyBaseLogger } from 'fastify'
 import cookie from '@fastify/cookie'
 import multipart from '@fastify/multipart'
 import staticPlugin from '@fastify/static'
@@ -33,6 +33,12 @@ declare module 'fastify' {
 interface AppOptions {
   dbPath?: string
   logger?: boolean
+  /** Test-only: pass a pre-built pino instance (e.g. writing to a capturable
+   *  stream) instead of a plain boolean, for tests that need to assert on
+   *  log output. Mutually exclusive with `logger` — Fastify throws if both
+   *  are provided, so this is only ever passed instead of `logger`, never
+   *  alongside it. */
+  loggerInstance?: FastifyBaseLogger
   clientDistPath?: string
 }
 
@@ -65,7 +71,24 @@ export function resolveTrustedProxies(value: string | undefined): string[] {
 }
 
 export function buildApp(opts: AppOptions = {}) {
-  const app = Fastify({ logger: opts.logger ?? true, trustProxy: resolveTrustedProxies(process.env.TRUSTED_PROXY_IPS) })
+  // Fastify's *automatic* per-request pino lines ("incoming request" /
+  // "request completed") include req.remoteAddress for every request,
+  // including public analytics endpoint hits — persisted to disk via
+  // Docker's json-file log driver in production, contradicting geoip.ts's
+  // resolveCountry() doc comment that the client IP is "resolved then
+  // discarded, never persisted." disableRequestLogging only turns off
+  // these automatic lines; it does NOT touch req.log itself, so the
+  // deliberate, intentionally-scoped forensic logging in
+  // routes/admin/auth.ts (admin_login/admin_logout events, which include
+  // ip on purpose) is completely unaffected (PRIV-1).
+  // Fastify throws if both `logger` and `loggerInstance` are provided
+  // together, so this picks exactly one — loggerInstance when a caller
+  // (test-only) supplies one, otherwise the normal boolean-driven default.
+  const app = Fastify({
+    disableRequestLogging: true,
+    trustProxy: resolveTrustedProxies(process.env.TRUSTED_PROXY_IPS),
+    ...(opts.loggerInstance ? { loggerInstance: opts.loggerInstance } : { logger: opts.logger ?? true })
+  })
   const dbPath = opts.dbPath ?? path.resolve('data/db.sqlite')
   const db = initDb(dbPath)
 
