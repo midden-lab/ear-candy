@@ -48,7 +48,7 @@ Closes the real, fully-verified remaining gap between Ear Candy's listener UI an
 **Files:** `client/src/components/Masthead.tsx` (new), `client/src/tests/Masthead.test.tsx` (new), `client/src/components/MobileSettingsView.tsx`, its test file
 **Requires review:** false
 
-Full-width header: wordmark (`podcastName`) + tagline (`Settings.tagline`) on the left. When `showControls` is true (desktop only — mobile shows just the wordmark/tagline, persistently, across all three tabs), render on the right: a hardcoded station string (`"KDUR 91.9 / 93.9 FM"` — a literal string constant, not sourced from `Settings`; see this plan's Decisions section on why), a `Light`/`Dark` text-toggle pair (two buttons, `aria-pressed`, matching `plans/007-mockups/desktop.html`'s `.themeswitch` — not the emoji `ThemeBadge`), and a plain-text `Admin` button (not a real `<a href>`, consistent with this app's client-side view switching). No icons anywhere in this component.
+Full-width header: wordmark (`podcastName`) + tagline (`Settings.tagline`) on the left. When `showControls` is true (desktop only — mobile shows just the wordmark/tagline, persistently, across all three tabs), render on the right: a hardcoded station string (a literal string constant, not sourced from `Settings`; see this plan's Decisions section on why), a `Light`/`Dark` text-toggle pair (two buttons, `aria-pressed`, matching `plans/007-mockups/desktop.html`'s `.themeswitch` — not the emoji `ThemeBadge`), and a plain-text `Admin` button (not a real `<a href>`, consistent with this app's client-side view switching). No icons anywhere in this component.
 
 ```ts
 interface MastheadProps {

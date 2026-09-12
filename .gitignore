@@ -1,6 +1,8 @@
 node_modules/
 dist/
 server/data/*.sqlite
+server/data/*.sqlite-shm
+server/data/*.sqlite-wal
 server/data/*.sqlite.pre-migration-*.bak
 server/data/uploads/*
 !server/data/uploads/.gitkeep
