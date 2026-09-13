@@ -2,6 +2,8 @@
 
 A self-hostable podcast webapp. Each deployment hosts a single podcast. Listeners browse seasons and episodes and play audio in the browser. Admins manage all content through a built-in web interface.
 
+![Ear Candy listener UI in dark mode](docs/images/screenshot-dark.png)
+
 ## Stack
 
 - **Server**: Fastify 5 + SQLite (via `better-sqlite3`) + TypeScript
