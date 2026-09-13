@@ -2,6 +2,7 @@
   "name": "ear-candy-e2e",
   "version": "0.1.0",
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "test": "playwright test",
     "test:ui": "playwright test --ui"

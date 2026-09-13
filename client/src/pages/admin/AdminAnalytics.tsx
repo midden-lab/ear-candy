@@ -99,7 +99,15 @@ export default function AdminAnalytics() {
       </section>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <BreakdownList title="Countries" rows={breakdowns.countries} />
+        <div>
+          <BreakdownList title="Countries" rows={breakdowns.countries} />
+          <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
+            IP geolocation by{' '}
+            <a href="https://db-ip.com" target="_blank" rel="noreferrer" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">
+              DB-IP
+            </a>
+          </p>
+        </div>
         <BreakdownList title="Devices" rows={breakdowns.devices} />
         <BreakdownList title="Browsers" rows={breakdowns.browsers} />
         <BreakdownList title="Operating systems" rows={breakdowns.os} />

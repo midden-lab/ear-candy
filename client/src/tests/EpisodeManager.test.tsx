@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import EpisodeManager from '../pages/admin/EpisodeManager'
+import type { Season } from '../types'
 
 vi.mock('../api', () => ({
   getSeasons: vi.fn().mockResolvedValue([
@@ -20,7 +21,7 @@ vi.mock('../api', () => ({
   login: vi.fn(),
 }))
 
-import { getEpisodes, createEpisode }  from '../api'
+import { getEpisodes, createEpisode, updateSeason }  from '../api'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -88,5 +89,58 @@ describe('episode creation flow', () => {
     await waitFor(() => {
       expect(screen.getByText('1. Test Episode')).toBeInTheDocument()
     })
+  })
+})
+
+describe('season editing flow', () => {
+  it('clicking a season\'s Edit button opens the season form panel', async () => {
+    render(<EpisodeManager />)
+    await waitFor(() => {
+      expect(screen.getByText('S1: S1')).toBeInTheDocument()
+    })
+
+    const editButtons = screen.getAllByText('Edit')
+    await userEvent.click(editButtons[0])
+    expect(screen.getByRole('heading', { name: 'Edit Season' })).toBeInTheDocument()
+  })
+
+  it('submitting the season form saves the season and refreshes the list', async () => {
+    const updatedSeason: Season = { id: 1, number: 1, title: 'Renamed Season', description: '', cover_art_path: null, hidden: false, created_at: '' }
+    vi.mocked(updateSeason).mockResolvedValue(updatedSeason)
+
+    render(<EpisodeManager />)
+    await waitFor(() => {
+      expect(screen.getByText('S1: S1')).toBeInTheDocument()
+    })
+
+    const editButtons = screen.getAllByText('Edit')
+    await userEvent.click(editButtons[0])
+
+    const titleInput = screen.getByLabelText('Title')
+    await userEvent.clear(titleInput)
+    await userEvent.type(titleInput, 'Renamed Season')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(updateSeason).toHaveBeenCalledWith(1, { title: 'Renamed Season', number: 1 })
+    })
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Edit Season' })).not.toBeInTheDocument()
+    })
+  })
+
+  it('clicking Cancel on the season form closes it without saving', async () => {
+    render(<EpisodeManager />)
+    await waitFor(() => {
+      expect(screen.getByText('S1: S1')).toBeInTheDocument()
+    })
+
+    const editButtons = screen.getAllByText('Edit')
+    await userEvent.click(editButtons[0])
+    expect(screen.getByRole('heading', { name: 'Edit Season' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('heading', { name: 'Edit Season' })).not.toBeInTheDocument()
+    expect(updateSeason).not.toHaveBeenCalled()
   })
 })

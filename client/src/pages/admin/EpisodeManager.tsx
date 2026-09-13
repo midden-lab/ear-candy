@@ -9,6 +9,7 @@ import {
 } from '../../api'
 import SeasonBlock from './SeasonBlock'
 import EpisodeFormPanel from './EpisodeFormPanel'
+import SeasonFormPanel from './SeasonFormPanel'
 
 interface FormPanel {
   type: 'new' | 'edit'
@@ -20,6 +21,7 @@ export default function EpisodeManager() {
   const [seasons, setSeasons] = useState<Season[]>([])
   const [episodes, setEpisodes] = useState<Episode[]>([])
   const [formPanel, setFormPanel] = useState<FormPanel | null>(null)
+  const [editingSeason, setEditingSeason] = useState<Season | null>(null)
   const [loading, setLoading] = useState(true)
 
   async function fetchSeasons() {
@@ -50,8 +52,12 @@ export default function EpisodeManager() {
   }
 
   function handleEditSeason(season: Season) {
-    // Season editing not yet implemented in this panel
-    console.log('Edit season', season)
+    setEditingSeason(season)
+  }
+
+  async function handleSeasonSaved(_season: Season) {
+    setEditingSeason(null)
+    await fetchSeasons()
   }
 
   async function handleDeleteSeason(id: number) {
@@ -107,6 +113,13 @@ export default function EpisodeManager() {
           episode={formPanel.episode}
           onSave={handleFormSave}
           onCancel={() => setFormPanel(null)}
+        />
+      )}
+      {editingSeason && (
+        <SeasonFormPanel
+          season={editingSeason}
+          onSave={handleSeasonSaved}
+          onCancel={() => setEditingSeason(null)}
         />
       )}
     </div>

@@ -50,9 +50,9 @@ All commands should be run from the repo root unless noted.
 
 **Per-package commands:**
 
-- **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 166 tests), `npm run lint` (eslint)
-- **Client:** `cd client && npm run dev` (vite), `npm test` (vitest + jsdom, 334 tests + 3 skipped), `npm run lint` (eslint), `npm run typecheck` (tsc --noEmit)
-- **E2E:** `cd e2e && npm test` (playwright, 48 tests, 2 skipped outside CI's production-image run), `npm run test:ui` (playwright --ui) — prefer `make e2e`/`make e2e-ui` (see note above)
+- **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 268 tests), `npm run lint` (eslint)
+- **Client:** `cd client && npm run dev` (vite), `npm test` (vitest + jsdom, 449 tests + 1 skipped), `npm run lint` (eslint), `npm run typecheck` (tsc --noEmit)
+- **E2E:** `cd e2e && npm test` (playwright, 52 tests, 2 skipped outside CI's production-image run), `npm run test:ui` (playwright --ui) — prefer `make e2e`/`make e2e-ui` (see note above)
 
 ---
 
@@ -119,7 +119,7 @@ ear-candy/
 │   │       ├── validation.ts   # isValidMediaPath and friends (accepts /audio/, /images/, http(s) URLs)
 │   │       └── crawler.ts      # isKnownCrawler, renderEpisodeOgHtml — OG tags for shared-link preview bots
 │   ├── scripts/                # One-off maintenance scripts (see Docker & Deployment gotchas)
-│   ├── tests/                  # Vitest tests (node env, globals), 166 tests
+│   ├── tests/                  # Vitest tests (node env, globals), 268 tests
 │   │   └── helpers.ts          # buildTestApp(), buildTestDb()
 │   └── data/                   # SQLite DB + uploads (gitignored)
 │
@@ -145,7 +145,7 @@ ear-candy/
 │   │   │   ├── AdminLogin.tsx
 │   │   │   └── admin/          # AdminLayout (session check on mount), EpisodeManager, EpisodeFormPanel,
 │   │   │                       # SeasonBlock, AdminSettings
-│   │   └── tests/              # Vitest tests (jsdom env, globals), 334 tests + 3 skipped
+│   │   └── tests/              # Vitest tests (jsdom env, globals), 449 tests + 1 skipped
 │   │       └── setup.ts        # localStorage/matchMedia/ResizeObserver/Audio mocks + jest-dom
 │   ├── vite.config.ts          # Vite + proxy /api, /audio, and /images to server
 │   └── tailwind.config.ts      # darkMode: 'class'
@@ -154,7 +154,7 @@ ear-candy/
 │   ├── fixtures.ts             # Custom Playwright fixtures (seededPage, adminPage)
 │   ├── fixtures/               # Test media files (audio, cover art, favicon)
 │   ├── playwright.config.ts    # workers: 1, chromium only
-│   └── tests/                  # E2E specs, 48 tests across admin/listener/mobile/player/screenshot/sharing/theme (2 skip unless running against the production image)
+│   └── tests/                  # E2E specs, 52 tests across admin/listener/mobile/player/screenshot/sharing/theme (2 skip unless running against the production image)
 │
 ├── plans/                     # Active plan-architect/plan-executor plans (NNN-kebab-case-name.md)
 │   └── archive/               # Superseded/historical design specs and plans
@@ -163,7 +163,7 @@ ear-candy/
 │   └── downsample-audio-dir.sh # local tool: downsample a directory of audio files to a target bitrate (gotcha #37a)
 ├── Makefile                  # Primary dev commands
 ├── docker-compose.yml        # Dev stack
-├── docker-compose.prod.yml   # Production stack — builds/runs the root Dockerfile, NOT client/Dockerfile (see gotcha)
+├── docker-compose.prod.yml   # Production stack — builds/runs the root Dockerfile
 └── Dockerfile                # Multi-stage production build (the one actually deployed)
 ```
 
@@ -198,7 +198,7 @@ ear-candy/
 
 ## Testing Approach
 
-### Server Tests (`server/tests/`) — 166 tests
+### Server Tests (`server/tests/`) — 268 tests
 
 - **Runner:** Vitest with `environment: 'node'`, `globals: true`.
 - **Test DB:** `:memory:` SQLite via `buildTestApp()` helper (`tests/helpers.ts`).
@@ -206,7 +206,7 @@ ear-candy/
 - **Auth in tests:** Tests that need admin auth set `process.env.ADMIN_PASSWORD_HASH` to a bcrypt hash, then call login to get a cookie, and pass it in headers.
 - **Cleanup:** `afterEach` often deletes `process.env.ADMIN_PASSWORD_HASH` to avoid cross-test pollution.
 
-### Client Tests (`client/src/tests/`) — 334 tests + 3 skipped
+### Client Tests (`client/src/tests/`) — 449 tests + 1 skipped
 
 - **Runner:** Vitest with `environment: 'jsdom'`, `globals: true`.
 - **Setup file:** `client/src/tests/setup.ts` mocks `localStorage` (Node v22+ native localStorage breaks without a valid file path), `matchMedia`, `ResizeObserver`, `URL.createObjectURL`/`revokeObjectURL`, and patches `HTMLMediaElement.prototype.src` to fire an async `error` event by default (jsdom never fires real media load events on its own — this stops anything awaiting audio duration probing from hanging forever). Also imports `@testing-library/jest-dom`.
@@ -214,7 +214,7 @@ ear-candy/
 - **Important:** `vi.clearAllMocks()` wipes `HTMLMediaElement` mocks, so re-apply them after clearing.
 - **Testing real audio duration detection:** `EpisodeFormPanel.test.tsx` stubs `window.Audio` wholesale via `vi.stubGlobal('Audio', ...)` with a controllable fake (settable `.duration`, manual `.emit('loadedmetadata' | 'durationchange' | 'error')`) — this bypasses the global jsdom patch above and gives full control over the probe's resolved value per test.
 
-### E2E Tests (`e2e/tests/`) — 48 tests (2 skipped outside the production-image CI run)
+### E2E Tests (`e2e/tests/`) — 52 tests (2 skipped outside the production-image CI run)
 
 - **Runner:** Playwright with `workers: 1` (tests share a real database, must run serially — see the cascading-failure gotcha below for why this matters more than it looks).
 - **Base URL:** `http://localhost:5173` (dev client). **Requires `make up` running.** Always run the suite via `make e2e`/`make e2e-ui`, not `cd e2e && npm test` directly — see gotcha #28.
@@ -286,7 +286,7 @@ ear-candy/
 32. **Dev Dockerfiles are minimal.** `server/Dockerfile.dev` and `client/Dockerfile.dev` just `npm install` and copy files. The compose file mounts source volumes for hot reload.
 33. **Production Dockerfile (root-level, monolithic) is multi-stage.** Stage 1 builds client, Stage 2 builds server TS, Stage 3 installs production deps (compiling native addons — bcrypt, better-sqlite3 — here, since Alpine needs `python3 make g++` only for this stage), Stage 4 is the final runner (compiled JS + static client files, no compilers). This is the image actually deployed — both `docker-compose.prod.yml` and CI's `deploy` job build/pull and run *this* `Dockerfile` directly via `SERVE_CLIENT=true` on a single port (3000).
 33a. **The production container runs as the non-root `node` user (uid/gid 1000) built into every official `node:*-alpine` image — not root.** `Dockerfile`'s runner stage `chown -R node:node /app` then `USER node` before `CMD` (issue #36) — a remote-code-execution bug in the app or a dependency no longer grants root inside the container for free. This has a real migration consequence: the bind-mounted host directory (`/opt/ear-candy/data`, previously written by a root-running container and therefore root-owned) must be owned by uid 1000 or the new container fails immediately with `SQLITE_READONLY` on startup (confirmed directly — reproduced this exact crash locally against a deliberately root-owned volume before shipping the fix). The `deploy` job (`.github/workflows/ci-cd.yml`) runs `chown -R 1000:1000 /opt/ear-candy/data` after stopping the old container and before starting the new one, on every deploy — idempotent, so it's a no-op once already correct, not a one-time migration step someone has to remember. `scripts/setup-droplet.sh` also chowns the directory at creation time, so a fresh Droplet's very first deploy doesn't depend on the deploy job's chown being the first thing to touch it. CI's `e2e` job runs this image with **no volume mount at all** (fully ephemeral container filesystem), which is why the image's own `chown -R` in the `Dockerfile` matters independently of the host-side fix — both are needed, for different scenarios. Only the production `Dockerfile` changed; `server/Dockerfile.dev`/`client/Dockerfile.dev` (dev-only, bind-mount the live source tree from the host) still run as root, which is fine there — dev containers aren't exposed and a root-owned local dev bind-mount is the normal/expected pattern.
-34. **`client/Dockerfile` + `client/nginx.conf` are unused/dead.** They describe an alternate nginx-fronted deployment (separate client/server containers, nginx proxying `/api/`+`/audio/`) that nothing in this repo actually builds or runs anymore — not `docker-compose.prod.yml`, not CI. Don't assume nginx is involved in production; it isn't. (Worth a cleanup pass to remove these if confirmed genuinely dead.)
+34. **`client/Dockerfile` + `client/nginx.conf` used to exist but were removed** (confirmed genuinely dead — no reference anywhere in `docker-compose.prod.yml`, CI, or the root `Dockerfile`). They described an alternate nginx-fronted deployment (separate client/server containers, nginx proxying `/api/`+`/audio/`) that nothing in this repo ever actually built or ran. Nginx is not involved in production; the root `Dockerfile` is the only one deployed.
 35. **Production compose mounts `./data` for persistence.** Without this, the SQLite DB and uploads are lost on container restart. Actual production on the Droplet uses a raw `docker run` (not `docker-compose.prod.yml`) with `-v /opt/ear-candy/data:/app/data` — see CI/CD's `deploy` job. Both this file's `logging:` block and the `deploy` job's `docker run` carry matching `json-file` log rotation (`max-size=10m`, `max-file=3`, ~30MB cap) so they stay in sync even though the compose file isn't what's actually deployed (issue #8) — logs don't survive a deploy anyway, since `deploy` does `docker stop && docker rm` before `docker run` on every release, but this bounds disk usage between releases.
 36. **Bcrypt hashes contain `$` characters.** When passing `ADMIN_PASSWORD_HASH` or `COOKIE_SECRET` to `docker run` in shell scripts (e.g., GitHub Actions deploy), always use single quotes (`'...'`) to prevent bash from interpreting `$` as variable expansion. Double quotes will corrupt the hash and login will fail silently.
 37. **One-off maintenance scripts live in `server/scripts/`, run against production via a throwaway container.** E.g. `backfill-durations.mjs` populates `duration_seconds` for upload-type episodes that predate the auto-detect-on-save feature, or whose client-side probe silently failed at save time (confirmed root cause for a real recurrence, plans/013: an 8s timeout in `EpisodeFormPanel.tsx`'s `probeAudioDuration` is too short for large — ~57-58MB — uploaded files). Already run against production three times: 2026-07-13 (episodes #96-#100), and 2026-09-08 with the script's newer `--season-id` filter (Season 1's remaining #101-122) — see the script's own header for full status; it's idempotent and safe to re-run per-season as the gap resurfaces elsewhere (Seasons 2-4 still have ~44 affected episodes, not yet backfilled). URL-type episodes never needed this — they self-heal automatically (re-probed unconditionally on every save); upload-type only re-probes when a new file is explicitly re-selected. `downsample-audio.sh` is a similar one-off: it re-encodes published upload-type episode audio from its as-uploaded 192kbps down to 128kbps stereo mp3 in place on the Droplet (a DAW/export-default bitrate that was never a deliberate choice), backing up originals to `/opt/ear-candy/backups/audio-192k/` first and preserving filenames so it needs zero DB writes — see the script's own header for status/idempotency details. Unlike `backfill-durations.mjs` (pure Node against the DB), this one is bash because it orchestrates two separate containers — the deployed app image (to read the episode list) and a pinned `ffmpeg` image (to transcode) — neither of which has both capabilities alone. Pattern for running one of these against production:
@@ -352,10 +352,10 @@ This is convention, not a technical enforcement: GitHub branch protection rules 
 Jobs run in this order:
 
 1. `lint` — ESLint on server + client (parallel with `test`/`typecheck`)
-2. `test` — Vitest server (166 tests) + client (334 tests + 3 skipped)
+2. `test` — Vitest server (268 tests) + client (449 tests + 1 skipped)
 3. `typecheck` — `tsc --noEmit` on client
 4. `build` — builds the root `Dockerfile` image, pushes to GHCR (needs lint+test+typecheck)
-5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright (48 tests, including 2 production-image-only OG-tag crawler tests that BASE_URL-gate-skip everywhere else) against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit). Capped at `timeout-minutes: 15` (healthy runs take ~4-6 min) so a genuine hang (browser/network stall) fails fast instead of silently running for hours. Invoked directly as `npx playwright test`, not `npm test` — the npm wrapper was found to buffer all output until the child process exits normally, which hid a real ~20-minute cascading test failure behind what looked like total silence.
+5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright (52 tests, including 2 production-image-only OG-tag crawler tests that BASE_URL-gate-skip everywhere else) against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit). Capped at `timeout-minutes: 15` (healthy runs take ~4-6 min) so a genuine hang (browser/network stall) fails fast instead of silently running for hours. Invoked directly as `npx playwright test`, not `npm test` — the npm wrapper was found to buffer all output until the child process exits normally, which hid a real ~20-minute cascading test failure behind what looked like total silence.
 6. `deploy` — only on `main`; SSHes to the production Droplet, pulls the new image **by digest** (not tag — see below), restarts the container, health-checks it (needs build+e2e)
 
 Note: CI's `e2e` job exercises the **production image**, not `docker compose up` — different from local `make e2e`, which requires the dev stack (`make up`).

@@ -226,8 +226,6 @@ ear-candy/
 └── Dockerfile                  # The actual production image (multi-stage; server serves client directly)
 ```
 
-Note: `client/Dockerfile` and `client/nginx.conf` also exist in the repo but are unused — they describe an alternate nginx-fronted deployment that nothing currently builds or runs. Production uses the root `Dockerfile` only.
-
 ---
 
 ## CI/CD
@@ -246,14 +244,17 @@ All work happens on `dev`, promoted to `main` via a reviewed PR — see `CLAUDE.
 ## Testing
 
 ```bash
-# Server (100 tests)
+# Server (268 tests)
 cd server && npm test
 
-# Client (200 tests + 2 skipped)
+# Client (449 tests + 1 skipped)
 cd client && npm test
 
-# E2E (43 tests, requires the dev stack running — see `make e2e`)
-cd e2e && npm test
+# E2E (52 tests, requires the dev stack running)
+make up      # start the dev stack first, if it isn't already running
+make e2e     # NOT `cd e2e && npm test` — this resets the dev DB to a clean
+             # state first (see CLAUDE.md) and running the raw npm command
+             # skips that, which can cascade into unrelated test failures
 ```
 
 Lint:

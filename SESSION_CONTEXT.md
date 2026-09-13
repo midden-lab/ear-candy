@@ -21,4 +21,4 @@ Self-hostable podcast webapp. Stack: Fastify 5 + SQLite (`better-sqlite3`) + Rea
 - `plans/` — active plans; `plans/archive/` — historical design docs.
 - `scripts/setup-droplet.sh` — Droplet provisioning script (already run against the live Droplet; only relevant again if standing up a new one).
 - `docs/runbooks/rotate-secrets.md` — secret rotation procedure.
-- `Dockerfile` — multi-stage production build (the one actually deployed — see CLAUDE.md for why `client/Dockerfile`/`server/Dockerfile` are dead code, not this one).
+- `Dockerfile` — multi-stage production build, the one actually deployed (the formerly-dead `client/Dockerfile` + `client/nginx.conf` describing an unused nginx-fronted deployment have since been removed).
