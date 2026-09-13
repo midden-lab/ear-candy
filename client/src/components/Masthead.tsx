@@ -4,7 +4,7 @@ import ThemeSwitch from './ThemeSwitch'
 // field in Settings today; adding one is an explicit, deferred follow-up
 // decision, not part of this component's scope. Removing this line
 // entirely is also a valid future outcome of that decision.
-const STATION = 'KDUR 91.9 / 93.9 FM'
+const STATION = 'as heard on KDUR 91.9 / 93.9 FM'
 
 interface MastheadProps {
   podcastName: string

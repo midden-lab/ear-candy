@@ -2,7 +2,7 @@ import ThemeSwitch from './ThemeSwitch'
 
 // Hardcoded per plans/007's Decisions section — see Masthead.tsx's matching
 // constant and comment for why this isn't sourced from Settings (yet).
-const STATION = 'KDUR 91.9 / 93.9 FM'
+const STATION = 'as heard on KDUR 91.9 / 93.9 FM'
 
 interface MobileSettingsViewProps {
   isDark: boolean
