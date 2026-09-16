@@ -25,7 +25,7 @@
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/better-sqlite3": "^7.6.8",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.5.1",
     "eslint": "^10.9.1",
     "music-metadata": "^11.13.0",
     "pino": "^9.14.0",
