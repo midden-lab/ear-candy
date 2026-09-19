@@ -50,7 +50,7 @@ All commands should be run from the repo root unless noted.
 
 **Per-package commands:**
 
-- **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 268 tests), `npm run lint` (eslint)
+- **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 270 tests), `npm run lint` (eslint)
 - **Client:** `cd client && npm run dev` (vite), `npm test` (vitest + jsdom, 449 tests + 1 skipped), `npm run lint` (eslint), `npm run typecheck` (tsc --noEmit)
 - **E2E:** `cd e2e && npm test` (playwright, 52 tests, 2 skipped outside CI's production-image run), `npm run test:ui` (playwright --ui) — prefer `make e2e`/`make e2e-ui` (see note above)
 
@@ -119,7 +119,7 @@ ear-candy/
 │   │       ├── validation.ts   # isValidMediaPath and friends (accepts /audio/, /images/, http(s) URLs)
 │   │       └── crawler.ts      # isKnownCrawler, renderEpisodeOgHtml — OG tags for shared-link preview bots
 │   ├── scripts/                # One-off maintenance scripts (see Docker & Deployment gotchas)
-│   ├── tests/                  # Vitest tests (node env, globals), 268 tests
+│   ├── tests/                  # Vitest tests (node env, globals), 270 tests
 │   │   └── helpers.ts          # buildTestApp(), buildTestDb()
 │   └── data/                   # SQLite DB + uploads (gitignored)
 │
@@ -198,7 +198,7 @@ ear-candy/
 
 ## Testing Approach
 
-### Server Tests (`server/tests/`) — 268 tests
+### Server Tests (`server/tests/`) — 270 tests
 
 - **Runner:** Vitest with `environment: 'node'`, `globals: true`.
 - **Test DB:** `:memory:` SQLite via `buildTestApp()` helper (`tests/helpers.ts`).
@@ -334,6 +334,7 @@ ear-candy/
 44. **Server-rendered Open Graph tags for shared links only exist in production's single-container mode.** `server/src/app.ts`'s crawler-detection `onRequest` hook (backing `server/src/utils/crawler.ts`) is registered only inside the `if (clientDist && fs.existsSync(clientDist))` block — inert in dev's split client/server topology, active only when `SERVE_CLIENT=true`. It's scoped to exactly `/` (checked via `req.url.split('?')[0] !== '/'`) so a crawler-UA-flavored request to any other route (e.g. an API endpoint) can't be accidentally short-circuited into an OG-HTML response. `og:image` is resolved to an absolute URL (`${req.protocol}://${req.hostname}${path}`) before being emitted — cover art paths are stored/returned as site-relative paths, and the Open Graph spec requires an absolute `og:image` or link-preview unfurlers silently show no image at all (a real bug caught in a pre-production review, not a hypothetical).
 45. **`og:url`'s origin trusts the request's `Host` header by default — an optional `PUBLIC_ORIGIN` env var pins it instead (issue #53).** `req.hostname` is attacker-controllable input (the `Host`/`X-Forwarded-Host` header), reflected — HTML-escaped, so not script-injectable — into the crawler-served OG response. This was a real (low-severity, escaped, metadata-only) open-redirect-flavored issue when the response also included a `<meta http-equiv="refresh">` pointing at that same attacker-controlled origin; the refresh tag has since been removed entirely (it was genuinely non-essential — bots read `<meta>` tags, they don't follow refreshes — so removing it was strictly safer, not a feature cut). `server/src/utils/crawler.ts`'s `resolveConfiguredOrigin` validates `process.env.PUBLIC_ORIGIN` (must be a bare `scheme://host[:port]`, no path, no trailing slash) and, if set and well-formed, `app.ts`'s crawler hook uses it instead of `${req.protocol}://${req.hostname}` — malformed or unset values fall straight back to the request-derived origin rather than crashing on a typo'd env var.
 46. **`e2e/tests/sharing.spec.ts`'s OG-tag crawler tests are gated on `!process.env.BASE_URL`, not `!process.env.CI`.** Per gotcha #44, crawler OG rendering only exists in the production single-container build — CI's `e2e` job always explicitly sets `BASE_URL=http://localhost:3000` (the running production image) while local `make e2e` never sets it (defaults to the dev client's `:5173`), so that's a direct, reliable signal for "is the crawler hook even reachable here" rather than a proxy for it (issue #51). The two share-flow tests (deep-link round-trip through the real UI) run everywhere and don't need this gate.
+47. **`client/public/robots.txt` and `client/public/llms.txt` are static, not templated per-deployment.** They're generic — describing "a self-hosted podcast site" rather than any specific deployment's actual podcast name/settings — since this is open-source software other people deploy for their own shows; a hardcoded real podcast name baked into a static file would be wrong for every fork. Both are plain Vite `public/` passthrough files (same mechanism as `client/public/fonts/`), served at their root paths by `@fastify/static` in production and by Vite's dev server directly — locked in by `server/tests/static.test.ts`. **`robots.txt` explicitly `Disallow`s every AI-crawler user-agent identifiable at the time it was written** (GPTBot, ClaudeBot, CCBot, Google-Extended, etc. — see the file's own comment for the full list and rationale) — a deliberate policy choice made when the repo went public, not a default anyone has to accept; revisit the list periodically since new AI crawler UAs appear faster than any hand-maintained list can track (a resource like `darkvisitors.com` tracks this more dynamically). **Deliberately excluded from that block list: bare `Applebot` and `facebookexternalhit`** — those are the link-preview/unfurl crawlers gotcha #44's OG-tag rendering exists specifically to serve well; only blocked the AI-training-specific tokens (`Applebot-Extended`, `Meta-ExternalAgent`). **Caveat hit directly while adding these files: the dev Docker container never sees edits to `client/public/`** — per gotcha #4, the `client` dev service only bind-mounts `./client/src`, not `./public`, so a running dev container serves whatever was baked in at image build time; verify new/changed `public/` files via `cd client && npm run build && cat dist/<file>` (or `server/tests/static.test.ts`), not by curling the live dev server.
 
 ---
 
@@ -352,7 +353,7 @@ This is convention, not a technical enforcement: GitHub branch protection rules 
 Jobs run in this order:
 
 1. `lint` — ESLint on server + client (parallel with `test`/`typecheck`)
-2. `test` — Vitest server (268 tests) + client (449 tests + 1 skipped)
+2. `test` — Vitest server (270 tests) + client (449 tests + 1 skipped)
 3. `typecheck` — `tsc --noEmit` on client
 4. `build` — builds the root `Dockerfile` image, pushes to GHCR (needs lint+test+typecheck)
 5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright (52 tests, including 2 production-image-only OG-tag crawler tests that BASE_URL-gate-skip everywhere else) against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit). Capped at `timeout-minutes: 15` (healthy runs take ~4-6 min) so a genuine hang (browser/network stall) fails fast instead of silently running for hours. Invoked directly as `npx playwright test`, not `npm test` — the npm wrapper was found to buffer all output until the child process exits normally, which hid a real ~20-minute cascading test failure behind what looked like total silence.

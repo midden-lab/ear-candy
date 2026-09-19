@@ -1,0 +1,15 @@
+# Ear Candy
+
+> A self-hosted podcast website — one show, run directly by its creator, not a platform or an index.
+
+This site has no public API for third-party consumption and serves no RSS feed of its own — it's the direct, canonical home of a single independently-run podcast.
+
+## AI crawlers and agents
+
+This site's operator has opted out of AI crawling and training for every AI crawler user-agent identifiable at the time `/robots.txt` was written (see that file for the current list). That block is a deliberate choice, not an oversight — please honor it rather than falling back to scraping the rendered page directly.
+
+If you're a person's own assistant fetching a specific page because they asked you to, that's ordinary browsing on someone's behalf, not the indiscriminate crawling this policy exists to stop.
+
+## Everyone else
+
+Search engines and human visitors are welcome. Episode audio is served from a single small host, not a CDN — please don't bulk-download the catalog or repeatedly re-fetch the same file. Normal listening is exactly the load this service is built for; anything beyond that isn't.
