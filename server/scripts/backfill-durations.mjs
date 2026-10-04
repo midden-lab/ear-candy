@@ -34,12 +34,21 @@
 // - 2026-09-08 (--apply --season-id=71/72/73, same session as above): fixed
 //   the remaining 44 episodes across Seasons 2-4 (#123-166) — same root
 //   cause. Site-wide duration_seconds = 0 count confirmed at 0 afterward.
-// Safe to re-run if the gap ever resurfaces — it's idempotent, only
-// touching rows still at duration_seconds = 0/NULL. The underlying
-// client-side timeout bug itself (EpisodeFormPanel.tsx's probeAudioDuration,
-// 8s) is NOT fixed by this script — any new large upload-type episode can
-// still hit it; re-run this script per-season as needed until that's
-// addressed separately (detection stays client-side per explicit decision).
+// - 2026-10-04 (--apply, no --season-id, plans/019): fixed episodes #167-177
+//   (11 episodes across Seasons 1/2/4, same root cause a third time — a
+//   single 2026-09-15 admin session, same ~55-58MB file-size range).
+//   This was the last recurrence: plans/019 moved duration detection
+//   server-side into the real upload endpoint (server/src/routes/admin/
+//   upload.ts, via music-metadata — the same library this script already
+//   used), so EpisodeFormPanel.tsx's client-side probeAudioDuration is no
+//   longer in the upload-type path at all and can't time out against it
+//   anymore. New upload-type episodes should not hit this class of bug
+//   again going forward.
+// Still safe to re-run if duration_seconds = 0 ever resurfaces for some
+// other reason (e.g. a manually-inserted row, a future audio
+// encoding/format music-metadata can't parse) — it's idempotent, only
+// touching rows still at duration_seconds = 0/NULL. It should no longer be
+// expected to need *routine* re-running the way it did before plans/019.
 //
 // Operational note: running `npm install <pkg> --no-save` directly in
 // /app (as the one-off-script procedure below describes) can silently

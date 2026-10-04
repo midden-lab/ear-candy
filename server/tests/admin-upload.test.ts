@@ -1,10 +1,20 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import bcrypt from 'bcrypt'
+import { parseFile } from 'music-metadata'
 import { buildTestApp } from './helpers.js'
 
 // Mock node:stream/promises and node:fs at the module level for ESM compatibility
 vi.mock('node:stream/promises', () => ({
   pipeline: vi.fn().mockResolvedValue(undefined)
+}))
+
+// Since node:fs's createWriteStream is also mocked below (no real file is
+// ever written), music-metadata's parseFile would otherwise always fail
+// with a real ENOENT rather than exercising the specific success/failure
+// behaviors under test — mock it directly so each test controls what
+// duration detection returns.
+vi.mock('music-metadata', () => ({
+  parseFile: vi.fn()
 }))
 
 vi.mock('node:fs', () => {
@@ -191,5 +201,51 @@ describe('POST /api/admin/upload', () => {
 
     expect(res.statusCode).toBe(400)
     expect(res.json()).toEqual({ error: 'Only audio file uploads are allowed' })
+  })
+
+  it('returns duration_seconds from the server-side duration probe on a successful upload', async () => {
+    vi.mocked(parseFile).mockResolvedValue({ format: { duration: 754.6 } } as Awaited<ReturnType<typeof parseFile>>)
+
+    const app = await makeApp()
+    const cookie = await getAuthCookie(app)
+
+    const boundary = '----testboundary'
+    const body = multipartBuffer(boundary, 'test.mp3', 'audio/mpeg', REAL_MP3_BYTES)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/upload',
+      headers: {
+        cookie,
+        'content-type': `multipart/form-data; boundary=${boundary}`
+      },
+      payload: body
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().duration_seconds).toBe(755)
+  })
+
+  it('still succeeds with duration_seconds: 0 when the server-side duration probe fails (issue #152)', async () => {
+    vi.mocked(parseFile).mockRejectedValue(new Error('unsupported encoding'))
+
+    const app = await makeApp()
+    const cookie = await getAuthCookie(app)
+
+    const boundary = '----testboundary'
+    const body = multipartBuffer(boundary, 'test.mp3', 'audio/mpeg', REAL_MP3_BYTES)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/upload',
+      headers: {
+        cookie,
+        'content-type': `multipart/form-data; boundary=${boundary}`
+      },
+      payload: body
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().duration_seconds).toBe(0)
   })
 })

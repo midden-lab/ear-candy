@@ -92,24 +92,24 @@ export default function EpisodeFormPanel({ seasonId, episode, onSave, onCancel }
     if (!file) return
     setUploading(true)
     setUploadError('')
-
-    // Probe the local file directly (object URL, no network round-trip or
-    // CORS concerns) in parallel with the actual upload.
-    const objectUrl = URL.createObjectURL(file)
     setDetectingDuration(true)
-    void probeAudioDuration(objectUrl).then(seconds => {
-      setDurationSeconds(seconds)
-      setDetectingDuration(false)
-      URL.revokeObjectURL(objectUrl)
-    })
 
+    // Duration now comes from the server's response (computed server-side
+    // once the file is fully uploaded — see server/src/routes/admin/
+    // upload.ts), not a local-blob probe. A local probe used to run here
+    // concurrently with the upload, racing a fixed timeout against this
+    // podcast's typically large (tens of MB) files — and losing, repeatedly,
+    // in production (see CLAUDE.md gotcha #37/#152 and plans/019). Duration
+    // now simply arrives atomically with the rest of the upload result.
     try {
       const result = await uploadAudio(file)
       setAudioPath(result.path)
+      setDurationSeconds(result.duration_seconds)
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
       setUploading(false)
+      setDetectingDuration(false)
     }
   }
 

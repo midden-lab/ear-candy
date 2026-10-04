@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import fs from 'node:fs'
 import { pipeline } from 'node:stream/promises'
+import { parseFile } from 'music-metadata'
 import { requireAdmin } from '../../auth.js'
 import { peekHeader, matchesAudioSignature } from '../../utils/magicBytes.js'
 
@@ -44,6 +45,27 @@ export const adminUploadRoute: FastifyPluginAsync = async (app) => {
 
     await pipeline(stream, fs.createWriteStream(dest))
 
-    return { path: `/audio/${filename}` }
+    // Determine duration server-side now that the file is fully on disk,
+    // rather than trusting a client-side probe — see
+    // client/src/pages/admin/EpisodeFormPanel.tsx's probeAudioDuration doc
+    // comment and CLAUDE.md gotcha #37/#152 for why: the client-side probe
+    // raced a fixed timeout against this podcast's typical ~55-58MB
+    // uploads and lost repeatedly in production. A failed parse here
+    // doesn't invalidate the upload — the file already passed magic-byte
+    // validation above as real audio; an unparseable duration is a missing
+    // signal, not an invalid upload (mirrors probeAudioDuration's own
+    // "never block saving" philosophy).
+    let durationSeconds = 0
+    try {
+      const metadata = await parseFile(dest)
+      const duration = metadata.format.duration
+      if (Number.isFinite(duration) && duration! > 0) {
+        durationSeconds = Math.round(duration!)
+      }
+    } catch {
+      // Leave durationSeconds at 0 — see comment above.
+    }
+
+    return { path: `/audio/${filename}`, duration_seconds: durationSeconds }
   })
 }

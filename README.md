@@ -246,7 +246,7 @@ All work happens on `dev`, promoted to `main` via a reviewed PR — see `CLAUDE.
 ## Testing
 
 ```bash
-# Server (270 tests)
+# Server (272 tests)
 cd server && npm test
 
 # Client (449 tests + 1 skipped)

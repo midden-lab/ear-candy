@@ -77,7 +77,7 @@ export async function logout(): Promise<void> {
   })
 }
 
-export async function uploadAudio(file: File): Promise<{ path: string }> {
+export async function uploadAudio(file: File): Promise<{ path: string; duration_seconds: number }> {
   const formData = new FormData()
   formData.append('file', file)
   const res = await fetch('/api/admin/upload', {
@@ -86,7 +86,7 @@ export async function uploadAudio(file: File): Promise<{ path: string }> {
     credentials: 'include',
   })
   if (!res.ok) throw new Error(`Upload failed: HTTP ${res.status}`)
-  return res.json() as Promise<{ path: string }>
+  return res.json() as Promise<{ path: string; duration_seconds: number }>
 }
 
 export async function uploadEpisodeArt(file: File): Promise<{ thumb: string; detail: string }> {

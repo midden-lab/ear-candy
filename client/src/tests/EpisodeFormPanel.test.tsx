@@ -119,7 +119,7 @@ describe('audio type upload', () => {
   })
 
   it('uploads file and populates audio_path on success', async () => {
-    mockUploadAudio.mockResolvedValue({ path: '/audio/test-123.mp3' })
+    mockUploadAudio.mockResolvedValue({ path: '/audio/test-123.mp3', duration_seconds: 0 })
     render(<EpisodeFormPanel seasonId={1} onSave={vi.fn()} onCancel={vi.fn()} />)
 
     await userEvent.selectOptions(screen.getByLabelText(/audio type/i), 'upload')
@@ -149,8 +149,11 @@ describe('audio type upload', () => {
 })
 
 describe('duration auto-detection', () => {
-  it('detects duration from an uploaded file and includes it in the create payload', async () => {
-    mockUploadAudio.mockResolvedValue({ path: '/audio/test-123.mp3' })
+  it('uses the server-returned duration from an uploaded file and includes it in the create payload', async () => {
+    // Duration for upload-type episodes now comes directly from the
+    // upload response (computed server-side) rather than a local Audio
+    // probe — no FakeAudio/fakeAudioInstances interaction for this case.
+    mockUploadAudio.mockResolvedValue({ path: '/audio/test-123.mp3', duration_seconds: 754 })
     render(<EpisodeFormPanel seasonId={1} onSave={vi.fn()} onCancel={vi.fn()} />)
 
     await userEvent.type(screen.getByLabelText(/title/i), 'New Ep')
@@ -162,9 +165,7 @@ describe('duration auto-detection', () => {
     const file = new File(['fake audio'], 'test.mp3', { type: 'audio/mpeg' })
     await userEvent.upload(fileInput, file)
 
-    await waitFor(() => expect(fakeAudioInstances).toHaveLength(1))
-    fakeAudioInstances[0].duration = 754
-    fakeAudioInstances[0].emit('loadedmetadata')
+    expect(fakeAudioInstances).toHaveLength(0)
 
     await waitFor(() => {
       expect(screen.getByText('Duration: 12:34')).toBeInTheDocument()

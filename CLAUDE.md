@@ -50,7 +50,7 @@ All commands should be run from the repo root unless noted.
 
 **Per-package commands:**
 
-- **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 270 tests), `npm run lint` (eslint)
+- **Server:** `cd server && npm run dev` (tsx watch), `npm test` (vitest, 272 tests), `npm run lint` (eslint)
 - **Client:** `cd client && npm run dev` (vite), `npm test` (vitest + jsdom, 449 tests + 1 skipped), `npm run lint` (eslint), `npm run typecheck` (tsc --noEmit)
 - **E2E:** `cd e2e && npm test` (playwright, 52 tests, 2 skipped outside CI's production-image run), `npm run test:ui` (playwright --ui) — prefer `make e2e`/`make e2e-ui` (see note above)
 
@@ -119,7 +119,7 @@ ear-candy/
 │   │       ├── validation.ts   # isValidMediaPath and friends (accepts /audio/, /images/, http(s) URLs)
 │   │       └── crawler.ts      # isKnownCrawler, renderEpisodeOgHtml — OG tags for shared-link preview bots
 │   ├── scripts/                # One-off maintenance scripts (see Docker & Deployment gotchas)
-│   ├── tests/                  # Vitest tests (node env, globals), 270 tests
+│   ├── tests/                  # Vitest tests (node env, globals), 272 tests
 │   │   └── helpers.ts          # buildTestApp(), buildTestDb()
 │   └── data/                   # SQLite DB + uploads (gitignored)
 │
@@ -198,7 +198,7 @@ ear-candy/
 
 ## Testing Approach
 
-### Server Tests (`server/tests/`) — 270 tests
+### Server Tests (`server/tests/`) — 272 tests
 
 - **Runner:** Vitest with `environment: 'node'`, `globals: true`.
 - **Test DB:** `:memory:` SQLite via `buildTestApp()` helper (`tests/helpers.ts`).
@@ -267,7 +267,7 @@ ear-candy/
 19. **No React Router.** Navigation is entirely state-driven in `App.tsx` (`view: 'player' | 'admin-login' | 'admin'`). Admin panel has its own tab state (`adminTab: 'episodes' | 'settings'`).
 20. **Accent color + contrast are CSS variables.** `useTheme` sets `--accent` on `:root` and computes `--accent-contrast` (`getContrastTextColor`, WCAG relative luminance) alongside it. Components reference them via `bg-[var(--accent)]` / `text-[var(--accent-contrast)]` — never hardcode `text-white` next to an accent background, since the accent color is admin-configurable and could be pale.
 21. **Dark is the default theme, not light.** `useTheme`'s initial state is `localStorage.getItem('theme') !== 'light'` — i.e. anything other than an explicit `'light'` choice defaults to dark. This is intentional: before light mode was actually implemented, the toggle existed but did nothing (no `dark:` styling anywhere), so defaulting new/existing users to dark preserves the app's long-standing look rather than silently changing it once light mode started actually rendering.
-22. **Episode duration auto-detection happens at different times depending on audio type.** Uploaded files: probed immediately via a local object URL (`URL.createObjectURL`, no network/CORS concerns) in parallel with the upload. URL-based audio: probed at *submit* time, not on blur — an earlier on-blur version caused a real, reproducible Save-button click failure (the network fetch + resulting re-render could land mid-click). A failed probe never blocks saving and never overwrites a previously-known-good duration on edit. See `EpisodeFormPanel.tsx`'s `probeAudioDuration`.
+22. **Episode duration detection works differently per audio type — server-side for uploads, client-side for URLs — after a production incident forced the split (plans/019).** Uploaded files: duration is computed **server-side**, synchronously, in `server/src/routes/admin/upload.ts` via `music-metadata`'s `parseFile()` on the fully-written file, and returned in the upload response (`{ path, duration_seconds }`) — `EpisodeFormPanel.tsx` no longer runs any client-side probe for uploads at all. This replaced an earlier client-side-only design (`probeAudioDuration` on a local `URL.createObjectURL` blob, racing an 8s timeout *in parallel with* the real upload) that silently produced `duration_seconds = 0` for this podcast's typical ~55-58MB episode files — confirmed as the root cause of three separate production incidents (see `server/scripts/backfill-durations.mjs`'s STATUS log) before being fixed this way. URL-based audio: still probed **client-side**, at *submit* time, not on blur — an earlier on-blur version caused a real, reproducible Save-button click failure (the network fetch + resulting re-render could land mid-click) — via the same `probeAudioDuration` function, which still exists in `EpisodeFormPanel.tsx` solely for this path now. Moving URL-type detection server-side too was deliberately rejected (plans/019): the server fetching an admin-supplied arbitrary URL would open a new SSRF-shaped concern that doesn't exist today, and no incident has ever implicated URL-type episodes. Both paths share the same never-block-saving philosophy: a failed probe/parse never blocks saving and never overwrites a previously-known-good duration on edit.
 23. **Chrome can report `duration: Infinity` on `loadedmetadata`** for audio files without a proper duration header (some MP3s), only resolving the real value afterward via a `durationchange` event. `probeAudioDuration` listens for both.
 24. **Audio player uses a hidden `<audio>` element.** `AudioPlayerView.tsx` creates an `<audio>` ref and controls it via `audioRef.current.play()` / `.pause()`. Time updates come from `onTimeUpdate` events.
 25. **Zustand store is module-level.** Import `usePlayerStore` and call `.setState()` or `.getState()` directly in tests. Wrap in `act()` when rendering is involved.
@@ -353,7 +353,7 @@ This is convention, not a technical enforcement: GitHub branch protection rules 
 Jobs run in this order:
 
 1. `lint` — ESLint on server + client (parallel with `test`/`typecheck`)
-2. `test` — Vitest server (270 tests) + client (449 tests + 1 skipped)
+2. `test` — Vitest server (272 tests) + client (449 tests + 1 skipped)
 3. `typecheck` — `tsc --noEmit` on client
 4. `build` — builds the root `Dockerfile` image, pushes to GHCR (needs lint+test+typecheck)
 5. `e2e` — runs the pushed image as a container, waits on `/api/settings`, runs Playwright (52 tests, including 2 production-image-only OG-tag crawler tests that BASE_URL-gate-skip everywhere else) against it over HTTP (not the dev stack), uploads report/screenshots as artifacts on failure (needs build). **Only runs on `main` pushes or PRs targeting `main`** — plain pushes to `dev` skip it, since it's the slow/costly stage and `dev`'s safety net is meant to be fast (lint/test/build on every commit). Capped at `timeout-minutes: 15` (healthy runs take ~4-6 min) so a genuine hang (browser/network stall) fails fast instead of silently running for hours. Invoked directly as `npx playwright test`, not `npm test` — the npm wrapper was found to buffer all output until the child process exits normally, which hid a real ~20-minute cascading test failure behind what looked like total silence.
