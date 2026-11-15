@@ -352,9 +352,99 @@ jobs:
 
             docker pull "$IMAGE"
 
+            # Capture the image the running container was created from, BEFORE
+            # replacing it, so a failed deploy can roll back to it. Empty on
+            # a first-ever deploy (nothing to roll back to).
+            PREV_IMAGE=$(docker inspect --format '{{.Config.Image}}' ear-candy 2>/dev/null || true)
+            echo "Previous image: ${PREV_IMAGE:-<none>}"
+
+            # Same flags for the new container and a rollback container, so
+            # a rollback is genuinely "the way it was", not a near-miss.
+            run_app() {
+              # TRUSTED_PROXY_IPS: 172.17.0.1 is this Droplet's default Docker
+              # bridge gateway — Caddy runs on the host and reverse-proxies to
+              # this container's published port, and that host-to-container
+              # hop gets NATed through the bridge, so from inside the
+              # container Caddy's connection appears to originate from the
+              # gateway address, not loopback (confirmed via `docker network
+              # inspect bridge` and live request logs — issue #33). This is a
+              # property of this specific deployment's Docker networking, so
+              # it's declared here next to the rest of the deploy config it
+              # depends on, not hardcoded into application source.
+              #
+              # GEOIP_DB_PATH is always set to this same path, unconditionally
+              # — the app degrades gracefully (country breakdown just stays
+              # empty) if no file exists there yet, so there's no need to
+              # branch on whether it's actually present. The file itself
+              # lives under the bind-mounted /opt/ear-candy/data (persists
+              # across deploys/container recreation) and is NOT something
+              # this workflow downloads — run scripts/fetch-geoip-db.sh
+              # against the Droplet to populate/refresh it (see README).
+              # A real deploy once ran with this env var missing entirely —
+              # the file existed on disk but the running container was never
+              # told where to look, so country tracking silently stayed off
+              # until this was added (issue #106).
+              # Loopback-only publish: Caddy runs on this host (not
+              # containerized) and reverse-proxies via `reverse_proxy
+              # localhost:3000` in its Caddyfile — that's loopback traffic,
+              # unaffected by this. Publishing to 0.0.0.0 (the old behavior)
+              # made the app directly reachable over plain HTTP on a
+              # non-standard port from anywhere on the internet, completely
+              # bypassing Caddy's TLS termination (confirmed live: a plain
+              # `curl http://<droplet-ip>:3000/api/health` returned 200).
+              # Fixes issue #81.
+              docker run -d \
+                --name ear-candy \
+                --restart unless-stopped \
+                --log-driver json-file \
+                --log-opt max-size=10m \
+                --log-opt max-file=3 \
+                -p 127.0.0.1:3000:3000 \
+                -v /opt/ear-candy/data:/app/data \
+                -e NODE_ENV=production \
+                -e SERVE_CLIENT=true \
+                -e PORT=3000 \
+                -e COOKIE_SECRET="$DEPLOY_COOKIE_SECRET" \
+                -e ADMIN_PASSWORD_HASH="$DEPLOY_ADMIN_PASSWORD_HASH" \
+                -e TRUSTED_PROXY_IPS="127.0.0.1,::1,172.17.0.1" \
+                -e GEOIP_DB_PATH="/app/data/geoip/dbip-country-lite.mmdb" \
+                "$1"
+            }
+
             echo "Stopping old container..."
             docker stop ear-candy || true
             docker rm ear-candy || true
+
+            # Pre-deploy DB copy. Taken after the old container is stopped so
+            # the SQLite files are cleanly closed and a plain copy is
+            # consistent. Copies exactly the three named files (never a
+            # db.sqlite* glob — that would also sweep up every accumulated
+            # .pre-migration-*.bak). The .predeploy suffix keeps these out of
+            # backup.sh's `find ... -name '*.sqlite' -mtime +14 -delete`,
+            # which recurses into this directory. No sqlite3 dependency.
+            BACKUP_ROOT=/opt/ear-candy/backups
+            PREDEPLOY_DIR="$BACKUP_ROOT/pre-deploy_$(date -u +%Y%m%dT%H%M%SZ)"
+            backup_db() {
+              mkdir -p "$PREDEPLOY_DIR" || return 1
+              for f in db.sqlite db.sqlite-wal db.sqlite-shm; do
+                if [ -f "/opt/ear-candy/data/$f" ]; then
+                  cp -a "/opt/ear-candy/data/$f" "$PREDEPLOY_DIR/$f.predeploy" || return 1
+                fi
+              done
+            }
+            echo "Backing up database to $PREDEPLOY_DIR ..."
+            if ! backup_db; then
+              echo "Pre-deploy backup FAILED — aborting deploy, restoring previous container" >&2
+              rm -rf "$PREDEPLOY_DIR"
+              if [ -n "$PREV_IMAGE" ]; then
+                run_app "$PREV_IMAGE" || true
+                echo "Restarted previous image $PREV_IMAGE" >&2
+              fi
+              exit 1
+            fi
+            # Keep only the newest 5 pre-deploy_* directories (only ever
+            # prunes backups this step created).
+            ls -dt "$BACKUP_ROOT"/pre-deploy_* 2>/dev/null | tail -n +6 | xargs -r rm -rf
 
             # The container now runs as the image's built-in non-root `node`
             # user (uid/gid 1000), not root (issue #36) — the bind-mounted
@@ -367,68 +457,43 @@ jobs:
             echo "Ensuring data directory ownership matches the container's non-root user..."
             chown -R 1000:1000 /opt/ear-candy/data
 
+            wait_healthy() {
+              for i in {1..30}; do
+                if curl -sf http://localhost:3000/api/health > /dev/null; then
+                  return 0
+                fi
+                sleep 2
+              done
+              return 1
+            }
+
             echo "Starting new container..."
-            # TRUSTED_PROXY_IPS: 172.17.0.1 is this Droplet's default Docker
-            # bridge gateway — Caddy runs on the host and reverse-proxies to
-            # this container's published port, and that host-to-container
-            # hop gets NATed through the bridge, so from inside the
-            # container Caddy's connection appears to originate from the
-            # gateway address, not loopback (confirmed via `docker network
-            # inspect bridge` and live request logs — issue #33). This is a
-            # property of this specific deployment's Docker networking, so
-            # it's declared here next to the rest of the deploy config it
-            # depends on, not hardcoded into application source.
-            #
-            # GEOIP_DB_PATH is always set to this same path, unconditionally
-            # — the app degrades gracefully (country breakdown just stays
-            # empty) if no file exists there yet, so there's no need to
-            # branch on whether it's actually present. The file itself
-            # lives under the bind-mounted /opt/ear-candy/data (persists
-            # across deploys/container recreation) and is NOT something
-            # this workflow downloads — run scripts/fetch-geoip-db.sh
-            # against the Droplet to populate/refresh it (see README).
-            # A real deploy once ran with this env var missing entirely —
-            # the file existed on disk but the running container was never
-            # told where to look, so country tracking silently stayed off
-            # until this was added (issue #106).
-            # Loopback-only publish: Caddy runs on this host (not
-            # containerized) and reverse-proxies via `reverse_proxy
-            # localhost:3000` in its Caddyfile — that's loopback traffic,
-            # unaffected by this. Publishing to 0.0.0.0 (the old behavior)
-            # made the app directly reachable over plain HTTP on a
-            # non-standard port from anywhere on the internet, completely
-            # bypassing Caddy's TLS termination (confirmed live: a plain
-            # `curl http://<droplet-ip>:3000/api/health` returned 200).
-            # Fixes issue #81.
-            docker run -d \
-              --name ear-candy \
-              --restart unless-stopped \
-              --log-driver json-file \
-              --log-opt max-size=10m \
-              --log-opt max-file=3 \
-              -p 127.0.0.1:3000:3000 \
-              -v /opt/ear-candy/data:/app/data \
-              -e NODE_ENV=production \
-              -e SERVE_CLIENT=true \
-              -e PORT=3000 \
-              -e COOKIE_SECRET="$DEPLOY_COOKIE_SECRET" \
-              -e ADMIN_PASSWORD_HASH="$DEPLOY_ADMIN_PASSWORD_HASH" \
-              -e TRUSTED_PROXY_IPS="127.0.0.1,::1,172.17.0.1" \
-              -e GEOIP_DB_PATH="/app/data/geoip/dbip-country-lite.mmdb" \
-              "$IMAGE"
+            # `docker run` failing outright counts as an unhealthy deploy too
+            # (falls through to the rollback below, rather than set -e
+            # aborting the script with no container running).
+            if run_app "$IMAGE" && wait_healthy; then
+              echo "App is healthy"
+              # Pruned only now, after the new image is proven healthy: the
+              # replaced image is untagged/dangling once its container is
+              # gone, and rollback needs it still present.
+              echo "Pruning dangling images..."
+              docker image prune -f || true
+              exit 0
+            fi
 
-            echo "Pruning dangling images..."
-            docker image prune -f || true
-
-            echo "Waiting for health check..."
-            for i in {1..30}; do
-              if curl -sf http://localhost:3000/api/health > /dev/null; then
-                echo "App is healthy"
-                exit 0
-              fi
-              sleep 2
-            done
             echo "Health check failed"
+            if [ -n "$PREV_IMAGE" ]; then
+              echo "Rolling back to $PREV_IMAGE ..."
+              docker rm -f ear-candy || true
+              run_app "$PREV_IMAGE"
+              if wait_healthy; then
+                echo "ROLLED BACK to $PREV_IMAGE"
+              else
+                echo "Rollback container did not become healthy either — manual intervention needed (docs/runbooks/security-rollout.md)" >&2
+              fi
+            fi
+            # Always fail, even after a successful rollback, so the job (and
+            # verify-production) stay red.
             exit 1
 
   # A separate job (not just deploy's own internal health-check loop above)
