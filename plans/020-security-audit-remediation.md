@@ -1,10 +1,10 @@
 ---
 id: security-audit-remediation
 title: "Security Audit 2026-11 — Prioritized Findings & Zero-Regression Remediation"
-status: pending
+status: in-progress
 priority: 1
 created: 2026-11-15
-steps_completed: 0
+steps_completed: 2
 steps_total: 11
 tags: [security, hardening, red-team, deploy-safety, dependencies]
 ---
@@ -138,10 +138,10 @@ max_episode_number=<max(number)>
 Create `docs/runbooks/security-rollout.md`: the MANUAL gates above as a numbered checklist (pre-merge, post-deploy, rollback), plus how to restore from a `pre-deploy_*` backup (stop container, replace `db.sqlite`, delete `-wal`/`-shm`, restart; reference CLAUDE.md gotcha 5) and how to hand-roll back to the previous image digest if Step 2's auto-rollback itself fails.
 
 **Acceptance criteria:**
-- [ ] `bash -n scripts/prod-data-snapshot.sh` passes; `shellcheck` clean if available.
-- [ ] Run against a temp SQLite file created in the scratchpad (with the same table names), the snapshot prints all keys, and `--compare` exits 0 on identical input and 1 when `episodes` differs.
-- [ ] The script contains no `INSERT|UPDATE|DELETE|DROP|\.backup` and opens SQLite with `-readonly`.
-- [ ] Runbook contains the rollback and restore procedures and mentions `/opt/ear-candy/backup.sh`.
+- [x] `bash -n scripts/prod-data-snapshot.sh` passes; `shellcheck` clean if available.
+- [x] Run against a temp SQLite file created in the scratchpad (with the same table names), the snapshot prints all keys, and `--compare` exits 0 on identical input and 1 when `episodes` differs.
+- [x] The script contains no `INSERT|UPDATE|DELETE|DROP|\.backup` and opens SQLite with `-readonly`.
+- [x] Runbook contains the rollback and restore procedures and mentions `/opt/ear-candy/backup.sh`.
 
 ---
 
@@ -160,13 +160,13 @@ Edit only the `deploy` job's remote script (keep every existing `${{ }}`-via-`en
 Leave the `verify-production` job unchanged.
 
 **Acceptance criteria:**
-- [ ] `docker run` flags in `run_app` are byte-for-byte equivalent to the current ones (diff reviewed).
-- [ ] The extracted remote script passes `bash -n` and, if `shellcheck` is available, has no new warnings.
-- [ ] A local harness (shell script in the scratchpad, **not committed**) that puts stub `docker`/`curl` binaries first on `PATH` demonstrates: (a) healthy path starts only the new image; (b) when the stub health check fails, `docker run` is invoked a second time with `PREV_IMAGE` and the script exits non-zero; (c) when the `cp` backup fails, the new image is never started.
-- [ ] `docker image prune -f` occurs only after the health loop succeeds (rollback image can't be pruned first).
-- [ ] The backup copies only the three named files (no glob) and survives `backup.sh`'s 14-day sweep or is documented as subject to it.
-- [ ] Workflow still has no `${{ }}` spliced into `run:`/`script:` text (grep check).
-- [ ] CLAUDE.md "CI/CD" section updated to describe pre-deploy backup + auto-rollback.
+- [x] `docker run` flags in `run_app` are byte-for-byte equivalent to the current ones (diff reviewed).
+- [x] The extracted remote script passes `bash -n` and, if `shellcheck` is available, has no new warnings.
+- [x] A local harness (shell script in the scratchpad, **not committed**) that puts stub `docker`/`curl` binaries first on `PATH` demonstrates: (a) healthy path starts only the new image; (b) when the stub health check fails, `docker run` is invoked a second time with `PREV_IMAGE` and the script exits non-zero; (c) when the `cp` backup fails, the new image is never started.
+- [x] `docker image prune -f` occurs only after the health loop succeeds (rollback image can't be pruned first).
+- [x] The backup copies only the three named files (no glob) and survives `backup.sh`'s 14-day sweep or is documented as subject to it.
+- [x] Workflow still has no `${{ }}` spliced into `run:`/`script:` text (grep check).
+- [x] CLAUDE.md "CI/CD" section updated to describe pre-deploy backup + auto-rollback.
 
 ---
 # PHASE B — Dependency patches (ship alone; isolates native-module risk)
