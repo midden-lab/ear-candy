@@ -1,10 +1,10 @@
 ---
 id: security-audit-remediation
 title: "Security Audit 2026-11 — Prioritized Findings & Zero-Regression Remediation"
-status: pending
+status: in-progress
 priority: 1
 created: 2026-11-15
-steps_completed: 0
+steps_completed: 1
 steps_total: 11
 tags: [security, hardening, red-team, deploy-safety, dependencies]
 ---
@@ -138,10 +138,10 @@ max_episode_number=<max(number)>
 Create `docs/runbooks/security-rollout.md`: the MANUAL gates above as a numbered checklist (pre-merge, post-deploy, rollback), plus how to restore from a `pre-deploy_*` backup (stop container, replace `db.sqlite`, delete `-wal`/`-shm`, restart; reference CLAUDE.md gotcha 5) and how to hand-roll back to the previous image digest if Step 2's auto-rollback itself fails.
 
 **Acceptance criteria:**
-- [ ] `bash -n scripts/prod-data-snapshot.sh` passes; `shellcheck` clean if available.
-- [ ] Run against a temp SQLite file created in the scratchpad (with the same table names), the snapshot prints all keys, and `--compare` exits 0 on identical input and 1 when `episodes` differs.
-- [ ] The script contains no `INSERT|UPDATE|DELETE|DROP|\.backup` and opens SQLite with `-readonly`.
-- [ ] Runbook contains the rollback and restore procedures and mentions `/opt/ear-candy/backup.sh`.
+- [x] `bash -n scripts/prod-data-snapshot.sh` passes; `shellcheck` clean if available.
+- [x] Run against a temp SQLite file created in the scratchpad (with the same table names), the snapshot prints all keys, and `--compare` exits 0 on identical input and 1 when `episodes` differs.
+- [x] The script contains no `INSERT|UPDATE|DELETE|DROP|\.backup` and opens SQLite with `-readonly`.
+- [x] Runbook contains the rollback and restore procedures and mentions `/opt/ear-candy/backup.sh`.
 
 ---
 
