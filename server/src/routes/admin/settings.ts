@@ -37,10 +37,22 @@ export const adminSettingsRoute: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ error: 'excluded_analytics_ips is too long' })
     }
 
-    app.db.prepare('DELETE FROM settings').run()
-    app.db.prepare(
-      'INSERT INTO settings (podcast_name, tagline, description, cover_art_path, favicon_path, browser_tab_title, accent_color, analytics_enabled, track_returning_listeners, excluded_analytics_ips) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(podcast_name, tagline, description, cover_art_path ?? null, favicon_path ?? null, browser_tab_title ?? null, accent_color, analytics_enabled ? 1 : 0, track_returning_listeners ? 1 : 0, excluded_analytics_ips ?? null)
+    // A single UPDATE inside a transaction, not DELETE + INSERT (security
+    // audit M1). The old pattern (a) reset session_epoch to its column
+    // default of 0, since it wasn't in the INSERT's column list — silently
+    // reviving every session cookie previously revoked by a logout and
+    // killing the admin's own — and (b) wasn't atomic, so a failure between
+    // the two statements left zero rows and made the public /api/settings
+    // 500. The settings table still always has exactly one row, and
+    // session_epoch is deliberately never named here: it's an auth
+    // revocation counter owned by login/logout, not a user-editable setting.
+    // Omitted optional fields still reset to their defaults/null, exactly as
+    // before.
+    app.db.transaction(() => {
+      app.db.prepare(
+        'UPDATE settings SET podcast_name = ?, tagline = ?, description = ?, cover_art_path = ?, favicon_path = ?, browser_tab_title = ?, accent_color = ?, analytics_enabled = ?, track_returning_listeners = ?, excluded_analytics_ips = ?'
+      ).run(podcast_name, tagline, description, cover_art_path ?? null, favicon_path ?? null, browser_tab_title ?? null, accent_color, analytics_enabled ? 1 : 0, track_returning_listeners ? 1 : 0, excluded_analytics_ips ?? null)
+    })()
 
     const row = app.db.prepare('SELECT * FROM settings').get() as Settings
     return row

@@ -305,6 +305,101 @@ describe('Admin Settings routes', () => {
     })
   })
 
+  // M1 (plan 020 / security audit 2026-11): PUT used to DELETE the settings
+  // row and INSERT a new one without session_epoch, so the epoch reset to 0
+  // (reviving cookies already revoked by earlier logouts and killing the
+  // admin's own), and a failure between the two statements left zero rows
+  // (public /api/settings then 500s — site down).
+  describe('PUT /api/admin/settings preserves the row and session_epoch', () => {
+    const BASE = { podcast_name: 'Replaced', tagline: 't', description: 'd', accent_color: '#112233' }
+
+    const epochOf = (app: Awaited<ReturnType<typeof makeApp>>) =>
+      (app.db.prepare('SELECT session_epoch FROM settings').get() as { session_epoch: number }).session_epoch
+    const rowCount = (app: Awaited<ReturnType<typeof makeApp>>) =>
+      (app.db.prepare('SELECT COUNT(*) AS c FROM settings').get() as { c: number }).c
+
+    it('leaves session_epoch alone: revoked cookies stay revoked and the admin\'s own cookie stays valid', async () => {
+      const app = await makeApp()
+      const revoked = await getAuthCookie(app) // issued at epoch 0
+
+      // Two real logouts -> epoch 2.
+      for (let i = 0; i < 2; i++) {
+        const c = await getAuthCookie(app)
+        const out = await app.inject({ method: 'POST', url: '/api/admin/logout', headers: { cookie: c } })
+        expect(out.statusCode).toBe(200)
+      }
+      expect(epochOf(app)).toBe(2)
+
+      const current = await getAuthCookie(app)
+      const put = await app.inject({ method: 'PUT', url: '/api/admin/settings', headers: { cookie: current }, payload: BASE })
+      expect(put.statusCode).toBe(200)
+
+      expect(epochOf(app)).toBe(2)
+      const stillRevoked = await app.inject({ method: 'GET', url: '/api/admin/session', headers: { cookie: revoked } })
+      expect(stillRevoked.statusCode).toBe(401)
+      const stillValid = await app.inject({ method: 'GET', url: '/api/admin/session', headers: { cookie: current } })
+      expect(stillValid.statusCode).toBe(200)
+    })
+
+    it('keeps exactly one settings row after a PUT, including a rejected one', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+
+      await app.inject({ method: 'PUT', url: '/api/admin/settings', headers: { cookie }, payload: BASE })
+      expect(rowCount(app)).toBe(1)
+
+      const rejected = await app.inject({
+        method: 'PUT', url: '/api/admin/settings', headers: { cookie },
+        payload: { ...BASE, cover_art_path: 'javascript:alert(1)' }
+      })
+      expect(rejected.statusCode).toBe(400)
+      expect(rowCount(app)).toBe(1)
+    })
+
+    it('replaces every PUT-able field, setting nullable ones back to null/default when omitted', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      await app.inject({
+        method: 'PUT', url: '/api/admin/settings', headers: { cookie },
+        payload: {
+          podcast_name: 'First', tagline: 'a', description: 'b', accent_color: '#abcdef',
+          cover_art_path: '/images/c.png', favicon_path: '/images/f.png', browser_tab_title: 'Tab',
+          analytics_enabled: false, track_returning_listeners: false, excluded_analytics_ips: '203.0.113.5',
+        }
+      })
+
+      const res = await app.inject({ method: 'PUT', url: '/api/admin/settings', headers: { cookie }, payload: BASE })
+      expect(res.statusCode).toBe(200)
+      expect(res.json()).toMatchObject({
+        podcast_name: 'Replaced', tagline: 't', description: 'd', accent_color: '#112233',
+        cover_art_path: null, favicon_path: null, browser_tab_title: null,
+        analytics_enabled: 1, track_returning_listeners: 1, excluded_analytics_ips: null,
+      })
+      expect(rowCount(app)).toBe(1)
+    })
+
+    it('leaves the original row intact when the write itself fails mid-PUT', async () => {
+      const app = await makeApp()
+      const cookie = await getAuthCookie(app)
+      await app.inject({ method: 'PUT', url: '/api/admin/settings', headers: { cookie }, payload: { ...BASE, podcast_name: 'Original' } })
+
+      // An object where a string is expected passes the route's own checks
+      // but makes SQLite throw while binding — i.e. a failure in the middle
+      // of the write. The old DELETE-then-INSERT left zero rows here.
+      const res = await app.inject({
+        method: 'PUT', url: '/api/admin/settings', headers: { cookie },
+        payload: { ...BASE, podcast_name: 'Should not persist', tagline: { not: 'a string' } }
+      })
+      expect(res.statusCode).toBeGreaterThanOrEqual(400)
+
+      expect(rowCount(app)).toBe(1)
+      const row = app.db.prepare('SELECT podcast_name FROM settings').get() as { podcast_name: string }
+      expect(row.podcast_name).toBe('Original')
+      const pub = await app.inject({ method: 'GET', url: '/api/settings' })
+      expect(pub.statusCode).toBe(200)
+    })
+  })
+
   describe('PATCH /api/admin/settings', () => {
     it('returns 401 without auth cookie', async () => {
       const app = await makeApp()

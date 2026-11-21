@@ -4,7 +4,7 @@ title: "Security Audit 2026-11 — Prioritized Findings & Zero-Regression Remedi
 status: in-progress
 priority: 1
 created: 2026-11-15
-steps_completed: 4
+steps_completed: 6
 steps_total: 11
 tags: [security, hardening, red-team, deploy-safety, dependencies]
 ---
@@ -214,10 +214,10 @@ Test first: add cases to `admin-auth.test.ts`: (a) anonymous `POST /api/admin/lo
 Test first: (a) logout twice (epoch 2), PUT settings → `session_epoch` still 2 and a pre-PUT cookie from epoch 0 stays 401; (b) settings row count is exactly 1 after PUT; (c) all PUT-able fields are replaced, including setting nullable fields back to null/default; (d) simulated failure mid-PUT (invalid `cover_art_path`) leaves the original row intact. Implementation: replace `DELETE`+`INSERT` with a single `UPDATE settings SET <all PUT-able columns> = ?` inside `app.db.transaction(...)`; never touch `session_epoch`. Update CLAUDE.md gotcha 8 (the DELETE+INSERT pattern note is no longer true).
 
 **Acceptance criteria:**
-- [ ] `session_epoch` unchanged across a PUT (test).
-- [ ] Settings row count is 1 after any PUT, including a rejected one (test).
-- [ ] Response body shape unchanged vs. today (existing tests pass untouched).
-- [ ] CLAUDE.md gotcha 8 reflects the new behavior.
+- [x] `session_epoch` unchanged across a PUT (test).
+- [x] Settings row count is 1 after any PUT, including a rejected one (test).
+- [x] Response body shape unchanged vs. today (existing tests pass untouched).
+- [x] CLAUDE.md gotcha 8 reflects the new behavior.
 
 ---
 
