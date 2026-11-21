@@ -89,6 +89,26 @@ export function buildApp(opts: AppOptions = {}) {
     trustProxy: resolveTrustedProxies(process.env.TRUSTED_PROXY_IPS),
     ...(opts.loggerInstance ? { loggerInstance: opts.loggerInstance } : { logger: opts.logger ?? true })
   })
+
+  // Central error handler (security audit M4). Without one, any unexpected
+  // throw — a SQLite binding/constraint error, a bug — reached the client as
+  // Fastify's default 500 body, including the raw error message (internals,
+  // table/column names). Now: 5xx and anything without a status code gets a
+  // generic body and the real error is logged server-side; 4xx errors
+  // (rate-limit 429, body-too-large 413, malformed JSON 400, ...) are handed
+  // straight to Fastify's own default handler so their status codes, bodies
+  // and headers are exactly what they were before. Captured BEFORE
+  // setErrorHandler replaces it. Registered ahead of every plugin so all
+  // routes inherit it.
+  const defaultErrorHandler = app.errorHandler
+  app.setErrorHandler((error, req, reply) => {
+    const statusCode = (error as { statusCode?: number }).statusCode
+    if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
+      return defaultErrorHandler(error, req, reply)
+    }
+    req.log.error({ err: error }, 'unhandled error')
+    void reply.status(500).send({ error: 'Internal server error' })
+  })
   const dbPath = opts.dbPath ?? path.resolve('data/db.sqlite')
   const db = initDb(dbPath)
 
