@@ -229,10 +229,10 @@ Test first: (a) logout twice (epoch 2), PUT settings → `session_epoch` still 2
 Test first (these are the reproduced behaviors): missing body / `{}` / `{password: 123}` / `{password: ['a']}` / empty string → **400** `{error:'password is required'}` (never 500), counted as a failed attempt against the per-IP counter only; 31 failures from 31 distinct IPs must **not** block a subsequent correct-password login from a fresh IP (→ 200); a single IP is still locked after 10 failures (→ 429, existing test stays); a `warn`-level log `{event:'admin_login_global_failure_spike', count}` fires once per window when the global count reaches the old threshold. Implementation: keep the per-IP lockout untouched; keep the global *counter* but make it **observability-only** (structured warn log, no 429). Never log the password. Rationale in code comment: a global hard block is itself a denial-of-service on the only admin credential; brute-force resistance rests on bcrypt cost + per-IP lockout + a strong password. In CLAUDE.md gotcha 10a/9 note the change.
 
 **Acceptance criteria:**
-- [ ] The four malformed bodies return 400, not 500 (test).
-- [ ] Correct password succeeds after 31 distinct-IP failures (test).
-- [ ] Per-IP lockout after 10 failures still returns 429 (existing test).
-- [ ] The spike log line is emitted once per window and contains no password (log-capture test via `buildTestAppWithLogCapture`).
+- [x] The four malformed bodies return 400, not 500 (test).
+- [x] Correct password succeeds after 31 distinct-IP failures (test).
+- [x] Per-IP lockout after 10 failures still returns 429 (existing test).
+- [x] The spike log line is emitted once per window and contains no password (log-capture test via `buildTestAppWithLogCapture`).
 
 ---
 

@@ -5,16 +5,18 @@ import { requireAdmin, buildSessionCookieValue, SESSION_MAX_AGE_MS } from '../..
 const MAX_FAILED_ATTEMPTS = 10
 const LOCKOUT_WINDOW_MS = 15 * 60 * 1000
 
-// A second, IP-independent counter, layered onto the per-IP one above —
-// not a tighter version of it. The per-IP lockout stops credential
-// stuffing from one address; it does nothing against an attacker with
-// access to many apparent source IPs, who gets a fresh 10-attempt
-// allowance per address. This app has exactly one credential gating full
-// content control, so a global backstop is worth the (deliberately
-// higher, so a real admin's own occasional mistyped password from one IP
-// essentially never trips it) ceiling below (red-team AUTH-2).
-const GLOBAL_MAX_FAILED_ATTEMPTS = 30
-const GLOBAL_LOCKOUT_WINDOW_MS = 30 * 60 * 1000
+// A second, IP-independent counter — observability only, it NEVER blocks.
+// It used to hard-block every login (429) once 30 failures landed in 30
+// minutes from any addresses combined (red-team AUTH-2), but a global hard
+// block is itself a denial-of-service on the only admin credential: an
+// attacker with a few source IPs could keep the real admin locked out,
+// even with the correct password, indefinitely (security audit H2). Now it
+// only emits one structured `warn` per window when the count reaches the
+// old threshold, so a distributed guessing attempt is visible in the logs
+// without handing an attacker a lever. Brute-force resistance rests on the
+// bcrypt cost, the per-IP lockout above, and a strong admin password.
+const GLOBAL_FAILURE_SPIKE_THRESHOLD = 30
+const GLOBAL_FAILURE_WINDOW_MS = 30 * 60 * 1000
 
 export const adminAuthRoute: FastifyPluginAsync = async (app) => {
   // Tracks failed login attempts per IP, not all requests — a legitimate
@@ -25,7 +27,7 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
   // so each buildApp() call — including each test's fresh app — gets its
   // own isolated state.
   const failedAttempts = new Map<string, { count: number; resetAt: number }>()
-  let globalFailed: { count: number; resetAt: number } | null = null
+  let globalFailed: { count: number; resetAt: number; spikeLogged: boolean } | null = null
 
   function isLockedOut(ip: string): boolean {
     const entry = failedAttempts.get(ip)
@@ -46,28 +48,22 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
     }
   }
 
-  function isGloballyLockedOut(): boolean {
-    if (!globalFailed) return false
-    if (Date.now() > globalFailed.resetAt) {
-      globalFailed = null
-      return false
-    }
-    return globalFailed.count >= GLOBAL_MAX_FAILED_ATTEMPTS
-  }
-
-  function recordGlobalFailedAttempt(): void {
+  // Counts wrong-password attempts across all IPs and logs one warn per
+  // window when the count reaches the threshold. Observability only.
+  function recordGlobalFailedAttempt(log: { warn: (obj: object) => void }): void {
     if (!globalFailed || Date.now() > globalFailed.resetAt) {
-      globalFailed = { count: 1, resetAt: Date.now() + GLOBAL_LOCKOUT_WINDOW_MS }
+      globalFailed = { count: 1, resetAt: Date.now() + GLOBAL_FAILURE_WINDOW_MS, spikeLogged: false }
     } else {
       globalFailed.count += 1
     }
+    if (!globalFailed.spikeLogged && globalFailed.count >= GLOBAL_FAILURE_SPIKE_THRESHOLD) {
+      globalFailed.spikeLogged = true
+      log.warn({ event: 'admin_login_global_failure_spike', count: globalFailed.count })
+    }
   }
 
-  app.post<{ Body: { password: string } }>('/admin/login', async (req, reply) => {
-    // Deliberately the same 429 response either way — distinguishing
-    // "your IP is locked" from "the whole app is locked" in the response
-    // would hand an attacker a signal about which control they tripped.
-    if (isLockedOut(req.ip) || isGloballyLockedOut()) {
+  app.post<{ Body: { password?: unknown } | undefined }>('/admin/login', async (req, reply) => {
+    if (isLockedOut(req.ip)) {
       return reply.status(429).send({ error: 'Too many failed login attempts. Try again later.' })
     }
 
@@ -77,11 +73,22 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
       return reply.status(500).send({ error: 'Internal server error' })
     }
 
-    const { password } = req.body
+    // A missing body or a non-string/empty password used to reach
+    // bcrypt.compare, which throws, surfacing as a 500 with raw error text
+    // (security audit M4). Reject it as a plain 400 instead. It still
+    // counts toward this IP's own lockout counter, so garbage requests
+    // can't be used to probe for free, but not toward the global spike
+    // counter, which is about wrong-password guessing.
+    const password = req.body?.password
+    if (typeof password !== 'string' || password.length === 0) {
+      recordFailedAttempt(req.ip)
+      return reply.status(400).send({ error: 'password is required' })
+    }
+
     const match = await bcrypt.compare(password, hash)
     if (!match) {
       recordFailedAttempt(req.ip)
-      recordGlobalFailedAttempt()
+      recordGlobalFailedAttempt(req.log)
       // Deliberately never logs the submitted password itself — only the
       // outcome and requesting IP, enough to answer "did someone get in,
       // and when" after the fact (issue #13) without logging credentials.
