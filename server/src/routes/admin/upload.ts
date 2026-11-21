@@ -6,6 +6,7 @@ import { pipeline } from 'node:stream/promises'
 import { parseFile } from 'music-metadata'
 import { requireAdmin } from '../../auth.js'
 import { peekHeader, matchesAudioSignature } from '../../utils/magicBytes.js'
+import { removeFileQuietly } from '../../utils/mediaFiles.js'
 
 const ALLOWED_AUDIO_EXTENSIONS = new Set([
   '.mp3', '.m4a', '.wav', '.ogg', '.oga', '.flac', '.aac', '.webm'
@@ -43,7 +44,16 @@ export const adminUploadRoute: FastifyPluginAsync = async (app) => {
     const filename = `${randomUUID()}${ext}`
     const dest = path.resolve('data/uploads', filename)
 
-    await pipeline(stream, fs.createWriteStream(dest))
+    // If the write fails partway (disk error, client abort, size limit) the
+    // partial file would otherwise stay in the publicly-served uploads dir,
+    // unreferenced and never cleaned up (security audit L4). Remove it,
+    // then rethrow so the request still fails.
+    try {
+      await pipeline(stream, fs.createWriteStream(dest))
+    } catch (err) {
+      await removeFileQuietly(dest)
+      throw err
+    }
 
     // Determine duration server-side now that the file is fully on disk,
     // rather than trusting a client-side probe — see
