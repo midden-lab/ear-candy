@@ -36,3 +36,49 @@ ssh earcandy "cat /etc/caddy/Caddyfile"
 
 Compare against `infra/Caddyfile.template` with the real domain substituted
 in for `__DOMAIN__`. They should match exactly.
+
+## Upgrading Caddy
+
+Caddy comes from the Cloudsmith apt repo on the Droplet and is **not** upgraded
+by CI or by the `deploy` job. Upgrade it by hand with the steps below (last
+done 2.11.4 → 2.11.9 on 2026-11-21, plan 021).
+
+**Never run `apt upgrade` / `apt full-upgrade` for this.** A blanket upgrade
+would also pull containerd, Docker and kernel updates, which need a reboot
+(the app container restarts) and deserve their own change. Upgrade only the one
+package.
+
+Before upgrading, read the release notes for every version between the
+installed one and the target (GitHub releases for `caddyserver/caddy`) and look
+for breaking changes affecting `reverse_proxy` or automatic HTTPS. For example,
+2.11.6 added default 1-minute idle read/write timeouts and a 16 KiB request
+header limit.
+
+1. **Preflight** (on the Droplet, `ssh earcandy`):
+   `df -h /` shows at least 3 GB free; `caddy version`; `systemctl is-active caddy`;
+   `curl -sf http://localhost:3000/api/health`; note the status of
+   `curl -sI https://<domain>/api/health` (expect 200).
+2. **Save rollback material.** The Cloudsmith repo only lists the latest
+   version, so `apt-get install caddy=<old>` will not work as a rollback:
+   `cp -a /usr/bin/caddy /root/caddy-<old-version>.bin` and
+   `cp -a /etc/caddy/Caddyfile /root/Caddyfile.pre-<new-version>`, then confirm
+   `/root/caddy-<old-version>.bin version`.
+3. **Upgrade only Caddy:**
+   `DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade caddy -o Dpkg::Options::=--force-confold`
+   (`--force-confold` keeps the live Caddyfile if apt asks about it).
+4. **Validate:** `diff /etc/caddy/Caddyfile /root/Caddyfile.pre-<new-version>`
+   is empty; `caddy validate --config /etc/caddy/Caddyfile` passes;
+   `caddy version` shows the target version.
+5. **Confirm the running process is the new binary.** The package normally
+   restarts the service; compare `systemctl show caddy -p ActiveEnterTimestamp`
+   with the time of the upgrade, and `systemctl restart caddy` if it is older.
+6. **Verify:** `curl -sI https://<domain>/api/health` returns 200 with a valid
+   certificate (no `-k`) and the body contains `"ok":true`; `docker ps` shows the
+   `ear-candy` container with the same ID and uptime as before; and
+   `journalctl -u caddy --since "10 min ago"` has no unexpected errors (a
+   "Caddyfile input is not formatted" warning is harmless).
+
+**Rollback** (if step 4, 5 or 6 fails):
+`systemctl stop caddy && cp -a /root/caddy-<old-version>.bin /usr/bin/caddy && cp -a /root/Caddyfile.pre-<new-version> /etc/caddy/Caddyfile && systemctl start caddy`,
+then repeat the step 6 checks. apt will keep offering the newer version; run
+`apt-mark hold caddy` if you want to stay on the old one.
