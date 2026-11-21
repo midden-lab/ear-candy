@@ -4,7 +4,7 @@ title: "Patch Caddy, the Node base image and server npm advisories (supersedes p
 status: in-progress
 priority: 1
 created: 2026-11-21
-steps_completed: 3
+steps_completed: 4
 steps_total: 7
 tags: [security, patching, caddy, node, dependencies, deploy-safety]
 ---
@@ -120,8 +120,8 @@ Append an entry for the root `Dockerfile`, matching the existing style:
 Do not add the `*.Dockerfile.dev` directories (dev-only, unpinned).
 
 **Acceptance criteria:**
-- [ ] The file parses as YAML (`python3 -c 'import yaml'` is unavailable here, so verify with `ruby -ryaml -e` or by reading the file; or a `gh api` dry check is not required) and contains exactly one new `docker` entry for `/`.
-- [ ] The existing four entries are unchanged.
+- [x] The file parses as YAML (`python3 -c 'import yaml'` is unavailable here, so verify with `ruby -ryaml -e` or by reading the file; or a `gh api` dry check is not required) and contains exactly one new `docker` entry for `/`.
+- [x] The existing four entries are unchanged.
 
 ---
 
