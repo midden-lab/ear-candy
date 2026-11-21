@@ -4,7 +4,7 @@ title: "Patch Caddy, the Node base image and server npm advisories (supersedes p
 status: in-progress
 priority: 1
 created: 2026-11-21
-steps_completed: 4
+steps_completed: 5
 steps_total: 7
 tags: [security, patching, caddy, node, dependencies, deploy-safety]
 ---
@@ -135,9 +135,9 @@ Do not add the `*.Dockerfile.dev` directories (dev-only, unpinned).
 - `plans/020-security-audit-remediation.md`: in its **Notes** section add one line: "Step 3 (Phase B) is superseded by plan 021 (Caddy, Node image pin and server npm patches); mark it complete or skipped when 021 ships." Change nothing else in plan 020, including its frontmatter.
 
 **Acceptance criteria:**
-- [ ] The runbook section lists every Step 1 command and the rollback.
-- [ ] CLAUDE.md mentions the digest pin/Dependabot docker coverage in one or two sentences.
-- [ ] `git diff plans/020-security-audit-remediation.md` shows exactly one added line in Notes.
+- [x] The runbook section lists every Step 1 command and the rollback.
+- [x] CLAUDE.md mentions the digest pin/Dependabot docker coverage in one or two sentences.
+- [x] `git diff plans/020-security-audit-remediation.md` shows exactly one added line in Notes.
 
 ---
 

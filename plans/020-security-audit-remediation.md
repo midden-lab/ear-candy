@@ -338,4 +338,5 @@ Add `--cap-drop ALL` and `--security-opt no-new-privileges:true` to `run_app` (S
 - `--read-only` and memory/pids limits were deliberately left out of Step 10 to avoid regressions on large uploads; revisit with real measurements.
 - Retention (Step 9) is deliberately opt-in; if the maintainer later wants a default, that's a separate, explicit decision because it deletes existing analytics.
 - Step 3: record here any advisories left unfixed because they need a major-version bump.
+- Step 3 (Phase B) is superseded by plan 021 (Caddy, Node image pin and server npm patches); mark it complete or skipped when 021 ships.
 - The audit did not review: Droplet OS hardening (SSH config, fail2ban, unattended-upgrades, firewall), GitHub account security (2FA, deploy-key scope, `GHCR_PAT` scope), DNS/registrar. Worth a separate checklist.
