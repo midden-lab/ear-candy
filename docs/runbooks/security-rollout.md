@@ -32,7 +32,12 @@ All commands run on the Droplet (`ssh root@<droplet>`) unless noted.
    `schema_max`, `uploads_*` and `accent_color` must be equal, `settings_rows`
    exactly 1, `session_epoch` and `events` not lower. Pass
    `--allow-events-shrink` only if event retention was enabled on purpose.
-3. Smoke test in a browser: load the public site, play one episode, log into
+3. Check audio serving (not covered by the deploy health check, so a
+   regression here would not trigger the auto-rollback): take an upload-type
+   episode's `audio_path` from `https://<domain>/api/episodes` and run
+   `curl -s -o /dev/null -w '%{http_code} %{size_download}\n' -H 'Range: bytes=0-1023' https://<domain><audio_path>`.
+   Expect `206 1024`.
+4. Smoke test in a browser: load the public site, play one episode, log into
    admin, open Settings and Analytics.
 
 ## 3. Rollback
