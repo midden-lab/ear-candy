@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { requireAdmin } from '../../auth.js'
 import { peekHeader, matchesFaviconSignature } from '../../utils/magicBytes.js'
+import { removeFileQuietly } from '../../utils/mediaFiles.js'
 
 // SVG deliberately excluded: unlike PNG/ICO, an SVG can embed <script> and a
 // browser will execute it if the uploaded file is ever navigated to directly
@@ -44,7 +45,14 @@ export const adminUploadFaviconRoute: FastifyPluginAsync = async (app) => {
     const filename = `favicon-${randomUUID()}${ext}`
     const dest = path.join(uploadsDir, filename)
 
-    await pipeline(stream, fs.createWriteStream(dest))
+    // Remove the partial file if the write fails partway (security audit
+    // L4), then rethrow so the request still fails.
+    try {
+      await pipeline(stream, fs.createWriteStream(dest))
+    } catch (err) {
+      await removeFileQuietly(dest)
+      throw err
+    }
 
     if (data.file.truncated) {
       fs.unlinkSync(dest)

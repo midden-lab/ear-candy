@@ -54,3 +54,19 @@ export async function deleteLocalMediaFile(mediaPath: string | null | undefined)
     }
   }
 }
+
+/**
+ * Removes a file by absolute path, tolerating it already being gone.
+ * Used to clean up the partial output of an upload that failed partway —
+ * such a file sits in the publicly-served uploads directory under its
+ * (guessable-by-whoever-saw-it) UUID name, unreferenced by any DB row and
+ * never otherwise deleted (security audit L4).
+ */
+export async function removeFileQuietly(absPath: string): Promise<void> {
+  try {
+    await fs.unlink(absPath)
+  } catch {
+    // Already gone, or can't be removed — nothing more useful to do; the
+    // caller is already on an error path and will surface the real failure.
+  }
+}

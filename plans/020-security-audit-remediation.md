@@ -4,7 +4,7 @@ title: "Security Audit 2026-11 — Prioritized Findings & Zero-Regression Remedi
 status: in-progress
 priority: 1
 created: 2026-11-15
-steps_completed: 7
+steps_completed: 8
 steps_total: 11
 tags: [security, hardening, red-team, deploy-safety, dependencies]
 ---
@@ -261,10 +261,10 @@ Add to `utils/validation.ts`: `isNonEmptyString(v, max): v is string`, `isIntege
 Test first: a buffer with SVG/GIF/BMP/TIFF content named `x.png` (mimetype `image/png`) → 400 before `sharp` is invoked; real JPEG/PNG/WebP fixtures (`e2e/fixtures/test-cover.jpg` etc.) still succeed with the same `{thumb, detail}` shape; an audio upload whose stream errors mid-way leaves **no** file in `data/uploads`. Add `matchesImageSignature(head: Buffer, ext: string): boolean` (JPEG `FF D8 FF`; PNG `89 50 4E 47 0D 0A 1A 0A`; WebP `RIFF....WEBP`) next to the existing audio/favicon matchers and call it on `buffer.subarray(0, 12)` before `sharp`. Construct sharp with `{ limitInputPixels: 50_000_000 }` for the metadata and both resizes (leave `failOn` at its default, which is already the strictest, `'warning'`). In `upload.ts` and `upload-favicon.ts`, wrap `pipeline(...)` in try/catch that `fs.promises.unlink(dest)` (ignore ENOENT) then rethrows. **Do not** change duration detection or which audio extensions are allowed (webm uploads must keep working).
 
 **Acceptance criteria:**
-- [ ] Spoofed-extension SVG/GIF is rejected with 400 (test).
-- [ ] Existing cover-art, favicon, audio-range and duration tests pass; e2e upload tests pass.
-- [ ] Aborted/failed upload leaves no orphan file (test).
-- [ ] A 4000×4000 JPEG (16 MP) still uploads successfully (test with generated image via sharp).
+- [x] Spoofed-extension SVG/GIF is rejected with 400 (test).
+- [x] Existing cover-art, favicon, audio-range and duration tests pass; e2e upload tests pass.
+- [x] Aborted/failed upload leaves no orphan file (test).
+- [x] A 4000×4000 JPEG (16 MP) still uploads successfully (test with generated image via sharp).
 
 ---
 
