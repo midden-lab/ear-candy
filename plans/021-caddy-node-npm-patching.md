@@ -4,7 +4,7 @@ title: "Patch Caddy, the Node base image and server npm advisories (supersedes p
 status: in-progress
 priority: 1
 created: 2026-11-21
-steps_completed: 2
+steps_completed: 3
 steps_total: 7
 tags: [security, patching, caddy, node, dependencies, deploy-safety]
 ---
@@ -95,10 +95,10 @@ Resolve the digest from the registry, never by hand: `docker buildx imagetools i
 Then build and smoke-test the production image locally: `docker build -t ear-candy:node-bump .`; `docker run --rm ear-candy:node-bump node -v` prints `v22.23.5`; start it the way CI's `e2e` job does (same env vars, no volume) and confirm `/api/health` and `/api/settings` return 200 and that the `node` user (uid 1000) can write `/app/data` (health `uploads:true`/`db:true`). Check `docker run --rm ear-candy:node-bump sh -c "apk info -v | grep -E '^(openssl|libssl3|musl|zlib)'"` and record the versions in Notes.
 
 **Acceptance criteria:**
-- [ ] All four `FROM` lines carry the same new digest and `node -v` inside the built image is `v22.23.5`.
-- [ ] The digest was resolved from the registry (command recorded in the commit message), not typed.
-- [ ] The locally started production image passes `/api/health` with `db:true` and `uploads:true`.
-- [ ] No remaining reference to the old digest, or each is explained in Notes.
+- [x] All four `FROM` lines carry the same new digest and `node -v` inside the built image is `v22.23.5`.
+- [x] The digest was resolved from the registry (command recorded in the commit message), not typed.
+- [x] The locally started production image passes `/api/health` with `db:true` and `uploads:true`.
+- [x] No remaining reference to the old digest, or each is explained in Notes.
 
 ---
 
@@ -181,5 +181,5 @@ Prerequisite, done by the maintainer or approved by them at this gate: take a pr
 - **Alternative considered:** pinning Caddy to 2.11.5 (smallest jump that fixes CVE-2026-55458). Rejected by the maintainer in favour of 2.11.9; revisit only if a release note shows a breaking change.
 - **Client alerts** (`undici`, `vite`, `source-map-js`, `@vitest/mocker`, `postcss-selector-parser`) are left to plan 018 unless `npm audit fix` fixes them for free.
 - Step 2 (done 2026-11-21): `npm audit` in `server/` went from 9 prod / 21 total to 0 / 0; no advisory left unfixed. Only `server/package-lock.json` changed. The lockfile contains 9 transitive major bumps that `npm audit fix` applied without `--force` because they are within parents' declared ranges: `content-disposition` 2→3, `glob` 13→14, `minimatch` 10→11, `path-scurry` 2→3 (all four prod-path, via `@fastify/static` 10.1.3→10.1.12) and dev-only `file-entry-cache`, `flat-cache`, `keyv`, `obug`, `why-is-node-running`. Maintainer approved keeping them; all gates passed (lint, 272 server + 449 client tests, `audio-range.test.ts`, e2e 50 passed/2 skipped, `docker build .`, native modules load in the Alpine image). Client: `npm audit fix --dry-run` includes 3 major bumps (`minimatch`, `obug`, `why-is-node-running`), so it was not applied; left to plan 018 (15 client advisories remain, dev tooling).
-- Step 3: record here the Alpine `openssl`/`musl`/`zlib` versions in the new image.
+- Step 3 (done 2026-11-21): new pin `sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a` (index digest of `node:22.23.5-alpine`, resolved with `docker buildx imagetools inspect`). Image reports Node v22.23.5, Alpine 3.24.4, openssl/libssl3/libcrypto3 3.5.9-r0 (was 3.5.7), musl 1.2.6-r3, zlib 1.3.2-r1. The same digest was also applied to `.github/workflows/ci-cd.yml` (the e2e job's CI-credential hashing `docker run`), with the maintainer's approval; the old digest remains only in plan 020's historical fallback command.
 - The CVE ids and fix versions in the Summary came from search-result snippets on 2026-11-21 and were not individually verified against upstream advisories.
