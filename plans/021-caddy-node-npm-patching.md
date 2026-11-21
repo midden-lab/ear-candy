@@ -1,10 +1,10 @@
 ---
 id: caddy-node-npm-patching
 title: "Patch Caddy, the Node base image and server npm advisories (supersedes plan 020 Step 3)"
-status: in-progress
+status: complete
 priority: 1
 created: 2026-11-21
-steps_completed: 5
+steps_completed: 7
 steps_total: 7
 tags: [security, patching, caddy, node, dependencies, deploy-safety]
 ---
@@ -149,9 +149,9 @@ Do not add the `*.Dockerfile.dev` directories (dev-only, unpinned).
 Commit per step on `security/patching-021` (Steps 2–5, one commit each; Step 1 has no commit). Run `make lint`, `make test`, `make e2e-reset-db` + `make e2e` once more on the final tree. Push the branch, open a PR into `dev`, merge it when `gh pr checks` is green, and confirm the latest `dev` CI run is `success` (`gh run list --branch dev --limit 1`). Then open (do **not** merge) a `dev`→`main` promotion PR whose description lists the steps, notes that the production image's `e2e` job exercises the new Node base image and rebuilt native modules, notes the Caddy upgrade was already applied on the Droplet (Step 1), and links `docs/runbooks/security-rollout.md`. Confirm `gh pr checks <n>` shows every check passing, including the production-image `e2e`.
 
 **Acceptance criteria:**
-- [ ] Working branch merged into `dev` via PR; latest `dev` run is `success`.
-- [ ] A `dev`→`main` promotion PR is open, not merged, with all checks green (`gh pr list --base main --head dev --state open`).
-- [ ] The agent has not pushed to `main` or merged the promotion PR.
+- [x] Working branch merged into `dev` via PR; latest `dev` run is `success`.
+- [x] A `dev`→`main` promotion PR is open, not merged, with all checks green (`gh pr list --base main --head dev --state open`).
+- [x] The agent has not pushed to `main` or merged the promotion PR.
 
 ---
 
@@ -163,11 +163,11 @@ Commit per step on `security/patching-021` (Steps 2–5, one commit each; Step 1
 Prerequisite, done by the maintainer or approved by them at this gate: take a pre-merge snapshot on the Droplet (`/root/prod-data-snapshot.sh | tee /root/snapshot-before-021.txt`) and confirm `/opt/ear-candy/backups/` has a recent `db_*.sqlite` (the nightly job now takes a DB-only backup). After the maintainer merges, wait for `deploy` and `verify-production` to finish green, then over SSH run only read-only checks: `/root/prod-data-snapshot.sh --compare /root/snapshot-before-021.txt` (expect `RESULT: OK`), `docker ps` (new container healthy), `docker exec ear-candy node -v` (expect `v22.23.5`), `curl -sf https://<domain>/api/health`, and `ls /opt/ear-candy/backups/pre-deploy_*` (a new pre-deploy copy exists). Repeat the audio-serving probe, because `/api/health` does not exercise `@fastify/static` and a regression there would not trigger the auto-rollback: pick an upload-type episode's `audio_path` from `https://<domain>/api/episodes` and run `curl -s -o /dev/null -w '%{http_code} %{size_download}\n' -H 'Range: bytes=0-1023' https://<domain><audio_path>`, expecting `206 1024` (the same request returned 206 against the previous release on 2026-11-21). Check that `df -h /` still has ≥ 3 GB free. Finally resync `dev` per CLAUDE.md (`git checkout dev && git reset --hard origin/main && git push --force origin dev`). If `deploy` rolled back (`ROLLED BACK to ...` in its log), stop and report instead of retrying.
 
 **Acceptance criteria:**
-- [ ] `deploy` and `verify-production` are green and the snapshot compare prints `RESULT: OK`.
-- [ ] The audio range probe returns `206 1024` through Caddy.
-- [ ] The running container reports Node `v22.23.5` and `/api/health` is `ok` over HTTPS through Caddy 2.11.9.
-- [ ] `dev` equals `origin/main` after the resync.
-- [ ] Plan 020's Step 3 status is left for the maintainer to mark; this plan's `steps_completed` is updated to 7.
+- [x] `deploy` and `verify-production` are green and the snapshot compare prints `RESULT: OK`.
+- [x] The audio range probe returns `206 1024` through Caddy.
+- [x] The running container reports Node `v22.23.5` and `/api/health` is `ok` over HTTPS through Caddy 2.11.9.
+- [x] `dev` equals `origin/main` after the resync.
+- [x] Plan 020's Step 3 status is left for the maintainer to mark; this plan's `steps_completed` is updated to 7.
 
 ## Testing
 

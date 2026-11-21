@@ -156,6 +156,19 @@ describe('logout', () => {
   })
 })
 
+describe('logout with an already-expired session', () => {
+  // POST /api/admin/logout now requires a valid session (plan 020 step 4),
+  // so a logout from a session that already expired or was revoked gets a
+  // 401. The caller (App.handleLogout) must still be able to fall through
+  // to clearing local view state, so logout() must resolve, not throw.
+  it('resolves (does not throw) when the server answers 401', async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce({ ok: false, status: 401 } as Response)
+    vi.stubGlobal('fetch', mockFetch)
+
+    await expect(logout()).resolves.toBeUndefined()
+  })
+})
+
 describe('uploadAudio', () => {
   it('posts FormData to /api/admin/upload with credentials and returns path', async () => {
     const fetchMock = vi.fn()

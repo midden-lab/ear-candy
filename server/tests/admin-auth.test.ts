@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import bcrypt from 'bcrypt'
 import { sign as signCookie } from '@fastify/cookie'
-import { buildTestApp } from './helpers.js'
+import { buildTestApp, buildTestAppWithLogCapture } from './helpers.js'
 import { requireAdmin, SESSION_MAX_AGE_MS } from '../src/auth.js'
 
 const VALID_PASSWORD = 'supersecret'
@@ -102,12 +102,15 @@ describe('POST /api/admin/login', () => {
     }
   })
 
-  it('trips a global lockout after enough failures spread across many distinct IPs, even though none individually hits the per-IP ceiling', async () => {
+  // H2 (plan 020 / security audit 2026-11): the old global hard lockout
+  // (30 failures from ANY IPs in 30 min -> 429 for everyone) also blocked
+  // the real admin's CORRECT password, so an attacker with a few IPs could
+  // lock the only admin out indefinitely. The global counter is now
+  // observability-only; see the spike-log test below.
+  it('does not block a correct-password login after many failures spread across distinct IPs', async () => {
     const app = await makeApp()
 
-    // 30 distinct IPs, one failure each — no single IP gets anywhere near
-    // its own 10-attempt/15-minute ceiling, but the global counter should.
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 31; i++) {
       const res = await app.inject({
         method: 'POST',
         url: '/api/admin/login',
@@ -117,13 +120,13 @@ describe('POST /api/admin/login', () => {
       expect(res.statusCode).toBe(401)
     }
 
-    const limited = await app.inject({
+    const ok = await app.inject({
       method: 'POST',
       url: '/api/admin/login',
       payload: { password: VALID_PASSWORD },
       remoteAddress: '10.0.0.99' // a brand-new IP, never used above
     })
-    expect(limited.statusCode).toBe(429)
+    expect(ok.statusCode).toBe(200)
   })
 
   it('a single IP\'s own per-IP lockout still trips independently of the global counter', async () => {
@@ -158,44 +161,106 @@ describe('POST /api/admin/login', () => {
     expect(otherIp.statusCode).toBe(200)
   })
 
-  it('a successful login from one IP does not clear the global counter accumulated by others', async () => {
+  it('rejects malformed login bodies with 400, not 500, and counts them against the per-IP counter only', async () => {
     const app = await makeApp()
-
-    for (let i = 0; i < 29; i++) {
-      await app.inject({
+    const bodies: Array<[string, unknown]> = [
+      ['no body', undefined],
+      ['empty object', {}],
+      ['numeric password', { password: 123 }],
+      ['array password', { password: ['a'] }],
+      ['empty string', { password: '' }],
+    ]
+    for (const [label, payload] of bodies) {
+      const res = await app.inject({
         method: 'POST',
         url: '/api/admin/login',
-        payload: { password: 'wrongpassword' },
-        remoteAddress: `10.0.1.${i}`
+        ...(payload === undefined ? {} : { payload: payload as object }),
+        remoteAddress: '10.9.0.1'
       })
+      expect(res.statusCode, label).toBe(400)
+      expect(res.json(), label).toEqual({ error: 'password is required' })
     }
 
-    // A real successful login from yet another IP.
-    const success = await app.inject({
+    // Counted against that IP: 5 above + 5 more = 10 -> now locked out,
+    // even for the correct password.
+    for (let i = 0; i < 5; i++) {
+      await app.inject({ method: 'POST', url: '/api/admin/login', payload: {}, remoteAddress: '10.9.0.1' })
+    }
+    const locked = await app.inject({
       method: 'POST',
       url: '/api/admin/login',
       payload: { password: VALID_PASSWORD },
-      remoteAddress: '10.0.1.200'
+      remoteAddress: '10.9.0.1'
     })
-    expect(success.statusCode).toBe(200)
+    expect(locked.statusCode).toBe(429)
 
-    // One more failure from a fresh IP tips the global counter to 30 —
-    // if success had cleared it, this would still return 401.
-    const oneMore = await app.inject({
-      method: 'POST',
-      url: '/api/admin/login',
-      payload: { password: 'wrongpassword' },
-      remoteAddress: '10.0.1.201'
-    })
-    expect(oneMore.statusCode).toBe(401)
-
-    const limited = await app.inject({
+    // ...but a different IP is unaffected.
+    const other = await app.inject({
       method: 'POST',
       url: '/api/admin/login',
       payload: { password: VALID_PASSWORD },
-      remoteAddress: '10.0.1.202'
+      remoteAddress: '10.9.0.2'
     })
-    expect(limited.statusCode).toBe(429)
+    expect(other.statusCode).toBe(200)
+  })
+
+  describe('global failure spike logging (observability only)', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    async function failFrom(app: ReturnType<typeof buildTestAppWithLogCapture>['app'], count: number, prefix: string, payload: object = { password: 'wrongpassword' }) {
+      for (let i = 0; i < count; i++) {
+        await app.inject({ method: 'POST', url: '/api/admin/login', payload, remoteAddress: `${prefix}.${i}` })
+      }
+    }
+
+    it('logs one warn per window when the global count reaches the old threshold, never with the password, and never blocks', async () => {
+      process.env.ADMIN_PASSWORD_HASH = await bcrypt.hash(VALID_PASSWORD, 10)
+      const { app, logs } = buildTestAppWithLogCapture()
+      const spikes = () => logs.filter(l => l.event === 'admin_login_global_failure_spike')
+
+      await failFrom(app, 29, '10.1.0')
+      expect(spikes()).toHaveLength(0)
+
+      await failFrom(app, 6, '10.1.1') // crosses 30, keeps going to 35
+      expect(spikes()).toHaveLength(1)
+      expect(spikes()[0]).toMatchObject({ level: 40, count: 30 })
+
+      // No log line may contain the submitted password.
+      expect(JSON.stringify(logs)).not.toContain('wrongpassword')
+
+      // Still not blocked.
+      const ok = await app.inject({
+        method: 'POST',
+        url: '/api/admin/login',
+        payload: { password: VALID_PASSWORD },
+        remoteAddress: '10.1.9.9'
+      })
+      expect(ok.statusCode).toBe(200)
+    })
+
+    it('logs again in the next window', async () => {
+      process.env.ADMIN_PASSWORD_HASH = await bcrypt.hash(VALID_PASSWORD, 10)
+      vi.useFakeTimers({ toFake: ['Date'] })
+      const { app, logs } = buildTestAppWithLogCapture()
+      const spikes = () => logs.filter(l => l.event === 'admin_login_global_failure_spike')
+
+      await failFrom(app, 30, '10.2.0')
+      expect(spikes()).toHaveLength(1)
+
+      vi.setSystemTime(Date.now() + 31 * 60 * 1000) // past the 30-minute window
+      await failFrom(app, 30, '10.2.1')
+      expect(spikes()).toHaveLength(2)
+    })
+
+    it('does not count malformed bodies toward the global spike counter', async () => {
+      process.env.ADMIN_PASSWORD_HASH = await bcrypt.hash(VALID_PASSWORD, 10)
+      const { app, logs } = buildTestAppWithLogCapture()
+
+      await failFrom(app, 40, '10.3.0', {})
+      expect(logs.filter(l => l.event === 'admin_login_global_failure_spike')).toHaveLength(0)
+    })
   })
 
   it('returns 401 on wrong password', async () => {
@@ -223,18 +288,69 @@ describe('POST /api/admin/login', () => {
 })
 
 describe('POST /api/admin/logout', () => {
-  it('returns 200 and clears the cookie', async () => {
-    const app = await makeApp()
+  afterEach(() => {
+    delete process.env.ADMIN_PASSWORD_HASH
+  })
+
+  function epochOf(app: Awaited<ReturnType<typeof makeApp>>): number {
+    return (app.db.prepare('SELECT session_epoch FROM settings').get() as { session_epoch: number }).session_epoch
+  }
+
+  async function loginCookie(app: Awaited<ReturnType<typeof makeApp>>): Promise<string> {
     const res = await app.inject({
       method: 'POST',
-      url: '/api/admin/logout'
+      url: '/api/admin/login',
+      payload: { password: VALID_PASSWORD }
     })
+    const setCookie = res.headers['set-cookie'] as string | string[]
+    return (Array.isArray(setCookie) ? setCookie[0] : setCookie).split(';')[0]
+  }
+
+  // H1 (plan 020 / security audit 2026-11): logout used to have no auth
+  // check, so any anonymous caller could bump session_epoch and revoke the
+  // admin's session on demand, repeatedly.
+  it('rejects an anonymous logout with 401 and does not touch session_epoch', async () => {
+    const app = await makeApp()
+    const before = epochOf(app)
+
+    const res = await app.inject({ method: 'POST', url: '/api/admin/logout' })
+
+    expect(res.statusCode).toBe(401)
+    expect(epochOf(app)).toBe(before)
+  })
+
+  it('rejects a logout carrying a forged/invalid-signature cookie with 401 and does not touch session_epoch', async () => {
+    const app = await makeApp()
+    const before = epochOf(app)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/logout',
+      headers: { cookie: `admin_session=authenticated:${Date.now()}:${before}.not-a-real-signature` }
+    })
+
+    expect(res.statusCode).toBe(401)
+    expect(epochOf(app)).toBe(before)
+  })
+
+  it('an authenticated logout returns 200, clears the cookie, bumps session_epoch by 1, and revokes that same cookie', async () => {
+    const app = await makeApp()
+    const cookie = await loginCookie(app)
+    const before = epochOf(app)
+
+    const sessionBefore = await app.inject({ method: 'GET', url: '/api/admin/session', headers: { cookie } })
+    expect(sessionBefore.statusCode).toBe(200)
+
+    const res = await app.inject({ method: 'POST', url: '/api/admin/logout', headers: { cookie } })
     expect(res.statusCode).toBe(200)
     expect(res.json()).toEqual({ ok: true })
     const setCookie = res.headers['set-cookie'] as string | string[]
     const cookieHeader = Array.isArray(setCookie) ? setCookie.join('; ') : setCookie ?? ''
-    // Cookie should be cleared (expires in the past or max-age=0 or empty value)
     expect(cookieHeader).toContain('admin_session=')
+    expect(epochOf(app)).toBe(before + 1)
+
+    const sessionAfter = await app.inject({ method: 'GET', url: '/api/admin/session', headers: { cookie } })
+    expect(sessionAfter.statusCode).toBe(401)
   })
 })
 
