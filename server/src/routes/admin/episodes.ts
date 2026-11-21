@@ -1,7 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Episode } from '../../types.js'
 import { requireAdmin } from '../../auth.js'
-import { isValidMediaPath } from '../../utils/validation.js'
+import {
+  isValidMediaPath, isNonEmptyString, isStringWithin, isIntegerInRange, firstInvalid,
+  MAX_TITLE_LENGTH, MAX_TEXT_LENGTH, MAX_DATE_LENGTH, MIN_NUMBER, MAX_NUMBER,
+  type FieldCheck,
+} from '../../utils/validation.js'
 import { deleteLocalMediaFile } from '../../utils/mediaFiles.js'
 
 const ALLOWED_EPISODE_PATCH_FIELDS = new Set([
@@ -15,6 +19,28 @@ const ALLOWED_EPISODE_PATCH_FIELDS = new Set([
 // CHECK(audio_type IN ('upload','url')) constraint, uncaught, as a raw 500
 // with internal SQLite error text instead of a clean 400.
 const ALLOWED_AUDIO_TYPES = new Set(['upload', 'url'])
+
+// Shape/size validation shared by POST, PUT and PATCH (`partial`: only
+// fields actually present are checked). Returns the first bad field's name,
+// or null. Existing, more specific checks (negative duration, audio_type,
+// media paths, season existence) still run afterwards and keep their
+// messages. Unknown extra fields stay tolerated.
+function invalidEpisodeField(b: Record<string, unknown>, partial: boolean): string | null {
+  const checks: FieldCheck[] = []
+  const want = (k: string) => !partial || b[k] !== undefined
+  if (want('title')) checks.push(['title', isNonEmptyString(b.title, MAX_TITLE_LENGTH)])
+  if (want('number')) checks.push(['number', isIntegerInRange(b.number, MIN_NUMBER, MAX_NUMBER)])
+  if (want('season_id')) checks.push(['season_id', isIntegerInRange(b.season_id, MIN_NUMBER, MAX_NUMBER)])
+  if (want('publish_date')) checks.push(['publish_date', isStringWithin(b.publish_date, MAX_DATE_LENGTH)])
+  for (const k of ['description', 'guests', 'tags']) {
+    if (b[k] !== undefined) checks.push([k, isStringWithin(b[k], MAX_TEXT_LENGTH)])
+  }
+  // Type only; a negative value keeps its own specific message below.
+  if (b.duration_seconds !== undefined) {
+    checks.push(['duration_seconds', typeof b.duration_seconds === 'number' && Number.isFinite(b.duration_seconds)])
+  }
+  return firstInvalid(checks)
+}
 
 export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
   app.post<{
@@ -34,6 +60,10 @@ export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
       hidden?: boolean
     }
   }>('/admin/episodes', { preHandler: requireAdmin }, async (req, reply) => {
+    const body = (req.body ?? {}) as Record<string, unknown>
+    if (typeof body.title === 'string' && !body.title.trim()) return reply.status(400).send({ error: 'title is required' })
+    const bad = invalidEpisodeField(body, false)
+    if (bad) return reply.status(400).send({ error: `${bad} is invalid` })
     const {
       season_id, number, title, publish_date, audio_type, audio_path,
       description = '', guests = '', tags = '', cover_art_path = null,
@@ -79,6 +109,10 @@ export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
     }
   }>('/admin/episodes/:id', { preHandler: requireAdmin }, async (req, reply) => {
     const id = parseInt(req.params.id, 10)
+    const body = (req.body ?? {}) as Record<string, unknown>
+    if (typeof body.title === 'string' && !body.title.trim()) return reply.status(400).send({ error: 'title is required' })
+    const bad = invalidEpisodeField(body, false)
+    if (bad) return reply.status(400).send({ error: `${bad} is invalid` })
     const {
       season_id, number, title, publish_date, audio_type, audio_path,
       description = '', guests = '', tags = '', cover_art_path = null,
@@ -126,7 +160,7 @@ export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
     }>
   }>('/admin/episodes/:id', { preHandler: requireAdmin }, async (req, reply) => {
     const id = parseInt(req.params.id, 10)
-    const updates = req.body
+    const updates = req.body ?? {}
     const fields = Object.keys(updates) as Array<keyof typeof updates>
 
     const invalidFields = fields.filter(f => !ALLOWED_EPISODE_PATCH_FIELDS.has(f))
@@ -134,9 +168,11 @@ export const adminEpisodesRoute: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ error: `Invalid field(s): ${invalidFields.join(', ')}` })
     }
 
-    if (updates.title !== undefined && !updates.title.trim()) {
+    if (typeof updates.title === 'string' && !updates.title.trim()) {
       return reply.status(400).send({ error: 'title is required' })
     }
+    const bad = invalidEpisodeField(updates as Record<string, unknown>, true)
+    if (bad) return reply.status(400).send({ error: `${bad} is invalid` })
     if (updates.duration_seconds !== undefined && updates.duration_seconds < 0) {
       return reply.status(400).send({ error: 'duration_seconds must not be negative' })
     }

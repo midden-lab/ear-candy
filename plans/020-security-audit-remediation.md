@@ -4,7 +4,7 @@ title: "Security Audit 2026-11 — Prioritized Findings & Zero-Regression Remedi
 status: in-progress
 priority: 1
 created: 2026-11-15
-steps_completed: 6
+steps_completed: 7
 steps_total: 11
 tags: [security, hardening, red-team, deploy-safety, dependencies]
 ---
@@ -244,12 +244,12 @@ Test first (these are the reproduced behaviors): missing body / `{}` / `{passwor
 Add to `utils/validation.ts`: `isNonEmptyString(v, max): v is string`, `isIntegerInRange(v, min, max)`, `isHexColor(v): boolean` (`/^#[0-9a-fA-F]{6}$/`). Apply to admin write routes: `title` must be a non-empty string ≤ 300 chars; `description`/`guests`/`tags` strings ≤ 10 000; `number`, `season_id` integers (0..1 000 000); `publish_date` a string; `accent_color` hex on PUT and PATCH. **Compatibility guard:** before coding, read the client forms (`EpisodeFormPanel.tsx`, `SeasonFormPanel.tsx`, `AdminSettings.tsx`) and `e2e/` fixtures to confirm the exact payload types they send, and set limits that accept all of them; **Set each cap at no less than 2× the maximum value found in production** (`max_*` keys from Step 1's snapshot; a PUT resends stored fields, so a cap below existing data would make editing that row return 400) — if the snapshot isn't available, omit the length/range caps and keep only type checks; unknown extra fields stay tolerated (don't switch to strict-reject on PUT/POST, to avoid breaking any client). Return 400 with `{error: '<field> is invalid'}`. Add `app.setErrorHandler`: for errors with `statusCode < 500` pass through Fastify's message; for everything else log with `req.log.error({err})` and reply `500 {error: 'Internal server error'}` (no stack, no raw SQLite text). Public routes keep current behavior.
 
 **Acceptance criteria:**
-- [ ] `POST /admin/seasons` without `title` → 400 (was 500); `number: "x"` → 400 (was 201).
-- [ ] `PATCH /admin/settings {accent_color:'red;}body{x'}` → 400; `#5a3ef5` → 200.
-- [ ] Rate-limit 429, multipart 413 and malformed-JSON 400 responses keep their current status codes and body shapes (test each; the error handler only rewrites non-4xx).
-- [ ] A forced internal error returns `{error:'Internal server error'}` with no stack/DB text (test via a route that throws).
-- [ ] Every existing server test and the whole e2e suite pass unchanged.
-- [ ] **Pre-merge manual check recorded in the PR:** the production `accent_color` from Step 1's snapshot matches `#rrggbb`; if it doesn't, stop and ask before shipping (otherwise saving Settings in prod would start returning 400).
+- [x] `POST /admin/seasons` without `title` → 400 (was 500); `number: "x"` → 400 (was 201).
+- [x] `PATCH /admin/settings {accent_color:'red;}body{x'}` → 400; `#5a3ef5` → 200.
+- [x] Rate-limit 429, multipart 413 and malformed-JSON 400 responses keep their current status codes and body shapes (test each; the error handler only rewrites non-4xx).
+- [x] A forced internal error returns `{error:'Internal server error'}` with no stack/DB text (test via a route that throws).
+- [x] Every existing server test and the whole e2e suite pass unchanged.
+- [x] **Pre-merge manual check recorded in the PR:** the production `accent_color` from Step 1's snapshot matches `#rrggbb`; if it doesn't, stop and ask before shipping (otherwise saving Settings in prod would start returning 400).
 
 ---
 
