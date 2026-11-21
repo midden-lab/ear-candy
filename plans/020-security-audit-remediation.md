@@ -4,7 +4,7 @@ title: "Security Audit 2026-11 — Prioritized Findings & Zero-Regression Remedi
 status: in-progress
 priority: 1
 created: 2026-11-15
-steps_completed: 2
+steps_completed: 4
 steps_total: 11
 tags: [security, hardening, red-team, deploy-safety, dependencies]
 ---
@@ -199,10 +199,10 @@ Gate (all required): `make lint`, `make test`, `server/tests/audio-range.test.ts
 Test first: add cases to `admin-auth.test.ts`: (a) anonymous `POST /api/admin/logout` → **401** and `settings.session_epoch` unchanged; (b) authenticated logout → 200, epoch +1, the same cookie then 401 on `/api/admin/session`; (c) a request with a forged/invalid cookie → 401, epoch unchanged. Then add `{ preHandler: requireAdmin }` to the logout route. The 401 path needs no cookie clearing (the browser cookie is useless once rejected). Check `client/src/api.ts` (`adminLogout`, ~line 74) and `AdminLayout`: the client must clear its local state and return to the listener view even if logout returns 401 (an already-expired session); fix it only if it currently depends on a 2xx, and add a client test.
 
 **Acceptance criteria:**
-- [ ] Anonymous logout returns 401 and does not change `session_epoch` (test).
-- [ ] Authenticated logout still revokes all sessions (test; existing #34 tests pass).
-- [ ] Client logging out with an expired session still ends up logged-out in the UI (test).
-- [ ] e2e logout flow passes.
+- [x] Anonymous logout returns 401 and does not change `session_epoch` (test).
+- [x] Authenticated logout still revokes all sessions (test; existing #34 tests pass).
+- [x] Client logging out with an expired session still ends up logged-out in the UI (test).
+- [x] e2e logout flow passes.
 
 ---
 

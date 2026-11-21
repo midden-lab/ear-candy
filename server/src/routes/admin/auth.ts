@@ -103,7 +103,14 @@ export const adminAuthRoute: FastifyPluginAsync = async (app) => {
     return { ok: true }
   })
 
-  app.post('/admin/logout', async (req, reply) => {
+  // Requires a valid session (H1, plan 020 step 4). This used to be open to
+  // anyone: an anonymous POST bumped session_epoch below and so revoked the
+  // real admin's session on demand, repeatably. An already-expired or
+  // revoked session simply gets a 401 — there's nothing left to revoke and
+  // the browser-side cookie is useless once rejected, so no cookie clearing
+  // is needed on that path; the client falls through to its logged-out view
+  // regardless of the status code.
+  app.post('/admin/logout', { preHandler: requireAdmin }, async (req, reply) => {
     req.log.info({ event: 'admin_logout', ip: req.ip })
     // Bumping the epoch invalidates every outstanding session cookie
     // server-side (issue #34), not just this browser's — there's only one

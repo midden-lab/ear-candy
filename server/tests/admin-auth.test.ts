@@ -223,18 +223,69 @@ describe('POST /api/admin/login', () => {
 })
 
 describe('POST /api/admin/logout', () => {
-  it('returns 200 and clears the cookie', async () => {
-    const app = await makeApp()
+  afterEach(() => {
+    delete process.env.ADMIN_PASSWORD_HASH
+  })
+
+  function epochOf(app: Awaited<ReturnType<typeof makeApp>>): number {
+    return (app.db.prepare('SELECT session_epoch FROM settings').get() as { session_epoch: number }).session_epoch
+  }
+
+  async function loginCookie(app: Awaited<ReturnType<typeof makeApp>>): Promise<string> {
     const res = await app.inject({
       method: 'POST',
-      url: '/api/admin/logout'
+      url: '/api/admin/login',
+      payload: { password: VALID_PASSWORD }
     })
+    const setCookie = res.headers['set-cookie'] as string | string[]
+    return (Array.isArray(setCookie) ? setCookie[0] : setCookie).split(';')[0]
+  }
+
+  // H1 (plan 020 / security audit 2026-11): logout used to have no auth
+  // check, so any anonymous caller could bump session_epoch and revoke the
+  // admin's session on demand, repeatedly.
+  it('rejects an anonymous logout with 401 and does not touch session_epoch', async () => {
+    const app = await makeApp()
+    const before = epochOf(app)
+
+    const res = await app.inject({ method: 'POST', url: '/api/admin/logout' })
+
+    expect(res.statusCode).toBe(401)
+    expect(epochOf(app)).toBe(before)
+  })
+
+  it('rejects a logout carrying a forged/invalid-signature cookie with 401 and does not touch session_epoch', async () => {
+    const app = await makeApp()
+    const before = epochOf(app)
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/logout',
+      headers: { cookie: `admin_session=authenticated:${Date.now()}:${before}.not-a-real-signature` }
+    })
+
+    expect(res.statusCode).toBe(401)
+    expect(epochOf(app)).toBe(before)
+  })
+
+  it('an authenticated logout returns 200, clears the cookie, bumps session_epoch by 1, and revokes that same cookie', async () => {
+    const app = await makeApp()
+    const cookie = await loginCookie(app)
+    const before = epochOf(app)
+
+    const sessionBefore = await app.inject({ method: 'GET', url: '/api/admin/session', headers: { cookie } })
+    expect(sessionBefore.statusCode).toBe(200)
+
+    const res = await app.inject({ method: 'POST', url: '/api/admin/logout', headers: { cookie } })
     expect(res.statusCode).toBe(200)
     expect(res.json()).toEqual({ ok: true })
     const setCookie = res.headers['set-cookie'] as string | string[]
     const cookieHeader = Array.isArray(setCookie) ? setCookie.join('; ') : setCookie ?? ''
-    // Cookie should be cleared (expires in the past or max-age=0 or empty value)
     expect(cookieHeader).toContain('admin_session=')
+    expect(epochOf(app)).toBe(before + 1)
+
+    const sessionAfter = await app.inject({ method: 'GET', url: '/api/admin/session', headers: { cookie } })
+    expect(sessionAfter.statusCode).toBe(401)
   })
 })
 
