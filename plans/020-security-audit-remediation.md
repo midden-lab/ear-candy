@@ -4,7 +4,7 @@ title: "Security Audit 2026-11 — Prioritized Findings & Zero-Regression Remedi
 status: in-progress
 priority: 1
 created: 2026-11-15
-steps_completed: 2
+steps_completed: 4
 steps_total: 11
 tags: [security, hardening, red-team, deploy-safety, dependencies]
 ---
@@ -199,10 +199,10 @@ Gate (all required): `make lint`, `make test`, `server/tests/audio-range.test.ts
 Test first: add cases to `admin-auth.test.ts`: (a) anonymous `POST /api/admin/logout` → **401** and `settings.session_epoch` unchanged; (b) authenticated logout → 200, epoch +1, the same cookie then 401 on `/api/admin/session`; (c) a request with a forged/invalid cookie → 401, epoch unchanged. Then add `{ preHandler: requireAdmin }` to the logout route. The 401 path needs no cookie clearing (the browser cookie is useless once rejected). Check `client/src/api.ts` (`adminLogout`, ~line 74) and `AdminLayout`: the client must clear its local state and return to the listener view even if logout returns 401 (an already-expired session); fix it only if it currently depends on a 2xx, and add a client test.
 
 **Acceptance criteria:**
-- [ ] Anonymous logout returns 401 and does not change `session_epoch` (test).
-- [ ] Authenticated logout still revokes all sessions (test; existing #34 tests pass).
-- [ ] Client logging out with an expired session still ends up logged-out in the UI (test).
-- [ ] e2e logout flow passes.
+- [x] Anonymous logout returns 401 and does not change `session_epoch` (test).
+- [x] Authenticated logout still revokes all sessions (test; existing #34 tests pass).
+- [x] Client logging out with an expired session still ends up logged-out in the UI (test).
+- [x] e2e logout flow passes.
 
 ---
 
@@ -229,10 +229,10 @@ Test first: (a) logout twice (epoch 2), PUT settings → `session_epoch` still 2
 Test first (these are the reproduced behaviors): missing body / `{}` / `{password: 123}` / `{password: ['a']}` / empty string → **400** `{error:'password is required'}` (never 500), counted as a failed attempt against the per-IP counter only; 31 failures from 31 distinct IPs must **not** block a subsequent correct-password login from a fresh IP (→ 200); a single IP is still locked after 10 failures (→ 429, existing test stays); a `warn`-level log `{event:'admin_login_global_failure_spike', count}` fires once per window when the global count reaches the old threshold. Implementation: keep the per-IP lockout untouched; keep the global *counter* but make it **observability-only** (structured warn log, no 429). Never log the password. Rationale in code comment: a global hard block is itself a denial-of-service on the only admin credential; brute-force resistance rests on bcrypt cost + per-IP lockout + a strong password. In CLAUDE.md gotcha 10a/9 note the change.
 
 **Acceptance criteria:**
-- [ ] The four malformed bodies return 400, not 500 (test).
-- [ ] Correct password succeeds after 31 distinct-IP failures (test).
-- [ ] Per-IP lockout after 10 failures still returns 429 (existing test).
-- [ ] The spike log line is emitted once per window and contains no password (log-capture test via `buildTestAppWithLogCapture`).
+- [x] The four malformed bodies return 400, not 500 (test).
+- [x] Correct password succeeds after 31 distinct-IP failures (test).
+- [x] Per-IP lockout after 10 failures still returns 429 (existing test).
+- [x] The spike log line is emitted once per window and contains no password (log-capture test via `buildTestAppWithLogCapture`).
 
 ---
 
