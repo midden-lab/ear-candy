@@ -23,3 +23,15 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # The base image is deliberately pinned to a Node LTS major (22). Take
+    # digest and patch/minor bumps automatically, but never propose a new
+    # major, which needs its own engine/dependency review.
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
