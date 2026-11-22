@@ -182,10 +182,10 @@ Confirm the Node toolchain works first (a manual prerequisite, see Context; or u
 Gate (all required): `make lint`, `make test`, `server/tests/audio-range.test.ts` explicitly (CLAUDE.md gotcha 17a: static-plugin bumps must re-run it), `make e2e` (uses real audio decode, image upload, favicon upload). Also `docker build .` of the production Dockerfile must succeed (native `bcrypt`/`better-sqlite3`/`sharp` rebuild on Alpine).
 
 **Acceptance criteria:**
-- [ ] `cd server && npm audit --omit=dev` reports 0 high/critical; any remaining moderate is listed in Notes with its reason.
-- [ ] `git diff --stat` shows only `server/package.json` and `server/package-lock.json` changed (plus Notes in this plan).
-- [ ] `make test`, `make lint`, `make e2e`, and `docker build .` all succeed.
-- [ ] Duration auto-detection and the upload e2e tests pass unchanged.
+- [x] `cd server && npm audit --omit=dev` reports 0 high/critical; any remaining moderate is listed in Notes with its reason.
+- [x] `git diff --stat` shows only `server/package.json` and `server/package-lock.json` changed (plus Notes in this plan).
+- [x] `make test`, `make lint`, `make e2e`, and `docker build .` all succeed.
+- [x] Duration auto-detection and the upload e2e tests pass unchanged.
 
 ---
 # PHASE C — Code, config and docs fixes
