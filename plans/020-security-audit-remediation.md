@@ -4,7 +4,7 @@ title: "Security Audit 2026-11 — Prioritized Findings & Zero-Regression Remedi
 status: in-progress
 priority: 1
 created: 2026-11-15
-steps_completed: 8
+steps_completed: 9
 steps_total: 11
 tags: [security, hardening, red-team, deploy-safety, dependencies]
 ---
@@ -278,11 +278,11 @@ Test first: a buffer with SVG/GIF/BMP/TIFF content named `x.png` (mimetype `imag
 (c) Wiring (gotcha 37b): document in `.env.example`/README; add `DEPLOY_EVENTS_RETENTION_DAYS: ${{ vars.EVENTS_RETENTION_DAYS }}` to the deploy `env:` and `envs:` lists and `-e EVENTS_RETENTION_DAYS="$DEPLOY_EVENTS_RETENTION_DAYS"` to `run_app`. An unset GitHub variable renders as empty → disabled. Leave the variable **unset**; enabling is the maintainer's MANUAL decision.
 
 **Acceptance criteria:**
-- [ ] `parseRetentionDays` returns null for `undefined`, `''`, `'abc'`, `'7'`; returns 90 for `'90'` (test).
-- [ ] `pruneEvents` deletes only rows older than the cutoff and keeps newer ones (test with seeded events; also verifies orphan-safe — no FK errors).
-- [ ] With the env var unset, `server.ts` registers no interval (verified by reading the code path + a unit test of the decision function).
-- [ ] Events above the global cap return 204 and are not inserted; the first 1200 in a minute are (test with a lowered cap via a module constant override).
-- [ ] The `deploy` job passes the variable by the `env:`/`envs:` convention, no `${{ }}` in script text.
+- [x] `parseRetentionDays` returns null for `undefined`, `''`, `'abc'`, `'7'`; returns 90 for `'90'` (test).
+- [x] `pruneEvents` deletes only rows older than the cutoff and keeps newer ones (test with seeded events; also verifies orphan-safe — no FK errors).
+- [x] With the env var unset, `server.ts` registers no interval (verified by reading the code path + a unit test of the decision function).
+- [x] Events above the global cap return 204 and are not inserted; the first 1200 in a minute are (test with a lowered cap via a module constant override).
+- [x] The `deploy` job passes the variable by the `env:`/`envs:` convention, no `${{ }}` in script text.
 
 ---
 
