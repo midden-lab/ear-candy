@@ -24,6 +24,10 @@ services:
       # data dir; override via your own .env if you want it elsewhere. See
       # scripts/fetch-geoip-db.sh and the README's Analytics section.
       - GEOIP_DB_PATH=${GEOIP_DB_PATH:-/app/data/geoip/dbip-country-lite.mmdb}
+      # Optional and OFF by default: empty/unset means no analytics events
+      # are ever deleted. A whole number >= 30 keeps that many days and
+      # permanently deletes older events (see README).
+      - EVENTS_RETENTION_DAYS=${EVENTS_RETENTION_DAYS:-}
     logging:
       driver: json-file
       options:

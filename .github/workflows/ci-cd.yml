@@ -309,6 +309,11 @@ jobs:
           DEPLOY_GHCR_ACTOR: ${{ github.actor }}
           DEPLOY_COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
           DEPLOY_ADMIN_PASSWORD_HASH: ${{ secrets.ADMIN_PASSWORD_HASH }}
+          # A repository *variable*, not a secret, and deliberately left
+          # unset: an unset variable renders as an empty string, which the
+          # app treats as "retention disabled" (nothing is ever deleted).
+          # Enabling it is a manual decision (README: EVENTS_RETENTION_DAYS).
+          DEPLOY_EVENTS_RETENTION_DAYS: ${{ vars.EVENTS_RETENTION_DAYS }}
         with:
           host: ${{ secrets.DROPLET_IP }}
           username: root
@@ -319,7 +324,7 @@ jobs:
           # script text via ${{ }}. Splicing would make any value containing
           # shell metacharacters execute as literal script on a job that
           # holds root SSH access to production (issue #31).
-          envs: DEPLOY_REGISTRY,DEPLOY_IMAGE_NAME,DEPLOY_IMAGE_DIGEST,DEPLOY_GHCR_PAT,DEPLOY_GHCR_ACTOR,DEPLOY_COOKIE_SECRET,DEPLOY_ADMIN_PASSWORD_HASH
+          envs: DEPLOY_REGISTRY,DEPLOY_IMAGE_NAME,DEPLOY_IMAGE_DIGEST,DEPLOY_GHCR_PAT,DEPLOY_GHCR_ACTOR,DEPLOY_COOKIE_SECRET,DEPLOY_ADMIN_PASSWORD_HASH,DEPLOY_EVENTS_RETENTION_DAYS
           script: |
             set -e
             if [ -z "$DEPLOY_IMAGE_DIGEST" ]; then
@@ -408,6 +413,7 @@ jobs:
                 -e ADMIN_PASSWORD_HASH="$DEPLOY_ADMIN_PASSWORD_HASH" \
                 -e TRUSTED_PROXY_IPS="127.0.0.1,::1,172.17.0.1" \
                 -e GEOIP_DB_PATH="/app/data/geoip/dbip-country-lite.mmdb" \
+                -e EVENTS_RETENTION_DAYS="$DEPLOY_EVENTS_RETENTION_DAYS" \
                 "$1"
             }
 
