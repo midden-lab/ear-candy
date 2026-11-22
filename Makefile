@@ -5,7 +5,7 @@ PASSWORD ?= changeme
 help:
 	@echo "Ear Candy — available targets:"
 	@echo ""
-	@echo "  setup            Generate .env with bcrypt hash (PASSWORD=yourpassword)"
+	@echo "  setup            Generate .env with bcrypt hash (PASSWORD='16+ char passphrase')"
 	@echo "  up               Start dev stack (docker compose up)"
 	@echo "  down             Stop dev stack"
 	@echo "  logs             Tail dev stack logs"
@@ -18,20 +18,50 @@ help:
 	@echo "  build-prod       Build production Docker images"
 	@echo "  up-prod          Start production stack (detached)"
 	@echo ""
-	@echo "  Example: make setup PASSWORD=mysecretpassword"
+	@echo "  Example: PASSWORD='a-long-passphrase-16+-chars' make setup"
 
+# `PASSWORD=... make setup` or `make setup PASSWORD=...` both work. Exported so
+# the recipe can read it from the environment instead of having make splice it
+# into the shell command text (a password containing a space, quote or `$`
+# used to break — or inject into — the old interpolated command line).
+export PASSWORD
+
+# Admin password -> bcrypt hash, entirely inside a throwaway container:
+#  - The password reaches the container through the environment (`-e PW`
+#    with no value: docker copies it from this shell), never as a command-line
+#    argument, and is never echoed.
+#  - The real server/ directory is NOT bind-mounted. Only package.json and the
+#    lockfile are mounted, read-only; `npm ci` runs on a copy inside the
+#    container. The old `-v server:/app` + `npm ci` replaced the host's
+#    macOS node_modules with Linux binaries. Installing from the lockfile
+#    (not an unpinned `npm install bcrypt`) keeps npm's integrity checks on
+#    the package that sees the real password. `--ignore-scripts` means no
+#    package install script runs at all, and it is also what makes this work:
+#    the old `npm ci` tried to COMPILE better-sqlite3 (no prebuilt binary for
+#    Node 20 on musl/arm64, so on Apple Silicon it failed outright — `make
+#    setup` was broken there) while bcrypt, the only module used here, ships
+#    its own prebuilt binaries and needs no install step.
+#  - Cost 12, matching scripts/hash-password.sh and the README (it was 10).
+#    Existing hashes keep working: the cost is embedded in the hash.
 setup:
 	@if [ -f .env ]; then \
 		echo ".env already exists — delete it first if you want to regenerate"; \
 		exit 1; \
 	fi
-	@echo "Generating bcrypt hash for password: $(PASSWORD)"
-	@HASH=$$(docker run --rm \
-		-v $(PWD)/server:/app \
-		-w /app \
-		-e PW=$(PASSWORD) \
+	@if [ -z "$$PASSWORD" ]; then \
+		echo "PASSWORD is required, e.g.: PASSWORD='a-long-passphrase-16+-chars' make setup" >&2; \
+		exit 1; \
+	fi
+	@if [ "$${#PASSWORD}" -lt 16 ]; then \
+		echo "WARNING: that password is under 16 characters. The admin password is the only thing between the internet and full control of this site; use a long passphrase (16+ characters)." >&2; \
+	fi
+	@echo "Generating a bcrypt hash (cost 12) for the admin password..."
+	@HASH=$$(PW="$$PASSWORD" docker run --rm \
+		-e PW \
+		-v "$(CURDIR)/server/package.json:/in/package.json:ro" \
+		-v "$(CURDIR)/server/package-lock.json:/in/package-lock.json:ro" \
 		node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 \
-		sh -c 'npm ci --quiet >/dev/null 2>&1 && node -e "const b=require(\"bcrypt\"); b.hash(process.env.PW, 10).then(h=>process.stdout.write(h))"' \
+		sh -c 'mkdir /w && cp /in/package.json /in/package-lock.json /w/ && cd /w && npm ci --omit=dev --ignore-scripts --quiet >/dev/null 2>&1 && node -e "const b=require(\"bcrypt\"); b.hash(process.env.PW, 12).then(h=>process.stdout.write(h))"' \
 	) && \
 	COOKIE_SECRET=$$(openssl rand -hex 32) && \
 	printf 'ADMIN_PASSWORD_HASH=%s\nCOOKIE_SECRET=%s\n' "$$(echo "$$HASH" | sed 's/\$$/$$$$/g')" "$$COOKIE_SECRET" > .env

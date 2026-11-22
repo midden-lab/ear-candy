@@ -1,10 +1,10 @@
 ---
 id: security-audit-remediation
 title: "Security Audit 2026-11 — Prioritized Findings & Zero-Regression Remediation"
-status: in-progress
+status: complete
 priority: 1
 created: 2026-11-15
-steps_completed: 10
+steps_completed: 11
 steps_total: 11
 tags: [security, hardening, red-team, deploy-safety, dependencies]
 ---
@@ -313,10 +313,10 @@ Add `--cap-drop ALL` and `--security-opt no-new-privileges:true` to `run_app` (S
 - SECURITY.md: add one line that fixes ship through the `dev`→`main` flow.
 
 **Acceptance criteria:**
-- [ ] `docs/runbooks/caddy-tls.md` has the manual apply + verify + warning steps.
-- [ ] `make setup` still generates a working `.env` (hash verifies via an existing login test or manual `make setup`).
-- [ ] CLAUDE.md gotchas match shipped behavior (no stale DELETE+INSERT or global-lockout text).
-- [ ] No production-affecting file other than the template changed in this step.
+- [x] `docs/runbooks/caddy-tls.md` has the manual apply + verify + warning steps.
+- [x] `make setup` still generates a working `.env` (hash verifies via an existing login test or manual `make setup`).
+- [x] CLAUDE.md gotchas match shipped behavior (no stale DELETE+INSERT or global-lockout text).
+- [x] No production-affecting file other than the template changed in this step.
 
 ## Testing
 
