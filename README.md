@@ -22,9 +22,11 @@ A self-hostable podcast webapp. Each deployment hosts a single podcast. Listener
 ### Quickest path: Makefile
 
 ```bash
-make setup PASSWORD=yourpassword   # generates .env (bcrypt hash + cookie secret), Docker-only, no local Node needed
-make up                            # docker compose up --build
+PASSWORD='a-long-passphrase-16+-chars' make setup   # generates .env (bcrypt hash + cookie secret), Docker-only, no local Node needed
+make up                                              # docker compose up --build
 ```
+
+**Choose a strong admin password — at least 16 characters** (a passphrase of several random words is ideal). It is the only thing between the internet and full control of the site: there is no second factor and no in-app "change password" flow (changing it means regenerating the hash and redeploying). The login endpoint locks an IP out after 10 failed attempts, but that and bcrypt's cost only slow a guesser down — a long password is what actually stops one. `make setup` warns (but doesn't refuse) below 16 characters, never prints the password, and hashes it at bcrypt cost 12. To keep it out of your shell history, use `read -rs PASSWORD && export PASSWORD && make setup`.
 
 Run `make help` for the full list of shortcuts (`test`, `lint`, `e2e`, `e2e-ui`, `build-prod`, `up-prod`, ...).
 
@@ -42,7 +44,7 @@ bcrypt.hash('your-password', 12).then(h => console.log(h));
 "
 ```
 
-Or use the helper script (requires Node + bcrypt installed locally):
+Use a password of at least 16 characters. Or use the helper script (requires Node + bcrypt installed locally):
 
 ```bash
 ./scripts/hash-password.sh your-password
@@ -88,7 +90,7 @@ The live production deployment (via GitHub Actions, see `.github/workflows/ci-cd
 
 | Variable | Description |
 |----------|-------------|
-| `ADMIN_PASSWORD_HASH` | bcrypt hash of the admin password (rounds ≥ 10 recommended) |
+| `ADMIN_PASSWORD_HASH` | bcrypt hash of the admin password (cost 12 recommended — what `make setup` and `scripts/hash-password.sh` use; existing lower-cost hashes keep working). Use a password of at least 16 characters. |
 | `COOKIE_SECRET` | Secret used to sign session cookies — use a long random string |
 
 Both are required; the server will refuse to start in production if either is missing.
