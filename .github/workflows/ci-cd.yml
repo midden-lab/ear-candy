@@ -473,11 +473,23 @@ jobs:
             # aborting the script with no container running).
             if run_app "$IMAGE" && wait_healthy; then
               echo "App is healthy"
-              # Pruned only now, after the new image is proven healthy: the
-              # replaced image is untagged/dangling once its container is
-              # gone, and rollback needs it still present.
-              echo "Pruning dangling images..."
-              docker image prune -f || true
+              # Pruned only now, after the new image is proven healthy,
+              # because the automatic rollback above needs the previous
+              # image still present until then.
+              #
+              # `-a` is required. This deploy pulls by digest, and a
+              # digest-pulled image has a repository name but no tag, which
+              # Docker does NOT count as "dangling" — so the plain
+              # `docker image prune -f` that used to be here removed nothing,
+              # and ~450MB per deploy piled up (74 images / ~7GB on the
+              # Droplet, taking the disk to 86% full, until cleaned by hand
+              # on 2026-11-22). `-a` removes every image no container is
+              # using — never the running one. `until=72h` (image build time)
+              # keeps the last few days of releases so a manual rollback to
+              # the previous one doesn't have to re-pull from GHCR, while
+              # still bounding growth.
+              echo "Pruning unused images older than 72h..."
+              docker image prune -a -f --filter "until=72h" || true
               exit 0
             fi
 
