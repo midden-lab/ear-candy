@@ -82,3 +82,49 @@ header limit.
 `systemctl stop caddy && cp -a /root/caddy-<old-version>.bin /usr/bin/caddy && cp -a /root/Caddyfile.pre-<new-version> /etc/caddy/Caddyfile && systemctl start caddy`,
 then repeat the step 6 checks. apt will keep offering the newer version; run
 `apt-mark hold caddy` if you want to stay on the old one.
+
+## Enabling HSTS (manual — and close to one-way)
+
+`infra/Caddyfile.template` now includes
+`header Strict-Transport-Security "max-age=31536000"` (one year, **no**
+`includeSubDomains`, **no** `preload`). That only affects a *fresh* Droplet
+provisioned by `scripts/setup-droplet.sh`. **The live `/etc/caddy/Caddyfile` has
+no HSTS header and nothing deploys one** — CI never touches Caddy. Applying it
+to the running Droplet is a deliberate, manual decision (security audit L3).
+
+**Read this first.** Once a browser has seen the header over HTTPS it refuses to
+use plain HTTP for this hostname until `max-age` runs out — a year, per the
+template. Removing the header later does **not** un-pin browsers that already
+cached it. The only way to shorten it is to serve a smaller value (or
+`max-age=0`) over working HTTPS and wait for each browser to revisit. That is
+harmless while HTTPS keeps working and painful if it ever breaks (an expired or
+misconfigured certificate becomes a hard failure with no click-through). Do not
+add `includeSubDomains` or `preload` unless you are certain every subdomain will
+be HTTPS-only indefinitely.
+
+**Recommended: stage it** — start with a short lifetime so a mistake expires in
+minutes, then raise it:
+
+1. Back up the live config on the Droplet:
+   `cp -a /etc/caddy/Caddyfile /root/Caddyfile.pre-hsts`.
+2. Edit `/etc/caddy/Caddyfile` and add this line inside the site block, above
+   `reverse_proxy`: `header Strict-Transport-Security "max-age=300"` (5 minutes).
+3. Validate before touching the running service:
+   `caddy validate --config /etc/caddy/Caddyfile`.
+4. Apply it: `systemctl reload caddy`.
+5. Verify:
+   `curl -sI https://<domain> | grep -i strict-transport-security` shows
+   `strict-transport-security: max-age=300`, and
+   `curl -sf https://<domain>/api/health` still returns `"ok":true`.
+6. Use the site for a while (browse, play an episode, log in to admin). When
+   you are confident, change `max-age=300` to `max-age=31536000` (the value in
+   the template), repeat steps 3–5.
+
+**To undo** (the header only; already-pinned browsers keep their lifetime):
+restore the backup with `cp -a /root/Caddyfile.pre-hsts /etc/caddy/Caddyfile`
+and `systemctl reload caddy`. To actively shorten browsers' pin instead, serve
+`max-age=0` for as long as your visitors take to come back.
+
+Keep the live config and the template in step (see above): if you apply HSTS by
+hand with a different value, back-port it to `infra/Caddyfile.template`.
+

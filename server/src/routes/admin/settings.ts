@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Settings } from '../../types.js'
 import { requireAdmin } from '../../auth.js'
-import { isValidMediaPath } from '../../utils/validation.js'
+import { isValidMediaPath, isHexColor } from '../../utils/validation.js'
 import { normalizeIp } from '../../utils/ipMatch.js'
 
 const ALLOWED_SETTINGS_PATCH_FIELDS = new Set(['podcast_name', 'tagline', 'description', 'cover_art_path', 'favicon_path', 'browser_tab_title', 'accent_color', 'analytics_enabled', 'track_returning_listeners', 'excluded_analytics_ips'])
@@ -25,8 +25,9 @@ export const adminSettingsRoute: FastifyPluginAsync = async (app) => {
     const {
       podcast_name, tagline, description, cover_art_path, favicon_path, browser_tab_title, accent_color,
       analytics_enabled = true, track_returning_listeners = true, excluded_analytics_ips = null,
-    } = req.body
-    if (!podcast_name.trim()) return reply.status(400).send({ error: 'podcast_name is required' })
+    } = (req.body ?? {}) as Settings
+    if (typeof podcast_name !== 'string' || !podcast_name.trim()) return reply.status(400).send({ error: 'podcast_name is required' })
+    if (!isHexColor(accent_color)) return reply.status(400).send({ error: 'accent_color is invalid' })
     if (cover_art_path && !isValidMediaPath(cover_art_path)) {
       return reply.status(400).send({ error: 'Invalid cover_art_path' })
     }
@@ -37,10 +38,22 @@ export const adminSettingsRoute: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ error: 'excluded_analytics_ips is too long' })
     }
 
-    app.db.prepare('DELETE FROM settings').run()
-    app.db.prepare(
-      'INSERT INTO settings (podcast_name, tagline, description, cover_art_path, favicon_path, browser_tab_title, accent_color, analytics_enabled, track_returning_listeners, excluded_analytics_ips) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(podcast_name, tagline, description, cover_art_path ?? null, favicon_path ?? null, browser_tab_title ?? null, accent_color, analytics_enabled ? 1 : 0, track_returning_listeners ? 1 : 0, excluded_analytics_ips ?? null)
+    // A single UPDATE inside a transaction, not DELETE + INSERT (security
+    // audit M1). The old pattern (a) reset session_epoch to its column
+    // default of 0, since it wasn't in the INSERT's column list — silently
+    // reviving every session cookie previously revoked by a logout and
+    // killing the admin's own — and (b) wasn't atomic, so a failure between
+    // the two statements left zero rows and made the public /api/settings
+    // 500. The settings table still always has exactly one row, and
+    // session_epoch is deliberately never named here: it's an auth
+    // revocation counter owned by login/logout, not a user-editable setting.
+    // Omitted optional fields still reset to their defaults/null, exactly as
+    // before.
+    app.db.transaction(() => {
+      app.db.prepare(
+        'UPDATE settings SET podcast_name = ?, tagline = ?, description = ?, cover_art_path = ?, favicon_path = ?, browser_tab_title = ?, accent_color = ?, analytics_enabled = ?, track_returning_listeners = ?, excluded_analytics_ips = ?'
+      ).run(podcast_name, tagline, description, cover_art_path ?? null, favicon_path ?? null, browser_tab_title ?? null, accent_color, analytics_enabled ? 1 : 0, track_returning_listeners ? 1 : 0, excluded_analytics_ips ?? null)
+    })()
 
     const row = app.db.prepare('SELECT * FROM settings').get() as Settings
     return row
@@ -49,7 +62,7 @@ export const adminSettingsRoute: FastifyPluginAsync = async (app) => {
   app.patch<{
     Body: Partial<Settings>
   }>('/admin/settings', { preHandler: requireAdmin }, async (req, reply) => {
-    const updates = req.body
+    const updates = req.body ?? {}
     const fields = Object.keys(updates) as Array<keyof Settings>
 
     if (fields.length === 0) {
@@ -60,8 +73,13 @@ export const adminSettingsRoute: FastifyPluginAsync = async (app) => {
     if (invalidFields.length > 0) {
       return reply.status(400).send({ error: `Invalid field(s): ${invalidFields.join(', ')}` })
     }
-    if (updates.podcast_name !== undefined && !updates.podcast_name.trim()) {
+    if (updates.podcast_name !== undefined && (typeof updates.podcast_name !== 'string' || !updates.podcast_name.trim())) {
       return reply.status(400).send({ error: 'podcast_name is required' })
+    }
+    // accent_color is admin-supplied and ends up in a CSS custom property;
+    // require #rrggbb (L1). The client's <input type="color"> always emits it.
+    if (updates.accent_color !== undefined && !isHexColor(updates.accent_color)) {
+      return reply.status(400).send({ error: 'accent_color is invalid' })
     }
     if (updates.cover_art_path && !isValidMediaPath(updates.cover_art_path)) {
       return reply.status(400).send({ error: 'Invalid cover_art_path' })

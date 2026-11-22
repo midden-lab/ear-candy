@@ -100,6 +100,33 @@ function isIco(head: Buffer): boolean {
   return head.length >= 4 && head[0] === 0x00 && head[1] === 0x00 && head[2] === 0x01 && head[3] === 0x00
 }
 
+function isJpeg(head: Buffer): boolean {
+  return head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff
+}
+
+function isWebp(head: Buffer): boolean {
+  return (
+    head.length >= 12 &&
+    head.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    head.subarray(8, 12).toString('ascii') === 'WEBP'
+  )
+}
+
+/**
+ * True if the leading bytes are a real JPEG, PNG or WebP — whatever the
+ * filename extension claims. Used by the cover-art upload BEFORE the bytes
+ * reach sharp, which decodes by content: without this, a file named x.png
+ * that is really an SVG/GIF/TIFF was handed to libvips' other decoders
+ * (including librsvg, the code path behind sharp's advisory — security
+ * audit M3). Deliberately NOT tied to the extension, unlike the audio and
+ * favicon checks: it keeps every upload that already works working (e.g. a
+ * real PNG someone saved as photo.jpg) while still refusing every format
+ * the route never intended to accept.
+ */
+export function matchesImageSignature(head: Buffer): boolean {
+  return isJpeg(head) || isPng(head) || isWebp(head)
+}
+
 const FAVICON_SIGNATURE_CHECKS: Record<string, (head: Buffer) => boolean> = {
   '.png': isPng,
   '.ico': isIco,

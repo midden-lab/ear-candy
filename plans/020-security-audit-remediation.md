@@ -1,10 +1,10 @@
 ---
 id: security-audit-remediation
 title: "Security Audit 2026-11 — Prioritized Findings & Zero-Regression Remediation"
-status: in-progress
+status: complete
 priority: 1
 created: 2026-11-15
-steps_completed: 4
+steps_completed: 11
 steps_total: 11
 tags: [security, hardening, red-team, deploy-safety, dependencies]
 ---
@@ -182,10 +182,10 @@ Confirm the Node toolchain works first (a manual prerequisite, see Context; or u
 Gate (all required): `make lint`, `make test`, `server/tests/audio-range.test.ts` explicitly (CLAUDE.md gotcha 17a: static-plugin bumps must re-run it), `make e2e` (uses real audio decode, image upload, favicon upload). Also `docker build .` of the production Dockerfile must succeed (native `bcrypt`/`better-sqlite3`/`sharp` rebuild on Alpine).
 
 **Acceptance criteria:**
-- [ ] `cd server && npm audit --omit=dev` reports 0 high/critical; any remaining moderate is listed in Notes with its reason.
-- [ ] `git diff --stat` shows only `server/package.json` and `server/package-lock.json` changed (plus Notes in this plan).
-- [ ] `make test`, `make lint`, `make e2e`, and `docker build .` all succeed.
-- [ ] Duration auto-detection and the upload e2e tests pass unchanged.
+- [x] `cd server && npm audit --omit=dev` reports 0 high/critical; any remaining moderate is listed in Notes with its reason.
+- [x] `git diff --stat` shows only `server/package.json` and `server/package-lock.json` changed (plus Notes in this plan).
+- [x] `make test`, `make lint`, `make e2e`, and `docker build .` all succeed.
+- [x] Duration auto-detection and the upload e2e tests pass unchanged.
 
 ---
 # PHASE C — Code, config and docs fixes
@@ -214,10 +214,10 @@ Test first: add cases to `admin-auth.test.ts`: (a) anonymous `POST /api/admin/lo
 Test first: (a) logout twice (epoch 2), PUT settings → `session_epoch` still 2 and a pre-PUT cookie from epoch 0 stays 401; (b) settings row count is exactly 1 after PUT; (c) all PUT-able fields are replaced, including setting nullable fields back to null/default; (d) simulated failure mid-PUT (invalid `cover_art_path`) leaves the original row intact. Implementation: replace `DELETE`+`INSERT` with a single `UPDATE settings SET <all PUT-able columns> = ?` inside `app.db.transaction(...)`; never touch `session_epoch`. Update CLAUDE.md gotcha 8 (the DELETE+INSERT pattern note is no longer true).
 
 **Acceptance criteria:**
-- [ ] `session_epoch` unchanged across a PUT (test).
-- [ ] Settings row count is 1 after any PUT, including a rejected one (test).
-- [ ] Response body shape unchanged vs. today (existing tests pass untouched).
-- [ ] CLAUDE.md gotcha 8 reflects the new behavior.
+- [x] `session_epoch` unchanged across a PUT (test).
+- [x] Settings row count is 1 after any PUT, including a rejected one (test).
+- [x] Response body shape unchanged vs. today (existing tests pass untouched).
+- [x] CLAUDE.md gotcha 8 reflects the new behavior.
 
 ---
 
@@ -244,12 +244,12 @@ Test first (these are the reproduced behaviors): missing body / `{}` / `{passwor
 Add to `utils/validation.ts`: `isNonEmptyString(v, max): v is string`, `isIntegerInRange(v, min, max)`, `isHexColor(v): boolean` (`/^#[0-9a-fA-F]{6}$/`). Apply to admin write routes: `title` must be a non-empty string ≤ 300 chars; `description`/`guests`/`tags` strings ≤ 10 000; `number`, `season_id` integers (0..1 000 000); `publish_date` a string; `accent_color` hex on PUT and PATCH. **Compatibility guard:** before coding, read the client forms (`EpisodeFormPanel.tsx`, `SeasonFormPanel.tsx`, `AdminSettings.tsx`) and `e2e/` fixtures to confirm the exact payload types they send, and set limits that accept all of them; **Set each cap at no less than 2× the maximum value found in production** (`max_*` keys from Step 1's snapshot; a PUT resends stored fields, so a cap below existing data would make editing that row return 400) — if the snapshot isn't available, omit the length/range caps and keep only type checks; unknown extra fields stay tolerated (don't switch to strict-reject on PUT/POST, to avoid breaking any client). Return 400 with `{error: '<field> is invalid'}`. Add `app.setErrorHandler`: for errors with `statusCode < 500` pass through Fastify's message; for everything else log with `req.log.error({err})` and reply `500 {error: 'Internal server error'}` (no stack, no raw SQLite text). Public routes keep current behavior.
 
 **Acceptance criteria:**
-- [ ] `POST /admin/seasons` without `title` → 400 (was 500); `number: "x"` → 400 (was 201).
-- [ ] `PATCH /admin/settings {accent_color:'red;}body{x'}` → 400; `#5a3ef5` → 200.
-- [ ] Rate-limit 429, multipart 413 and malformed-JSON 400 responses keep their current status codes and body shapes (test each; the error handler only rewrites non-4xx).
-- [ ] A forced internal error returns `{error:'Internal server error'}` with no stack/DB text (test via a route that throws).
-- [ ] Every existing server test and the whole e2e suite pass unchanged.
-- [ ] **Pre-merge manual check recorded in the PR:** the production `accent_color` from Step 1's snapshot matches `#rrggbb`; if it doesn't, stop and ask before shipping (otherwise saving Settings in prod would start returning 400).
+- [x] `POST /admin/seasons` without `title` → 400 (was 500); `number: "x"` → 400 (was 201).
+- [x] `PATCH /admin/settings {accent_color:'red;}body{x'}` → 400; `#5a3ef5` → 200.
+- [x] Rate-limit 429, multipart 413 and malformed-JSON 400 responses keep their current status codes and body shapes (test each; the error handler only rewrites non-4xx).
+- [x] A forced internal error returns `{error:'Internal server error'}` with no stack/DB text (test via a route that throws).
+- [x] Every existing server test and the whole e2e suite pass unchanged.
+- [x] **Pre-merge manual check recorded in the PR:** the production `accent_color` from Step 1's snapshot matches `#rrggbb`; if it doesn't, stop and ask before shipping (otherwise saving Settings in prod would start returning 400).
 
 ---
 
@@ -261,10 +261,10 @@ Add to `utils/validation.ts`: `isNonEmptyString(v, max): v is string`, `isIntege
 Test first: a buffer with SVG/GIF/BMP/TIFF content named `x.png` (mimetype `image/png`) → 400 before `sharp` is invoked; real JPEG/PNG/WebP fixtures (`e2e/fixtures/test-cover.jpg` etc.) still succeed with the same `{thumb, detail}` shape; an audio upload whose stream errors mid-way leaves **no** file in `data/uploads`. Add `matchesImageSignature(head: Buffer, ext: string): boolean` (JPEG `FF D8 FF`; PNG `89 50 4E 47 0D 0A 1A 0A`; WebP `RIFF....WEBP`) next to the existing audio/favicon matchers and call it on `buffer.subarray(0, 12)` before `sharp`. Construct sharp with `{ limitInputPixels: 50_000_000 }` for the metadata and both resizes (leave `failOn` at its default, which is already the strictest, `'warning'`). In `upload.ts` and `upload-favicon.ts`, wrap `pipeline(...)` in try/catch that `fs.promises.unlink(dest)` (ignore ENOENT) then rethrows. **Do not** change duration detection or which audio extensions are allowed (webm uploads must keep working).
 
 **Acceptance criteria:**
-- [ ] Spoofed-extension SVG/GIF is rejected with 400 (test).
-- [ ] Existing cover-art, favicon, audio-range and duration tests pass; e2e upload tests pass.
-- [ ] Aborted/failed upload leaves no orphan file (test).
-- [ ] A 4000×4000 JPEG (16 MP) still uploads successfully (test with generated image via sharp).
+- [x] Spoofed-extension SVG/GIF is rejected with 400 (test).
+- [x] Existing cover-art, favicon, audio-range and duration tests pass; e2e upload tests pass.
+- [x] Aborted/failed upload leaves no orphan file (test).
+- [x] A 4000×4000 JPEG (16 MP) still uploads successfully (test with generated image via sharp).
 
 ---
 
@@ -278,11 +278,11 @@ Test first: a buffer with SVG/GIF/BMP/TIFF content named `x.png` (mimetype `imag
 (c) Wiring (gotcha 37b): document in `.env.example`/README; add `DEPLOY_EVENTS_RETENTION_DAYS: ${{ vars.EVENTS_RETENTION_DAYS }}` to the deploy `env:` and `envs:` lists and `-e EVENTS_RETENTION_DAYS="$DEPLOY_EVENTS_RETENTION_DAYS"` to `run_app`. An unset GitHub variable renders as empty → disabled. Leave the variable **unset**; enabling is the maintainer's MANUAL decision.
 
 **Acceptance criteria:**
-- [ ] `parseRetentionDays` returns null for `undefined`, `''`, `'abc'`, `'7'`; returns 90 for `'90'` (test).
-- [ ] `pruneEvents` deletes only rows older than the cutoff and keeps newer ones (test with seeded events; also verifies orphan-safe — no FK errors).
-- [ ] With the env var unset, `server.ts` registers no interval (verified by reading the code path + a unit test of the decision function).
-- [ ] Events above the global cap return 204 and are not inserted; the first 1200 in a minute are (test with a lowered cap via a module constant override).
-- [ ] The `deploy` job passes the variable by the `env:`/`envs:` convention, no `${{ }}` in script text.
+- [x] `parseRetentionDays` returns null for `undefined`, `''`, `'abc'`, `'7'`; returns 90 for `'90'` (test).
+- [x] `pruneEvents` deletes only rows older than the cutoff and keeps newer ones (test with seeded events; also verifies orphan-safe — no FK errors).
+- [x] With the env var unset, `server.ts` registers no interval (verified by reading the code path + a unit test of the decision function).
+- [x] Events above the global cap return 204 and are not inserted; the first 1200 in a minute are (test with a lowered cap via a module constant override).
+- [x] The `deploy` job passes the variable by the `env:`/`envs:` convention, no `${{ }}` in script text.
 
 ---
 
@@ -295,9 +295,9 @@ Add `--cap-drop ALL` and `--security-opt no-new-privileges:true` to `run_app` (S
 
 **Acceptance criteria:**
 - [ ] The e2e job's container uses the same cap/no-new-privileges flags as production and the full e2e suite passes with them (CI run on the promotion PR).
-- [ ] Container still writes to `/app/data` as uid 1000 and binds :3000 (health check passes in e2e).
-- [ ] An empty `PUBLIC_ORIGIN` leaves OG behavior unchanged (existing crawler tests pass; add a test that `resolveConfiguredOrigin('')` is null if absent).
-- [ ] No `${{ }}` spliced into script text.
+- [x] Container still writes to `/app/data` as uid 1000 and binds :3000 (health check passes in e2e).
+- [x] An empty `PUBLIC_ORIGIN` leaves OG behavior unchanged (existing crawler tests pass; add a test that `resolveConfiguredOrigin('')` is null if absent).
+- [x] No `${{ }}` spliced into script text.
 
 ---
 
@@ -313,10 +313,10 @@ Add `--cap-drop ALL` and `--security-opt no-new-privileges:true` to `run_app` (S
 - SECURITY.md: add one line that fixes ship through the `dev`→`main` flow.
 
 **Acceptance criteria:**
-- [ ] `docs/runbooks/caddy-tls.md` has the manual apply + verify + warning steps.
-- [ ] `make setup` still generates a working `.env` (hash verifies via an existing login test or manual `make setup`).
-- [ ] CLAUDE.md gotchas match shipped behavior (no stale DELETE+INSERT or global-lockout text).
-- [ ] No production-affecting file other than the template changed in this step.
+- [x] `docs/runbooks/caddy-tls.md` has the manual apply + verify + warning steps.
+- [x] `make setup` still generates a working `.env` (hash verifies via an existing login test or manual `make setup`).
+- [x] CLAUDE.md gotchas match shipped behavior (no stale DELETE+INSERT or global-lockout text).
+- [x] No production-affecting file other than the template changed in this step.
 
 ## Testing
 

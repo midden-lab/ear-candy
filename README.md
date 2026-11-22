@@ -22,9 +22,11 @@ A self-hostable podcast webapp. Each deployment hosts a single podcast. Listener
 ### Quickest path: Makefile
 
 ```bash
-make setup PASSWORD=yourpassword   # generates .env (bcrypt hash + cookie secret), Docker-only, no local Node needed
-make up                            # docker compose up --build
+PASSWORD='a-long-passphrase-16+-chars' make setup   # generates .env (bcrypt hash + cookie secret), Docker-only, no local Node needed
+make up                                              # docker compose up --build
 ```
+
+**Choose a strong admin password — at least 16 characters** (a passphrase of several random words is ideal). It is the only thing between the internet and full control of the site: there is no second factor and no in-app "change password" flow (changing it means regenerating the hash and redeploying). The login endpoint locks an IP out after 10 failed attempts, but that and bcrypt's cost only slow a guesser down — a long password is what actually stops one. `make setup` warns (but doesn't refuse) below 16 characters, never prints the password, and hashes it at bcrypt cost 12. To keep it out of your shell history, use `read -rs PASSWORD && export PASSWORD && make setup`.
 
 Run `make help` for the full list of shortcuts (`test`, `lint`, `e2e`, `e2e-ui`, `build-prod`, `up-prod`, ...).
 
@@ -42,7 +44,7 @@ bcrypt.hash('your-password', 12).then(h => console.log(h));
 "
 ```
 
-Or use the helper script (requires Node + bcrypt installed locally):
+Use a password of at least 16 characters. Or use the helper script (requires Node + bcrypt installed locally):
 
 ```bash
 ./scripts/hash-password.sh your-password
@@ -88,7 +90,7 @@ The live production deployment (via GitHub Actions, see `.github/workflows/ci-cd
 
 | Variable | Description |
 |----------|-------------|
-| `ADMIN_PASSWORD_HASH` | bcrypt hash of the admin password (rounds ≥ 10 recommended) |
+| `ADMIN_PASSWORD_HASH` | bcrypt hash of the admin password (cost 12 recommended — what `make setup` and `scripts/hash-password.sh` use; existing lower-cost hashes keep working). Use a password of at least 16 characters. |
 | `COOKIE_SECRET` | Secret used to sign session cookies — use a long random string |
 
 Both are required; the server will refuse to start in production if either is missing.
@@ -97,8 +99,9 @@ Both are required; the server will refuse to start in production if either is mi
 
 | Variable | Description |
 |----------|-------------|
-| `PUBLIC_ORIGIN` | Pins the origin (`scheme://host[:port]`, no trailing slash) used in Open Graph preview tags served to link-preview crawlers, instead of trusting the request's `Host` header. Fine to leave unset for most deployments. |
+| `PUBLIC_ORIGIN` | Pins the origin (`scheme://host[:port]`, no trailing slash) used in Open Graph preview tags served to link-preview crawlers, instead of trusting the request's `Host` header. Fine to leave unset for most deployments, but note that **while it's unset the preview origin is whatever `Host` the request carries** — an attacker can reflect their own hostname into `og:url` (low severity, HTML-escaped metadata only). A value that isn't a bare `scheme://host[:port]` (e.g. one with a path) is ignored and falls back silently, so double-check what you set. With this repo's `ci-cd.yml`, set it as the GitHub repository *variable* `PUBLIC_ORIGIN`; leaving the variable unset keeps the fallback. |
 | `TRUSTED_PROXY_IPS` | Comma-separated IPs Fastify trusts to set `X-Forwarded-For` (your reverse proxy's address, as seen from inside the app's own network namespace). Defaults to loopback only (`127.0.0.1,::1`). If your reverse proxy runs on the host while the app runs in a container, this is likely your Docker bridge gateway address, not loopback — check with `docker network inspect bridge`. |
+| `EVENTS_RETENTION_DAYS` | Optional, **off by default**. Keep analytics events for this many days and permanently delete older ones (at startup, then every 24 hours). Must be a whole number of at least 30; anything else — including unset or empty — means nothing is ever deleted. Only the analytics `events` table is affected. Deletion can't be undone, so older history survives only in your database backups. With this repo's `ci-cd.yml`, set it as the GitHub repository *variable* `EVENTS_RETENTION_DAYS`. |
 | `GEOIP_DB_PATH` | Path to a local `.mmdb` GeoIP country database, used to resolve listener country for the analytics dashboard's geography breakdown. Optional — analytics work fully without it, the country breakdown is just empty until it's set. Run `scripts/fetch-geoip-db.sh [path]` to download a free, no-signup-required database (DB-IP's "IP to Country Lite", CC BY 4.0 — attribute DB-IP.com wherever the country data is shown). Re-run that script periodically (roughly monthly) to keep the database current; nothing does this automatically. |
 
 ### Data persistence

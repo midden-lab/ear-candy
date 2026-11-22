@@ -1,10 +1,27 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Season, Episode } from '../../types.js'
 import { requireAdmin } from '../../auth.js'
-import { isValidMediaPath } from '../../utils/validation.js'
+import {
+  isValidMediaPath, isNonEmptyString, isStringWithin, isIntegerInRange, firstInvalid,
+  MAX_TITLE_LENGTH, MAX_TEXT_LENGTH, MIN_NUMBER, MAX_NUMBER,
+  type FieldCheck,
+} from '../../utils/validation.js'
 import { deleteLocalMediaFile } from '../../utils/mediaFiles.js'
 
 const ALLOWED_SEASON_PATCH_FIELDS = new Set(['number', 'title', 'description', 'cover_art_path', 'hidden'])
+
+// Shape/size validation shared by POST, PUT and PATCH. For PATCH (`partial`)
+// only fields actually present are checked. Returns the first bad field's
+// name, or null. A blank-but-string title keeps its existing, more specific
+// 'title is required' message (handled by the callers).
+function invalidSeasonField(b: Record<string, unknown>, partial: boolean): string | null {
+  const checks: FieldCheck[] = []
+  const want = (k: string) => !partial || b[k] !== undefined
+  if (want('title')) checks.push(['title', isNonEmptyString(b.title, MAX_TITLE_LENGTH)])
+  if (want('number')) checks.push(['number', isIntegerInRange(b.number, MIN_NUMBER, MAX_NUMBER)])
+  if (b.description !== undefined) checks.push(['description', isStringWithin(b.description, MAX_TEXT_LENGTH)])
+  return firstInvalid(checks)
+}
 
 export const adminSeasonsRoute: FastifyPluginAsync = async (app) => {
   app.post<{
@@ -15,8 +32,11 @@ export const adminSeasonsRoute: FastifyPluginAsync = async (app) => {
       hidden?: boolean
     }
   }>('/admin/seasons', { preHandler: requireAdmin }, async (req, reply) => {
+    const body = (req.body ?? {}) as Record<string, unknown>
+    if (typeof body.title === 'string' && !body.title.trim()) return reply.status(400).send({ error: 'title is required' })
+    const bad = invalidSeasonField(body, false)
+    if (bad) return reply.status(400).send({ error: `${bad} is invalid` })
     const { number, title, description = '', hidden = false } = req.body
-    if (!title.trim()) return reply.status(400).send({ error: 'title is required' })
     const result = app.db.prepare(`
       INSERT INTO seasons (number, title, description, hidden)
       VALUES (?, ?, ?, ?)
@@ -36,8 +56,11 @@ export const adminSeasonsRoute: FastifyPluginAsync = async (app) => {
     }
   }>('/admin/seasons/:id', { preHandler: requireAdmin }, async (req, reply) => {
     const id = parseInt(req.params.id, 10)
+    const body = (req.body ?? {}) as Record<string, unknown>
+    if (typeof body.title === 'string' && !body.title.trim()) return reply.status(400).send({ error: 'title is required' })
+    const bad = invalidSeasonField(body, false)
+    if (bad) return reply.status(400).send({ error: `${bad} is invalid` })
     const { number, title, description = '', cover_art_path = null, hidden = false } = req.body
-    if (!title.trim()) return reply.status(400).send({ error: 'title is required' })
     if (cover_art_path && !isValidMediaPath(cover_art_path)) {
       return reply.status(400).send({ error: 'Invalid cover_art_path' })
     }
@@ -61,16 +84,18 @@ export const adminSeasonsRoute: FastifyPluginAsync = async (app) => {
     }>
   }>('/admin/seasons/:id', { preHandler: requireAdmin }, async (req, reply) => {
     const id = parseInt(req.params.id, 10)
-    const updates = req.body
+    const updates = req.body ?? {}
     const fields = Object.keys(updates) as Array<keyof typeof updates>
 
     const invalidFields = fields.filter(f => !ALLOWED_SEASON_PATCH_FIELDS.has(f))
     if (invalidFields.length > 0) {
       return reply.status(400).send({ error: `Invalid field(s): ${invalidFields.join(', ')}` })
     }
-    if (updates.title !== undefined && !updates.title.trim()) {
+    if (typeof updates.title === 'string' && !updates.title.trim()) {
       return reply.status(400).send({ error: 'title is required' })
     }
+    const bad = invalidSeasonField(updates as Record<string, unknown>, true)
+    if (bad) return reply.status(400).send({ error: `${bad} is invalid` })
     if (updates.cover_art_path && !isValidMediaPath(updates.cover_art_path)) {
       return reply.status(400).send({ error: 'Invalid cover_art_path' })
     }

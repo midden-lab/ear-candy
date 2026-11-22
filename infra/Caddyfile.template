@@ -1,3 +1,12 @@
 __DOMAIN__ {
+  # HSTS (security audit L3): tells browsers to use HTTPS only for this host
+  # for a year. Deliberately NO includeSubDomains and NO preload: the scope
+  # stays this one hostname, and preload (a browser-vendor list that is very
+  # hard to leave) is never implied. Browsers that have seen this header
+  # cannot be quickly un-told — read docs/runbooks/caddy-tls.md ("Enabling
+  # HSTS") before applying it to a live host. This template is only consumed
+  # by scripts/setup-droplet.sh, so editing it changes nothing on an existing
+  # Droplet until the live /etc/caddy/Caddyfile is edited by hand.
+  header Strict-Transport-Security "max-age=31536000"
   reverse_proxy localhost:3000
 }

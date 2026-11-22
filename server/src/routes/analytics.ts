@@ -16,6 +16,16 @@ const MAX_SESSION_ID_LENGTH = 128
 // string (the client itself is already fixed to send origin-only).
 const MAX_REFERRER_LENGTH = 200
 
+// Global ceiling on INSERTS per minute across all callers (security audit
+// M5). The per-IP limit on the route (120/min) does nothing against a
+// distributed flood, and the events table shares a volume with the database
+// and uploads, so unbounded growth means a full disk and a down site. 1200/
+// min is 20/s — far above real traffic for a single podcast (the whole
+// production table holds a few hundred events) — yet still bounds worst-case
+// growth to a known rate. A mutable object, not a bare const, so tests can
+// lower it: the real value is unreachable through the per-IP limit alone.
+export const analyticsLimits = { globalMaxEventsPerMinute: 1200 }
+
 interface AnalyticsEventBody {
   event_type: AnalyticsEventType
   episode_id?: number
@@ -49,6 +59,10 @@ function isValidBody(body: unknown): body is AnalyticsEventBody {
 }
 
 export const analyticsRoute: FastifyPluginAsync = async (app) => {
+  // Per-app (not module-level) state, like the login counters, so every
+  // buildApp() — including each test's — gets its own fresh budget.
+  let capWindow = { minute: Math.floor(Date.now() / 60_000), inserts: 0, warned: false }
+
   app.post<{ Body: AnalyticsEventBody }>('/analytics/event', {
     // Small payload cap — this body is a handful of short fields, far
     // smaller than the 500MB default used for audio uploads elsewhere.
@@ -110,6 +124,22 @@ export const analyticsRoute: FastifyPluginAsync = async (app) => {
     if (duplicate) {
       return reply.status(204).send()
     }
+
+    // Global insert cap. Placed after every cheap drop path (so crawlers,
+    // excluded IPs, disabled analytics and duplicates never use up budget)
+    // and before the GeoIP lookup and the INSERT, so a flood is rejected as
+    // cheaply as possible. Still answers 204 — the response must never
+    // reveal what the server decided.
+    const minute = Math.floor(Date.now() / 60_000)
+    if (minute !== capWindow.minute) capWindow = { minute, inserts: 0, warned: false }
+    if (capWindow.inserts >= analyticsLimits.globalMaxEventsPerMinute) {
+      if (!capWindow.warned) {
+        capWindow.warned = true
+        req.log.warn({ event: 'analytics_global_cap', limit: analyticsLimits.globalMaxEventsPerMinute }, 'analytics global insert cap reached; dropping events until the next minute')
+      }
+      return reply.status(204).send()
+    }
+    capWindow.inserts += 1
 
     const country = await resolveCountry(req.ip)
     const { deviceType, os, browser } = parseUserAgent(req.headers['user-agent'])

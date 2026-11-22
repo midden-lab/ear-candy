@@ -15,3 +15,7 @@ helping keep it and its self-hosted deployments safe.
 This project does not currently maintain multiple released versions —
 security fixes are applied to the latest commit on `main` only. If you're
 running an older deployment, update to the latest release.
+
+Security fixes ship through the same `dev` → `main` promotion flow as every
+other change (a reviewed pull request; merging to `main` deploys) — there is no
+separate hotfix channel.

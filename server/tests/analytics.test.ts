@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { buildTestApp } from './helpers.js'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { buildTestApp, buildTestAppWithLogCapture } from './helpers.js'
+import { analyticsLimits } from '../src/routes/analytics.js'
 import { __resetGeoipCacheForTests } from '../src/utils/geoip.js'
 
 function seedEpisode(app: ReturnType<typeof buildTestApp>) {
@@ -328,5 +329,90 @@ describe('POST /api/analytics/event', () => {
       payload: { event_type: 'page_view', session_id: 'sess-over-limit' },
     })
     expect(limited.statusCode).toBe(429)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Security audit M5 (plan 020 step 9): a global ceiling on analytics INSERTS.
+// The per-IP limit (120/min) does nothing against a distributed flood, and
+// the events table shares a volume with the database and uploads.
+// ---------------------------------------------------------------------------
+describe('POST /api/analytics/event — global insert cap', () => {
+  afterEach(() => {
+    analyticsLimits.globalMaxEventsPerMinute = 1200
+    vi.useRealTimers()
+  })
+
+  const send = (app: ReturnType<typeof buildTestApp>, session_id: string, ua = REAL_UA, payload: object = {}) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/analytics/event',
+      headers: { 'user-agent': ua },
+      payload: { event_type: 'page_view', session_id, ...payload },
+    })
+
+  it('defaults to 1200 inserts per minute', () => {
+    expect(analyticsLimits.globalMaxEventsPerMinute).toBe(1200)
+  })
+
+  it('stops inserting once the cap is hit, but still answers 204 so the contract is unchanged', async () => {
+    analyticsLimits.globalMaxEventsPerMinute = 5
+    const app = buildTestApp()
+
+    for (let i = 0; i < 8; i++) {
+      const res = await send(app, `cap-${i}`)
+      expect(res.statusCode, `request ${i}`).toBe(204)
+    }
+    expect(countEvents(app)).toBe(5)
+  })
+
+  it('logs exactly one warn per minute-window, not one per dropped event', async () => {
+    analyticsLimits.globalMaxEventsPerMinute = 3
+    const { app, logs } = buildTestAppWithLogCapture()
+
+    for (let i = 0; i < 10; i++) await send(app, `warn-${i}`)
+
+    const warns = logs.filter(l => l.event === 'analytics_global_cap')
+    expect(warns).toHaveLength(1)
+    expect(warns[0].level).toBe(40)
+  })
+
+  it('the budget resets in the next minute (and warns again if it is exceeded again)', async () => {
+    analyticsLimits.globalMaxEventsPerMinute = 2
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const { app, logs } = buildTestAppWithLogCapture()
+
+    for (let i = 0; i < 4; i++) await send(app, `w1-${i}`)
+    expect(countEvents(app)).toBe(2)
+
+    vi.setSystemTime(Date.now() + 61_000)
+    for (let i = 0; i < 4; i++) await send(app, `w2-${i}`)
+    expect(countEvents(app)).toBe(4)
+    expect(logs.filter(l => l.event === 'analytics_global_cap')).toHaveLength(2)
+  })
+
+  it('only real inserts use up the budget: crawler and duplicate drops do not', async () => {
+    analyticsLimits.globalMaxEventsPerMinute = 3
+    const app = buildTestApp()
+
+    for (let i = 0; i < 10; i++) await send(app, `crawler-${i}`, KNOWN_CRAWLER_UA) // dropped, not inserted
+    await send(app, 'dup'); await send(app, 'dup'); await send(app, 'dup')          // 1 insert, 2 deduped
+    expect(countEvents(app)).toBe(1)
+
+    await send(app, 'real-a'); await send(app, 'real-b')                              // budget: 1+2 = 3
+    await send(app, 'real-c')                                                          // over the cap
+    expect(countEvents(app)).toBe(3)
+  })
+
+  it('still answers 400 for a malformed payload when the cap is exhausted (validation precedes the cap)', async () => {
+    analyticsLimits.globalMaxEventsPerMinute = 1
+    const app = buildTestApp()
+    await send(app, 'one'); await send(app, 'two') // second is over the cap
+
+    const bad = await app.inject({
+      method: 'POST', url: '/api/analytics/event',
+      headers: { 'user-agent': REAL_UA }, payload: { event_type: 'bogus', session_id: 'x' },
+    })
+    expect(bad.statusCode).toBe(400)
   })
 })

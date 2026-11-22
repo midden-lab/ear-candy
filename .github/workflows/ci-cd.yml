@@ -222,8 +222,13 @@ jobs:
           COOKIE_SECRET: ${{ steps.creds.outputs.cookie_secret }}
           ADMIN_PASSWORD_HASH: ${{ steps.creds.outputs.admin_password_hash }}
         run: |
+          # Same hardening flags as the production `run_app` below, so the
+          # full e2e suite runs against exactly what will be deployed —
+          # before any deploy, since `deploy` needs this job (security audit M6).
           docker run -d \
             --name ear-candy-test \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
             -p 3000:3000 \
             -e NODE_ENV=production \
             -e SERVE_CLIENT=true \
@@ -309,6 +314,18 @@ jobs:
           DEPLOY_GHCR_ACTOR: ${{ github.actor }}
           DEPLOY_COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
           DEPLOY_ADMIN_PASSWORD_HASH: ${{ secrets.ADMIN_PASSWORD_HASH }}
+          # A repository *variable*, not a secret, and deliberately left
+          # unset: an unset variable renders as an empty string, which the
+          # app treats as "retention disabled" (nothing is ever deleted).
+          # Enabling it is a manual decision (README: EVENTS_RETENTION_DAYS).
+          DEPLOY_EVENTS_RETENTION_DAYS: ${{ vars.EVENTS_RETENTION_DAYS }}
+          # Also a repository *variable*. Left unset it renders empty, which
+          # the app treats as "not configured" and falls back to the
+          # request's own Host header for og:url/og:image (security audit
+          # L2). Setting it to your public origin (e.g. https://podcast.
+          # example.com, no trailing slash or path) is what actually closes
+          # that — plumbing an empty value changes nothing by itself.
+          DEPLOY_PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN }}
         with:
           host: ${{ secrets.DROPLET_IP }}
           username: root
@@ -319,7 +336,7 @@ jobs:
           # script text via ${{ }}. Splicing would make any value containing
           # shell metacharacters execute as literal script on a job that
           # holds root SSH access to production (issue #31).
-          envs: DEPLOY_REGISTRY,DEPLOY_IMAGE_NAME,DEPLOY_IMAGE_DIGEST,DEPLOY_GHCR_PAT,DEPLOY_GHCR_ACTOR,DEPLOY_COOKIE_SECRET,DEPLOY_ADMIN_PASSWORD_HASH
+          envs: DEPLOY_REGISTRY,DEPLOY_IMAGE_NAME,DEPLOY_IMAGE_DIGEST,DEPLOY_GHCR_PAT,DEPLOY_GHCR_ACTOR,DEPLOY_COOKIE_SECRET,DEPLOY_ADMIN_PASSWORD_HASH,DEPLOY_EVENTS_RETENTION_DAYS,DEPLOY_PUBLIC_ORIGIN
           script: |
             set -e
             if [ -z "$DEPLOY_IMAGE_DIGEST" ]; then
@@ -360,6 +377,17 @@ jobs:
 
             # Same flags for the new container and a rollback container, so
             # a rollback is genuinely "the way it was", not a near-miss.
+            # Container hardening (security audit M6): drop every Linux
+            # capability and forbid privilege gain via setuid binaries. The
+            # app runs as uid 1000, binds an unprivileged port and needs no
+            # capability (verified against the production image: login,
+            # uploads, sharp, SQLite WAL, range requests all work). Kept in an
+            # ARRAY so the rollback below can retry without it: if these flags
+            # ever turned out to be the reason a release is unhealthy, a
+            # rollback that reused them would fail the same way and leave no
+            # working container at all.
+            HARDEN=(--cap-drop ALL --security-opt no-new-privileges:true)
+
             run_app() {
               # TRUSTED_PROXY_IPS: 172.17.0.1 is this Droplet's default Docker
               # bridge gateway — Caddy runs on the host and reverse-proxies to
@@ -396,6 +424,7 @@ jobs:
               docker run -d \
                 --name ear-candy \
                 --restart unless-stopped \
+                "${HARDEN[@]}" \
                 --log-driver json-file \
                 --log-opt max-size=10m \
                 --log-opt max-file=3 \
@@ -408,6 +437,8 @@ jobs:
                 -e ADMIN_PASSWORD_HASH="$DEPLOY_ADMIN_PASSWORD_HASH" \
                 -e TRUSTED_PROXY_IPS="127.0.0.1,::1,172.17.0.1" \
                 -e GEOIP_DB_PATH="/app/data/geoip/dbip-country-lite.mmdb" \
+                -e EVENTS_RETENTION_DAYS="$DEPLOY_EVENTS_RETENTION_DAYS" \
+                -e PUBLIC_ORIGIN="$DEPLOY_PUBLIC_ORIGIN" \
                 "$1"
             }
 
@@ -473,11 +504,23 @@ jobs:
             # aborting the script with no container running).
             if run_app "$IMAGE" && wait_healthy; then
               echo "App is healthy"
-              # Pruned only now, after the new image is proven healthy: the
-              # replaced image is untagged/dangling once its container is
-              # gone, and rollback needs it still present.
-              echo "Pruning dangling images..."
-              docker image prune -f || true
+              # Pruned only now, after the new image is proven healthy,
+              # because the automatic rollback above needs the previous
+              # image still present until then.
+              #
+              # `-a` is required. This deploy pulls by digest, and a
+              # digest-pulled image has a repository name but no tag, which
+              # Docker does NOT count as "dangling" — so the plain
+              # `docker image prune -f` that used to be here removed nothing,
+              # and ~450MB per deploy piled up (74 images / ~7GB on the
+              # Droplet, taking the disk to 86% full, until cleaned by hand
+              # on 2026-11-22). `-a` removes every image no container is
+              # using — never the running one. `until=72h` (image build time)
+              # keeps the last few days of releases so a manual rollback to
+              # the previous one doesn't have to re-pull from GHCR, while
+              # still bounding growth.
+              echo "Pruning unused images older than 72h..."
+              docker image prune -a -f --filter "until=72h" || true
               exit 0
             fi
 
@@ -485,11 +528,21 @@ jobs:
             if [ -n "$PREV_IMAGE" ]; then
               echo "Rolling back to $PREV_IMAGE ..."
               docker rm -f ear-candy || true
-              run_app "$PREV_IMAGE"
-              if wait_healthy; then
+              if run_app "$PREV_IMAGE" && wait_healthy; then
                 echo "ROLLED BACK to $PREV_IMAGE"
               else
-                echo "Rollback container did not become healthy either — manual intervention needed (docs/runbooks/security-rollout.md)" >&2
+                # Last resort: the previous image, same hardening as the
+                # release that just failed, is ALSO unhealthy — so the
+                # hardening flags themselves may be the cause. Try once more
+                # without them, the way this image ran before they existed.
+                echo "Rollback with hardening flags did not become healthy — retrying WITHOUT them" >&2
+                docker rm -f ear-candy || true
+                HARDEN=()
+                if run_app "$PREV_IMAGE" && wait_healthy; then
+                  echo "ROLLED BACK to $PREV_IMAGE WITHOUT hardening flags — the hardening flags are the likely cause; investigate before re-promoting (docs/runbooks/security-rollout.md)"
+                else
+                  echo "Rollback container did not become healthy either — manual intervention needed (docs/runbooks/security-rollout.md)" >&2
+                fi
               fi
             fi
             # Always fail, even after a successful rollback, so the job (and
