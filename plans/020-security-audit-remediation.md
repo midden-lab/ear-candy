@@ -4,7 +4,7 @@ title: "Security Audit 2026-11 — Prioritized Findings & Zero-Regression Remedi
 status: in-progress
 priority: 1
 created: 2026-11-15
-steps_completed: 9
+steps_completed: 10
 steps_total: 11
 tags: [security, hardening, red-team, deploy-safety, dependencies]
 ---
@@ -295,9 +295,9 @@ Add `--cap-drop ALL` and `--security-opt no-new-privileges:true` to `run_app` (S
 
 **Acceptance criteria:**
 - [ ] The e2e job's container uses the same cap/no-new-privileges flags as production and the full e2e suite passes with them (CI run on the promotion PR).
-- [ ] Container still writes to `/app/data` as uid 1000 and binds :3000 (health check passes in e2e).
-- [ ] An empty `PUBLIC_ORIGIN` leaves OG behavior unchanged (existing crawler tests pass; add a test that `resolveConfiguredOrigin('')` is null if absent).
-- [ ] No `${{ }}` spliced into script text.
+- [x] Container still writes to `/app/data` as uid 1000 and binds :3000 (health check passes in e2e).
+- [x] An empty `PUBLIC_ORIGIN` leaves OG behavior unchanged (existing crawler tests pass; add a test that `resolveConfiguredOrigin('')` is null if absent).
+- [x] No `${{ }}` spliced into script text.
 
 ---
 

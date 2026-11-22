@@ -37,7 +37,22 @@ All commands run on the Droplet (`ssh root@<droplet>`) unless noted.
    episode's `audio_path` from `https://<domain>/api/episodes` and run
    `curl -s -o /dev/null -w '%{http_code} %{size_download}\n' -H 'Range: bytes=0-1023' https://<domain><audio_path>`.
    Expect `206 1024`.
-4. Smoke test in a browser: load the public site, play one episode, log into
+4. Confirm the container hardening is actually in effect (a flag in the
+   repo is not proof of what the running container got — see CLAUDE.md gotcha
+   37b). On the Droplet:
+   `docker inspect ear-candy --format 'CapDrop={{.HostConfig.CapDrop}} SecurityOpt={{.HostConfig.SecurityOpt}}'`
+   expects `CapDrop=[ALL] SecurityOpt=[no-new-privileges:true]`, and
+   `docker exec ear-candy sh -c 'id -u; grep -E "^(CapEff|NoNewPrivs):" /proc/1/status'`
+   expects `1000`, `CapEff: 0000000000000000` and `NoNewPrivs: 1`. If the
+   deploy log says `ROLLED BACK ... WITHOUT hardening flags`, the flags were
+   the problem: that container is running unhardened on purpose, to stay up.
+5. Only once the repository variable `PUBLIC_ORIGIN` has been set (it is
+   deliberately unset by default, so Open Graph tags follow the request's
+   `Host` header): on the Droplet, with a real episode id,
+   `curl -s -A facebookexternalhit -H 'Host: attacker.example' 'http://localhost:3000/?episode=<id>' | grep -o 'og:url" content="[^"]*"'`
+   must show your pinned origin, not `attacker.example`. A value with a path
+   or other typo is silently ignored and would still show the attacker host.
+6. Smoke test in a browser: load the public site, play one episode, log into
    admin, open Settings and Analytics.
 
 ## 3. Rollback
@@ -49,6 +64,12 @@ container fails its health check, the job removes it, starts the previous
 image with identical flags, waits for health, prints `ROLLED BACK to <image>`,
 and **still exits non-zero** so the pipeline stays red. The previous image is
 not pruned until the new one is healthy.
+
+If the rollback with the hardening flags is also unhealthy, the job retries
+once more **without** `--cap-drop`/`--security-opt` (a rollback that reused
+flags which turned out to be the cause would otherwise leave nothing running).
+That run still exits non-zero so the pipeline stays red, and its message says
+`ROLLED BACK ... WITHOUT hardening flags`.
 
 ### Restore the database from a pre-deploy backup
 

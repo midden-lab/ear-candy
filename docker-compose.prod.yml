@@ -4,6 +4,13 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    # Container hardening — mirrors the deploy job's `run_app` flags in
+    # ci-cd.yml (security audit M6). The app runs as uid 1000, binds an
+    # unprivileged port and needs no Linux capability.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     # Loopback-only — mirrors the deploy job's binding in ci-cd.yml
     # (issue #81). A reverse proxy on the same host reaches this via
     # localhost; publishing to all interfaces bypassed TLS termination
@@ -28,6 +35,10 @@ services:
       # are ever deleted. A whole number >= 30 keeps that many days and
       # permanently deletes older events (see README).
       - EVENTS_RETENTION_DAYS=${EVENTS_RETENTION_DAYS:-}
+      # Optional. Pins the origin used in Open Graph tags instead of trusting
+      # the request's Host header; empty/unset falls back to the Host header.
+      # scheme://host[:port], no trailing slash or path (see README).
+      - PUBLIC_ORIGIN=${PUBLIC_ORIGIN:-}
     logging:
       driver: json-file
       options:
