@@ -119,9 +119,17 @@ copy it in as `db.sqlite`, `chown -R 1000:1000 /opt/ear-candy/data`, start). For
 uploads: stop the container, extract the tarball with
 `tar xzf uploads_<ts>.tar.gz -C /opt/ear-candy/data`, `chown -R 1000:1000`, start.
 
-## Disk usage (2026-11-23: 56% of 24 GB)
+## Disk usage (2026-11-23: 55% of 24 GB)
 
-~4.6 GB live uploads + ~4.5 GB uploads tarball + ~0.4 GB `backups/audio-192k`
-(a leftover from the earlier audio-downsampling work) + ~2.2 GB OS + ~0.6 GB
-Docker images. The tarball temporarily needs about its own size in free space on
-Sundays (guarded by `backup.sh`). Stable, not growing, except as episodes are added.
+~4.6 GB live uploads + ~4.5 GB uploads tarball + ~2.2 GB OS + ~0.6 GB Docker images.
+The tarball temporarily needs about its own size in free space on Sundays (guarded by
+`backup.sh`). Stable, not growing, except as episodes are added.
+
+**Pre-downsample originals.** Episodes 96-100 were downsampled in place on 2026-08-06
+(about 85 MB originals became about 56 MB). The originals had been left in
+`/opt/ear-candy/backups/audio-192k/` on the Droplet, and were the only copy anywhere (the
+tarballs and off-host copies hold the downsampled files). On 2026-11-23 they were copied to
+`~/ear-candy-backups/audio-originals-192k/` on the home-lab machine (SHA-256 verified,
+`SHA256SUMS.droplet` beside them) and then deleted from the Droplet, freeing ~414 MB.
+That folder is outside `rolling/`, so the pull script never prunes it. Keep it unless you
+are sure the 192k versions are not wanted.
