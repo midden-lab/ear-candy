@@ -85,6 +85,14 @@ then repeat the step 6 checks. apt will keep offering the newer version; run
 
 ## Enabling HSTS (manual — and close to one-way)
 
+**Live status (2026-11-23): staged rollout in progress.** The live Caddyfile now has
+`header Strict-Transport-Security "max-age=86400"` (1 day), raised from 300 after
+manual checks passed (`/root/Caddyfile.pre-hsts` is the original, `/root/Caddyfile.hsts-300`
+the 5-minute version). **Remaining step: after a few days with no problems (not before
+~2026-11-27), raise it to `max-age=31536000`** (the value already in the template) using
+steps 3–5 below, then update this note. No `includeSubDomains`/`preload`; the apex
+`positivesexed.com` is on Wix and must stay unaffected.
+
 `infra/Caddyfile.template` now includes
 `header Strict-Transport-Security "max-age=31536000"` (one year, **no**
 `includeSubDomains`, **no** `preload`). That only affects a *fresh* Droplet

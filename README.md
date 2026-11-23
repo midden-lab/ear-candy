@@ -113,7 +113,7 @@ volumes:
   - ./data:/app/data
 ```
 
-Back up the `data/` directory to preserve all podcast content.
+Back up the `data/` directory to preserve all podcast content. On the production Droplet, nightly DB backups and a weekly uploads tarball are made by `/opt/ear-candy/backup.sh`, and `scripts/pull-offhost-backup.sh` pulls verified copies to a separate machine — see `docs/runbooks/droplet-host.md`.
 
 ---
 

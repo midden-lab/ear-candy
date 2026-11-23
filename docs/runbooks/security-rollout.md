@@ -20,7 +20,9 @@ All commands run on the Droplet (`ssh root@<droplet>`) unless noted.
    (copy the script to the Droplet first if it isn't there; it is read-only).
 5. Confirm every check on the promotion PR is green (`gh pr checks <n>`),
    including the production-image `e2e` job.
-6. Before Phase C only: pull a backup off-host (issues #1/#37) at least once.
+6. Confirm the off-host copy is fresh: `cat ~/ear-candy-backups/rolling/last-success`
+   on the home-lab machine, or run `~/ear-candy-backups/bin/pull-offhost-backup.sh`
+   (see `droplet-host.md`; this replaced the one-off manual pull from issues #1/#37).
 
 ## 2. After the deploy
 
