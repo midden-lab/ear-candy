@@ -1,14 +1,24 @@
 name: CI/CD
 
+# Docs/ops-only changes skip the whole pipeline (no code to validate, nothing built
+# into the image). Keep both lists identical; see CLAUDE.md (CI/CD).
 on:
   push:
     branches: [main, dev]
     paths-ignore:
       - '**.md'
+      - 'docs/**'
+      - 'plans/**'
+      - 'scripts/**'
+      - 'LICENSE'
   pull_request:
     branches: [main]
     paths-ignore:
       - '**.md'
+      - 'docs/**'
+      - 'plans/**'
+      - 'scripts/**'
+      - 'LICENSE'
 
 env:
   REGISTRY: ghcr.io
