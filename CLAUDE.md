@@ -142,7 +142,7 @@ This is convention, not a technical enforcement: GitHub branch protection rules 
 
 ## CI/CD
 
-`.github/workflows/ci-cd.yml` triggers on push to `main` or `dev`, and on PRs targeting `main`. Commits touching only `**.md` files (`paths-ignore`) skip the entire pipeline — no lint/test/build/e2e/deploy — since there's no code to validate. A commit mixing docs with code changes still runs everything normally (`paths-ignore` only skips when *every* changed file matches).
+`.github/workflows/ci-cd.yml` triggers on push to `main` or `dev`, and on PRs targeting `main`. Commits touching only documentation/ops paths (`paths-ignore`: `**.md`, `docs/**`, `plans/**`, `scripts/**`, `LICENSE`) skip the entire pipeline — no lint/test/build/e2e/deploy — since none of them is built into the image or run by CI (the `Dockerfile` copies only `client/` and `server/`; `scripts/` is run by hand on the Droplet or a dev machine). The list is written out twice (`push` and `pull_request`) rather than with a YAML anchor, to avoid depending on Actions' anchor support. **Don't add a path to it unless nothing in CI, the `Makefile` or the image uses it** — anything the pipeline reads (`e2e/`, `infra/` if CI ever consumes it, `.github/`) must stay out. A commit mixing docs with code changes still runs everything normally (`paths-ignore` only skips when *every* changed file matches).
 
 Jobs run in this order:
 
